@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
-#include <conio.h>
 
 #include "Scanner.h"
 #include "Enums.h"
