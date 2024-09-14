@@ -176,7 +176,26 @@ public:
 		}, nspace);
 		globals->Define("readlines", fileReadlinesLiteral, "global::file::");
 
-		
+		// file::writelines()
+		Literal fileWritelinesLiteral = Literal();
+		fileWritelinesLiteral.SetCallable(2, [](LiteralList args)->Literal
+		{
+			if (args[0].IsString() && args[1].IsVector() && args[1].IsVecString())
+			{
+				std::ofstream file(args[0].StringValue().c_str());
+				if (file.is_open())
+				{
+					std::vector<std::string> lines = args[1].VecValue_S();
+					for (auto& l : lines)
+					{
+						file << l << std::endl;
+					}
+					file.close();
+				}
+			}
+			return 0;
+		}, nspace);
+		globals->Define("writelines", fileWritelinesLiteral, "global::file::");
 		
 		///////////////////////
 
@@ -216,6 +235,18 @@ public:
 		}, nspace);
 		globals->Define("split", strSplitLiteral, "global::str::");
 
+		// str::join()
+		Literal strJoinLiteral = Literal();
+		strJoinLiteral.SetCallable(2, [](LiteralList args)->Literal
+		{
+			if (args[0].IsVector() && args[0].IsVecString() && args[1].IsString())
+			{
+				return StrJoin(args[0].VecValue_S(), args[1].StringValue());
+			}
+			return 0;
+		}, nspace);
+		globals->Define("join", strJoinLiteral, "global::str::");
+
 		// str::substr()
 		Literal strSubstrLiteral = Literal();
 		strSubstrLiteral.SetCallable(3, [](LiteralList args)->Literal
@@ -247,6 +278,62 @@ public:
 		}, nspace);
 		globals->Define("to_upper", strToUpperLiteral, "global::str::");
 
+		// str::to_lower()
+		Literal strToLowerLiteral = Literal();
+		strToLowerLiteral.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsString())
+			{
+				std::string input = args[0].StringValue();
+				std::transform(input.begin(), input.end(), input.begin(), ::tolower);
+				return input;
+			}
+			return 0;
+		}, nspace);
+		globals->Define("to_lower", strToLowerLiteral, "global::str::");
+
+		// str::ltrim()
+		Literal strLtrim = Literal();
+		strLtrim.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsString())
+			{
+				std::string input = args[0].StringValue();
+				input.erase(0, input.find_first_not_of(" \t\n\r\f\v"));
+				return input;
+			}
+			return 0;
+		}, nspace);
+		globals->Define("ltrim", strLtrim, "global::str::");
+
+		// str::rtrim()
+		Literal strRtrim = Literal();
+		strRtrim.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsString())
+			{
+				std::string input = args[0].StringValue();
+				input.erase(input.find_last_not_of(" \t\n\r\f\v") + 1);
+				return input;
+			}
+			return 0;
+		}, nspace);
+		globals->Define("rtrim", strRtrim, "global::str::");
+
+		// str::trim()
+		Literal strTrim = Literal();
+		strTrim.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsString())
+			{
+				std::string input = args[0].StringValue();
+				input.erase(0, input.find_first_not_of(" \t\n\r\f\v")); // ltrim
+				input.erase(input.find_last_not_of(" \t\n\r\f\v") + 1); // rtrim
+				return input;
+			}
+			return 0;
+		}, nspace);
+		globals->Define("trim", strTrim, "global::str::");
 		
 		///////////////////////
 

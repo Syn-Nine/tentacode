@@ -24,6 +24,7 @@ enum TokenTypeEnum
 	TOKEN_SLASH,
 	TOKEN_STAR,
 	TOKEN_PERCENT,
+	TOKEN_AT,
 
 	// one or two character tokens
 	TOKEN_BANG,
@@ -49,6 +50,7 @@ enum TokenTypeEnum
 	TOKEN_TRUE,
 	TOKEN_PRINT,
 	TOKEN_PRINTLN,
+	TOKEN_FORMAT,
 	TOKEN_VAR_I32,
 	TOKEN_VAR_F32,
 	TOKEN_VAR_STRING,
@@ -102,6 +104,8 @@ enum ExpressionTypeEnum
 	EXPRESSION_DESTRUCTURE,
 	EXPRESSION_GET,
 	EXPRESSION_SET,
+	EXPRESSION_FUNCTOR,
+	EXPRESSION_FORMAT,
 };
 
 enum StatementTypeEnum

@@ -15,6 +15,7 @@
 
 class FunctionStmt;
 class StructStmt;
+class FunctorExpr;
 class Interpreter;
 class Literal;
 
@@ -25,6 +26,10 @@ struct EnumLiteral
 	std::string enumValue;
 	EnumLiteral() {}
 	EnumLiteral(std::string v) : enumValue(v) {}
+};
+
+struct FunctorLiteral
+{
 };
 
 class Literal
@@ -44,6 +49,7 @@ public:
 		LITERAL_TYPE_FUNCTION,
 		LITERAL_TYPE_TT_FUNCTION,
 		LITERAL_TYPE_TT_STRUCT,
+		LITERAL_TYPE_FUNCTOR,
 		
 		// raylib custom
 		LITERAL_TYPE_FONT,
@@ -82,6 +88,13 @@ public:
 	{
 		m_enumValue = val;
 		m_type = LITERAL_TYPE_ENUM;
+	}
+
+	Literal(FunctorLiteral val)
+	{
+		m_functorValue = val;
+		m_type = LITERAL_TYPE_FUNCTOR;
+		m_functorExpr = nullptr;
 	}
 
 	Literal(bool val)
@@ -165,7 +178,7 @@ public:
 
 	size_t Arity() { return m_arity; }
 
-	bool IsCallable() const { return m_type == LITERAL_TYPE_FUNCTION || m_type == LITERAL_TYPE_TT_FUNCTION || m_type == LITERAL_TYPE_TT_STRUCT; }
+	bool IsCallable() const { return m_type == LITERAL_TYPE_FUNCTION || m_type == LITERAL_TYPE_TT_FUNCTION || m_type == LITERAL_TYPE_TT_STRUCT || m_type == LITERAL_TYPE_FUNCTOR; }
 	bool ExplicitArgs() const { return m_explicitArgs; }
 	
 	bool IsDouble() const { return m_type == LITERAL_TYPE_DOUBLE; }
@@ -174,6 +187,7 @@ public:
 	bool IsString() const { return m_type == LITERAL_TYPE_STRING; }
 	bool IsEnum() const { return m_type == LITERAL_TYPE_ENUM; }
 	bool IsBool() const { return m_type == LITERAL_TYPE_BOOL; }
+	bool IsFunctor() const { return m_type == LITERAL_TYPE_FUNCTOR; }
 	bool IsRange() const { return m_type == LITERAL_TYPE_RANGE; }
 	bool IsInvalid() const { return m_type == LITERAL_TYPE_INVALID; }
 	bool IsVector() const { return m_type == LITERAL_TYPE_VEC; }
@@ -259,6 +273,7 @@ public:
 
 	void SetCallable(FunctionStmt* stmt);
 	void SetCallable(StructStmt* stmt);
+	void SetCallable(FunctorExpr* expr);
 
 	void SetCallable(int nArgs, std::function<Literal(LiteralList args)> ftn, std::string fqns, bool explicitArgs = true)
 	{
@@ -362,6 +377,7 @@ private:
 	int32_t m_rightValue;
 	std::string m_stringValue;
 	EnumLiteral m_enumValue;
+	FunctorLiteral m_functorValue;
 	std::vector<bool> m_vecValue_b;
 	std::vector<int32_t> m_vecValue_i;
 	std::vector<double> m_vecValue_d;
@@ -377,6 +393,7 @@ private:
 	int m_arity;
 	std::function<Literal(LiteralList args)> m_ftn;
 	FunctionStmt* m_ftnStmt;
+	FunctorExpr* m_functorExpr;
 	
 	StructStmt* m_stuctStmt;
 	std::map<std::string, Literal> m_parameters;

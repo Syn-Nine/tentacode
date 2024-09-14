@@ -173,6 +173,7 @@ void Scanner::ScanToken()
 	case ';': AddToken(TOKEN_SEMICOLON); break;
 	case '*': AddToken(TOKEN_STAR); break;
 	case '%': AddToken(TOKEN_PERCENT); break;
+	case '@': AddToken(TOKEN_AT); break;
 
 	// one or two character tokens
 	case '!': AddToken(Match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG); break;

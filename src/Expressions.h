@@ -90,6 +90,56 @@ private:
 };
 
 
+class FormatExpr : public Expr
+{
+public:
+	FormatExpr() = delete;
+	FormatExpr(Token* paren, ArgList arguments, std::string fqns)
+	{
+		m_token = paren;
+		m_arguments = arguments;
+		m_fqns = fqns;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_FORMAT; }
+
+	Token* Operator() { return m_token; }
+	ArgList GetArguments() { return m_arguments; }
+	std::string FQNS() { return m_fqns; }
+
+private:
+	Token* m_token;
+	ArgList m_arguments;
+	std::string m_fqns;
+};
+
+
+class FunctorExpr : public Expr
+{
+public:
+	FunctorExpr() = delete;
+	FunctorExpr(Token* token, TokenList params, void* block, std::string fqns)
+	{
+		m_token = token;
+		m_params = params;
+		m_body = block;
+		m_fqns = fqns;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_FUNCTOR; }
+
+	Token* Operator() { return m_token; }
+	TokenList GetParams() { return m_params; }
+	void* GetBody() { return m_body; }
+	std::string FQNS() { return m_fqns; }
+
+private:
+	Token* m_token;
+	TokenList m_params;
+	void* m_body;
+	std::string m_fqns;
+};
+
 class GroupExpr : public Expr
 {
 public:

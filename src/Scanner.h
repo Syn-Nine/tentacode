@@ -26,6 +26,7 @@ public:
 
 		m_keywordList.insert(std::make_pair("print", TOKEN_PRINT));
 		m_keywordList.insert(std::make_pair("println", TOKEN_PRINTLN));
+		m_keywordList.insert(std::make_pair("format", TOKEN_FORMAT));
 		m_keywordList.insert(std::make_pair("false", TOKEN_FALSE));
 		m_keywordList.insert(std::make_pair("true", TOKEN_TRUE));
 		m_keywordList.insert(std::make_pair("i32", TOKEN_VAR_I32));

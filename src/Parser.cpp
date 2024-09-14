@@ -24,6 +24,16 @@ bool Parser::CheckNext(TokenTypeEnum tokenType)
 	return next == tokenType;
 }
 
+bool Parser::CheckNextNext(TokenTypeEnum tokenType)
+{
+	if (IsAtEnd()) return false;
+	if (m_current + 1 == m_tokenList.size()) return false;
+	if (m_current + 2 == m_tokenList.size()) return false;
+	TokenTypeEnum next = m_tokenList.at(m_current + 2).GetType();
+	if (TOKEN_END_OF_FILE == next) return false;
+	return next == tokenType;
+}
+
 bool Parser::Consume(TokenTypeEnum tokenType, std::string err)
 {
 	if (Check(tokenType))

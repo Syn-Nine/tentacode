@@ -149,6 +149,8 @@ private:
 		case EXPRESSION_VARIABLE: return VisitVariable((VariableExpr*)expr);
 		case EXPRESSION_GET: return VisitGet((GetExpr*)expr);
 		case EXPRESSION_SET: return VisitSet((SetExpr*)expr);
+		case EXPRESSION_FORMAT: return VisitFormat((FormatExpr*)expr);
+		case EXPRESSION_FUNCTOR: return VisitFunctor((FunctorExpr*)expr);
 		}
 
 		return Literal();
@@ -319,11 +321,13 @@ private:
 		{
 			if (value.IsInvalid())
 			{
+				// duplicate code in literal.cpp
 				if (TOKEN_VAR_I32 == varType) value = Literal(int32_t(0));
 				if (TOKEN_VAR_F32 == varType) value = Literal(0.0);
 				if (TOKEN_VAR_STRING == varType) value = Literal(std::string(""));
 				if (TOKEN_VAR_ENUM == varType) value = Literal(EnumLiteral());
 				if (TOKEN_VAR_BOOL == varType) value = Literal(false);
+				if (TOKEN_DEF == varType) value = Literal(FunctorLiteral());
 				if (TOKEN_VAR_VEC == varType)
 				{
 					if (Literal::LITERAL_TYPE_BOOL == vecType)
@@ -530,6 +534,17 @@ private:
 					if (left.IsEnum()) return Literal(left.EnumValue().enumValue);
 					if (left.IsBool()) return Literal(left.ToString());
 					if (left.IsVector()) return Literal(left.ToString());
+				}
+				else if (TOKEN_VAR_ENUM == new_type && left.IsString())
+				{
+					// attempt to convert string to an enumeration
+					std::string name = left.ToString();
+					// should this require the :?
+					if (name.size() > 1 && name[0] == ':')
+					{
+						// todo add more checks for valid enum string
+						return Literal(EnumLiteral(name));
+					}
 				}
 			}
 			printf("Invalid explicit cast.\n");
@@ -943,6 +958,92 @@ private:
 		return Literal();
 	}
 
+	Literal VisitFormat(FormatExpr* expr)
+	{
+		ArgList arglist = expr->GetArguments();
+		if (arglist.empty()) return Literal("");
+		LiteralList args;
+
+		if (1 == arglist.size())
+		{
+			if (EXPRESSION_STRUCTURE == arglist[0]->GetType())
+			{
+				StructExpr* argexpr = (StructExpr*)arglist[0];
+				for (Expr* arg : argexpr->GetArguments())
+				{
+					args.push_back(Evaluate(arg));
+				}
+			}
+			else
+			{
+				args.push_back(Evaluate(arglist[0]));
+			}
+		}
+
+		// get string value of each item
+		std::vector<std::string> ss;
+		for (auto& v : args)
+		{
+			ss.push_back(v.ToString());
+		}
+
+		// find variables embedded in the first string;
+		std::string a = ss[0];
+
+		size_t arg_counter = 0;
+		std::string::size_type prev_lhs = 0;
+		std::string::size_type lhs;
+
+		while (
+		(lhs = a.find_first_of('{', prev_lhs)) != std::string::npos)
+		{
+			prev_lhs = lhs + 1;
+			std::string::size_type rhs = a.find_first_of('}', lhs);
+			if (rhs != std::string::npos)
+			{
+				// is this a vararg or environment variable?
+				if (rhs == lhs + 1)
+				{
+					// vararg
+					std::string s0 = a.substr(0, lhs);
+					std::string s1 = a.substr(rhs + 1);
+					std::string sm = "";
+					
+					// is there a vararg available?
+					arg_counter += 1;
+					if (arg_counter < ss.size()) sm = ss[arg_counter];
+					
+					// merge
+					a = s0 + sm + s1;
+				}
+				else
+				{
+					// environment variable
+					std::string sub = a.substr(lhs + 1, rhs - lhs - 1);
+					Token token(TOKEN_IDENTIFIER, sub, expr->Operator()->Line(), expr->Operator()->Filename());
+					Literal v = m_environment->Get(&token, expr->FQNS());
+					std::string s0 = a.substr(0, lhs);
+					std::string s1 = a.substr(rhs + 1);
+					a = s0 + v.ToString() + s1;
+				}
+			}
+			else
+			{
+				printf("Error parsing format(%s).\n", a.c_str());
+				break;
+			}
+		}
+
+		return Literal(a);
+	}
+
+
+	Literal VisitFunctor(FunctorExpr* expr)
+	{
+		Literal ftn = Literal();
+		ftn.SetCallable(expr);
+		return ftn;
+	}
 
 	Literal VisitLiteral(LiteralExpr* expr)
 	{

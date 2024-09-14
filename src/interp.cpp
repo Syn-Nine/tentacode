@@ -108,8 +108,18 @@ void RunPrompt()
 	//char* cmd = "i32 x, y = 1, 2;\nprintln(x as string + \", \" + y as string);\nx, y = y, x;\nprintln(x as string + \", \" + y as string);";
 	//char* cmd = "FILELINE";
 		
-	//printf("%s\n", cmd);
-	//Run(cmd, "Console");
+	//char* cmd = "def a;\na = @(x, y) { println(\"test \" + x as string + \", \" + y as string); };\na(5, 3);";
+	//char* cmd = "struct ms_s {\n    def d;\n = @(a, b) { return a + b; };\n}\n\nms_s ms;\nprintln(ms);\nprintln(ms.d(1, 2));";
+	//char* cmd = "myfunc(4, 5.5, @(x, y) { return x * y; });\n\ndef myfunc(a, b, c) {\n    println(c(a, b));\n}";
+	//char* cmd = "def factorial = @(x) {\n  if x == 0 { return 1; }\n  return x * factorial(x - 1);\n};\n\nprintln(factorial(5));";
+	//char* cmd = "enum e0 = :A;	def ee = @() { println(e0); e0 = :B; };	ee(); ee(); ";
+	//char* cmd = "enum e0 = :A;	def ee = @(x) { println(e0); e0 = x; };	ee(:B); ee(e0); ";
+	char* cmd = "string a = \"aa\";\nstring b = format(\"b{a}\");\nprintln(a);\nprintln(b);\nprintln(format(\"c{b}\"));";
+	//char* cmd = "string a = \"aa\";\ni32 b = 66;\nstring c = format(\"c{}{a}\", b);\nprintln(c);";
+
+//	printf("%s\n", cmd);
+//	Run(cmd, "Console");
+
 
 	// play game override
 	for (;;)
@@ -150,7 +160,7 @@ void RunFile(const char* filename)
 
 int main(int nargs, char* argsv[])
 {
-	const char* version = "0.1.1";
+	const char* version = "0.1.3";
 	printf("Launching Tentacode Interpreter v%s\n", version);
 
 	errorHandler = new ErrorHandler();

@@ -198,10 +198,10 @@ private:
 		
 		if (Match(1, TOKEN_STRUCT)) return StructDeclaration();
 
-		if (Match(1, TOKEN_DEF)) return Function("function");
+		if (Check(TOKEN_DEF) && CheckNext(TOKEN_IDENTIFIER) && CheckNextNext(TOKEN_LEFT_PAREN)) return Function("function");
 		
-		if (Match(6, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
-			TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL))
+		if (Match(7, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+			TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
 			return VarDeclaration();
 		
 		// raylib custom
@@ -238,6 +238,7 @@ private:
 	{
 		std::string fqns = m_fqns;
 		//if (m_global) fqns = "global::";
+		Consume(TOKEN_DEF, "");
 
 		bool internal = m_internal;
 		if (!Consume(TOKEN_IDENTIFIER, "Expected " + kind + " name.")) return nullptr;
@@ -279,8 +280,8 @@ private:
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd())
 		{
-			if (Match(10, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
-				TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL,
+			if (Match(11, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+				TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
 
 				// raylib custom
 				TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND))
@@ -560,6 +561,7 @@ private:
 		return nullptr;
 	}
 
+
 	Stmt* BreakStatement()
 	{
 		Token* keyword = new Token(Previous());
@@ -812,6 +814,11 @@ private:
 			Expr* right = Unary();
 			return new UnaryExpr(oper, right);
 		}
+		else if (Match(1, TOKEN_AT))
+		{
+			Token* oper = new Token(Previous());
+			return FinishFunctor(oper);
+		}
 
 		return Modulus();
 	}
@@ -864,8 +871,14 @@ private:
 		}
 
 		// used for AS syntax
-		if (Match(3, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING)) return new VariableExpr(new Token(Previous()), nullptr, m_fqns);
+		if (Match(4, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING, TOKEN_VAR_ENUM)) return new VariableExpr(new Token(Previous()), nullptr, m_fqns);
 		
+		if (Match(1, TOKEN_FORMAT))
+		{
+			Consume(TOKEN_LEFT_PAREN, "Expect '(' after format.");
+			return FinishFormat();
+		}
+
 		if (Match(1, TOKEN_IDENTIFIER))
 		{
 			Token prev = Previous();
@@ -881,7 +894,7 @@ private:
 
 			Expr* expr = new VariableExpr(new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename()), vecIndex, m_fqns);
 
-			// check for function call brace
+			// check for function call parenthesis
 			while (true)
 			{
 				if (Match(1, TOKEN_LEFT_PAREN))
@@ -948,6 +961,7 @@ private:
 
 	Expr* FinishCall(Expr* callee)
 	{
+		// similar to FinishFormat
 		ArgList args;
 		if (!Check(TOKEN_RIGHT_PAREN))
 		{
@@ -964,6 +978,77 @@ private:
 		}
 
 		return new CallExpr(callee, paren, args);
+	}
+
+	Expr* FinishFormat()
+	{
+		// similar to FinishCall
+		ArgList args;
+		if (!Check(TOKEN_RIGHT_PAREN)) args.push_back(Expression());
+
+		Token* paren = nullptr;
+		if (Consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments."))
+		{
+			paren = new Token(Previous());
+		}
+
+		return new FormatExpr(paren, args, m_fqns);
+	}
+
+	Expr* FinishFunctor(Token* oper)
+	{
+		if (!Check(TOKEN_LEFT_PAREN))
+		{
+			Error(Previous(), "Expected '(' after @.");
+			return nullptr;
+		}
+
+		TokenList args;
+
+		if (!CheckNext(TOKEN_RIGHT_PAREN))
+		{
+			Expr* temp = Expression();
+			if (EXPRESSION_GROUP != temp->GetType())
+			{
+				Error(Previous(), "Expected group expression after @.");
+				return nullptr;
+			}
+
+			GroupExpr* group = (GroupExpr*)temp;
+			if (EXPRESSION_VARIABLE == group->Expression()->GetType())
+			{
+				VariableExpr* temp = (VariableExpr*)(group->Expression());
+				args.push_back(*temp->Operator());
+			}
+			else if (EXPRESSION_STRUCTURE == group->Expression()->GetType())
+			{
+				StructExpr* temp = (StructExpr*)(group->Expression());
+				ArgList altemp = temp->GetArguments();
+				for (auto& a : altemp)
+				{
+					if (EXPRESSION_VARIABLE == a->GetType())
+					{
+						args.push_back(*((VariableExpr*)a)->Operator());
+					}
+					else
+					{
+						Error(Previous(), "Expected variable inside group expression.");
+						return nullptr;
+					}
+				}
+			}
+		}
+		else
+		{
+			Consume(TOKEN_LEFT_PAREN, "");
+			if (!Consume(TOKEN_RIGHT_PAREN, "Expected ')' after @.")) return nullptr;
+		}
+		
+		if (!Consume(TOKEN_LEFT_BRACE, "Expected block for anonymous function.")) return nullptr;
+
+		StmtList* body = BlockStatement();
+
+		return new FunctorExpr(oper, args, body, m_fqns);
 	}
 
 	Expr* FinishGet(Expr* callee)
@@ -1018,6 +1103,7 @@ private:
 	Token Advance();
 	bool Check(TokenTypeEnum tokenType);
 	bool CheckNext(TokenTypeEnum tokenType);
+	bool CheckNextNext(TokenTypeEnum tokenType);
 	bool Consume(TokenTypeEnum tokenType, std::string err);
 	bool IsAtEnd();
 	bool Match(int count, ...);

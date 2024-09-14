@@ -25,7 +25,24 @@ if "test"  != s { println("Test Failed, " + FILELINE); }
 if ":TEST" != e as string { println("Test Failed, " + FILELINE); }
 
 
+CLEARENV
+// type conversion test
+string s = ":blue";
+enum e = s as enum;
+if e != :blue { println("Test Failed, " + FILELINE); }
 
+
+CLEARENV
+// string formating tests
+string a = "aa";
+string b = format("b{a}");
+string c = format("c{b}");
+if "cbaa" != c { println("Test Failed, " + FILELINE); }
+	
+string a = "aa";
+i32 b = 66;
+string c = format("c{}{a}{}{}", b, 37.9, :GREEN);
+if "c66aa37.900000<enum :GREEN>" != c { println("Test Failed, " + FILELINE); }
 
 
 
@@ -51,3 +68,52 @@ if ivec[1] != 3 { println("Test Failed, " + FILELINE); }
 ivec = [1, 2, 3];
 if len(ivec) != 3 { println("Test Failed, " + FILELINE); }
 if ivec[0] != 1 || ivec[1] != 2 || ivec[2] != 3 { println("Test Failed, " + FILELINE); }
+ivec = vec::append(ivec, [9;3]);
+if len(ivec) != 6 { println("Test Failed, " + FILELINE); }
+if ivec[5] != 9 { println("Test Failed, " + FILELINE); }
+
+
+// function objects
+CLEARENV
+def a;
+a = @(x, y) { return x * y; };
+if 15 != a(5, 3) { println("Test Failed, " + FILELINE); }
+
+def b = @() { return 22.6; };
+if 22.6 != b() { println("Test Failed, " + FILELINE); }
+
+def c = @(z) { return z * z; };
+if 49 != c(7) { println("Test Failed, " + FILELINE); }
+
+struct ms_s {
+    i32 aa;
+    f32 bb;
+    def d;
+}
+
+ms_s ms;
+ms.aa = 9;
+ms.bb = 2.1;
+ms.d = @(zz) { return ms.aa * ms.bb * zz; };
+if 113.4 != ms.d(6) { println("Test Failed, " + FILELINE); }
+
+def myfunc(a, b, c) {
+    return c(a, b);
+}
+if 22.0 != myfunc(4, 5.5, @(x, y) { return x * y; }) { println("Test Failed, " + FILELINE); }
+
+i32 x = 16;
+def factorial = @(x) {
+    if x == 0 { return 1; }
+    return x * factorial(x - 1);
+};
+if 120 != factorial(5) { println("Test Failed, " + FILELINE); }
+
+// global variable overwrite from inside function object
+enum e0 = :A;
+def ee = @(x) { e0 = x; };
+ee(:B);
+if :B != e0 { println("Test Failed, " + FILELINE); }
+
+
+

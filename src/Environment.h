@@ -340,7 +340,7 @@ private:
 	typedef std::map<std::string, var_struct> NameSpaceMap;
 
 	NameSpaceMap m_namespaces;
-	std::map<std::string, std::string> m_fqns;
+	//std::map<std::string, std::string> m_fqns;
 	std::string m_scopeLabel;
 	std::string m_nextScopeLabel;
 

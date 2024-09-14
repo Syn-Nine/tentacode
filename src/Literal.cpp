@@ -1,5 +1,6 @@
 #include "Literal.h"
 #include "Statements.h"
+#include "Expressions.h"
 #include "Environment.h"
 #include "Interpreter.h"
 
@@ -7,7 +8,8 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 {
 	if (m_type != LITERAL_TYPE_FUNCTION &&
 		m_type != LITERAL_TYPE_TT_FUNCTION &&
-		m_type != LITERAL_TYPE_TT_STRUCT)
+		m_type != LITERAL_TYPE_TT_STRUCT &&
+		m_type != LITERAL_TYPE_FUNCTOR)
 		return Literal();
 
 	if (LITERAL_TYPE_FUNCTION == m_type)
@@ -31,11 +33,13 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 				TokenTypeEnum varType = stmt->VarType()->GetType();
 				Literal::LiteralTypeEnum vecType = stmt->VarVecType();
 
+				// duplicate code in interpreter.h
 				if (TOKEN_VAR_I32 == varType) value = Literal(int32_t(0));
 				if (TOKEN_VAR_F32 == varType) value = Literal(0.0);
 				if (TOKEN_VAR_STRING == varType) value = Literal(std::string(""));
 				if (TOKEN_VAR_ENUM == varType) value = Literal(EnumLiteral());
 				if (TOKEN_VAR_BOOL == varType) value = Literal(false);
+				if (TOKEN_DEF == varType) value = Literal(FunctorLiteral());
 				if (TOKEN_VAR_VEC == varType)
 				{
 					if (Literal::LITERAL_TYPE_BOOL == vecType)
@@ -78,6 +82,29 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 			}
 		}
 		
+		return ret;
+	}
+	else if (LITERAL_TYPE_FUNCTOR == m_type)
+	{
+		Environment* env = new Environment(interpreter->GetGlobals(), interpreter->GetErrorHandler());
+
+		auto params = m_functorExpr->GetParams();
+
+		for (size_t i = 0; i < args.size(); ++i)
+		{
+			env->Define(params.at(i).Lexeme(), args.at(i), m_fqns);
+		}
+
+		Literal ret;
+		try
+		{
+			interpreter->ExecuteBlock((StmtList*)m_functorExpr->GetBody(), env);
+		}
+		catch (Literal value)
+		{
+			ret = value;
+		}
+
 		return ret;
 	}
 	else
@@ -183,6 +210,14 @@ void Literal::SetCallable(StructStmt* stmt)
 	m_fqns = stmt->FQNS();
 }
 
+void Literal::SetCallable(FunctorExpr* expr)
+{
+	m_functorExpr = expr;
+	m_arity = expr->GetParams().size();
+	m_type = LITERAL_TYPE_FUNCTOR;
+	m_fqns = expr->FQNS();
+}
+
 
 std::string Literal::ToString() const
 {
@@ -192,10 +227,10 @@ std::string Literal::ToString() const
 		return "<Literal Invalid>";
 
 	case LITERAL_TYPE_FUNCTION:
-		return "<native ftn " + m_ftnStmt->Operator()->Lexeme() + ">";
+		return "<native ftn " + m_ftnStmt->Operator()->Lexeme() + ", arity=" + std::to_string(m_ftnStmt->GetParams().size()) + ">";
 
 	case LITERAL_TYPE_TT_FUNCTION:
-		return "<def " + m_ftnStmt->Operator()->Lexeme() + ">";
+		return "<def " + m_ftnStmt->Operator()->Lexeme() + ", arity=" + std::to_string(m_ftnStmt->GetParams().size()) + ">";
 
 	case LITERAL_TYPE_TT_STRUCT:
 	{
@@ -212,6 +247,10 @@ std::string Literal::ToString() const
 	case LITERAL_TYPE_ENUM:
 		return "<enum " + m_enumValue.enumValue + ">";
 
+	case LITERAL_TYPE_FUNCTOR:
+		if (m_functorExpr) return "<anonymous ftn, arity=" + std::to_string(m_functorExpr->GetParams().size()) + ">";
+		return "<anonymous ftn, not assigned>";
+	
 	case LITERAL_TYPE_BOOL:
 		return m_boolValue ? "true" : "false";
 

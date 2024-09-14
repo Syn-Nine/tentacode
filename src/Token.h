@@ -62,6 +62,7 @@ public:
 		case TOKEN_SEMICOLON: type = "TOKEN_SEMICOLON"; break;
 		case TOKEN_SLASH: type = "TOKEN_SLASH"; break;
 		case TOKEN_STAR: type = "TOKEN_STAR"; break;
+		case TOKEN_AT: type = "TOKEN_AT"; break;
 
 		// one or two character tokens
 		case TOKEN_BANG: type = "TOKEN_BANG"; break;
@@ -85,6 +86,7 @@ public:
 		case TOKEN_TRUE: type = "TOKEN_TRUE"; break;
 		case TOKEN_PRINT: type = "TOKEN_PRINT"; break;
 		case TOKEN_PRINTLN: type = "TOKEN_PRINTLN"; break;
+		case TOKEN_FORMAT: type = "TOKEN_FORMAT"; break;
 		case TOKEN_VAR_I32: type = "TOKEN_VAR_I32"; break;
 		case TOKEN_VAR_F32: type = "TOKEN_VAR_F32"; break;
 		case TOKEN_VAR_STRING: type = "TOKEN_VAR_STRING"; break;

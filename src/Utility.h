@@ -4,6 +4,16 @@
 #include <vector>
 #include <string>
 
+static std::string StrJoin(std::vector<std::string> s, std::string delimiter) {
+    std::string ret;
+    for (size_t i = 0; i < s.size(); ++i)
+    {
+        ret.append(s[i]);
+        if (i != s.size()-1) { ret.append(delimiter); }
+    }
+    return ret;
+}
+
 // source: https://stackoverflow.com/questions/14265581/parse-split-a-string-in-c-using-string-delimiter-standard-c
 static std::vector<std::string> StrSplit(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
