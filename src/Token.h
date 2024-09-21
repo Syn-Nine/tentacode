@@ -116,8 +116,10 @@ public:
 		// raylib custom
 		case TOKEN_VAR_FONT: type = "TOKEN_VAR_FONT"; break;
 		case TOKEN_VAR_IMAGE: type = "TOKEN_VAR_IMAGE"; break;
+		case TOKEN_VAR_RENDER_TEXTURE_2D: type = "TOKEN_VAR_RENDER_TEXTURE_2D"; break;
 		case TOKEN_VAR_TEXTURE: type = "TOKEN_VAR_TEXTURE"; break;
 		case TOKEN_VAR_SOUND: type = "TOKEN_VAR_SOUND"; break;
+		case TOKEN_VAR_SHADER: type = "TOKEN_VAR_SHADER"; break;
 
 		//
 		case TOKEN_END_OF_FILE: type = "TOKEN_END_OF_FILE"; break;

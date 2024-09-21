@@ -160,7 +160,7 @@ void RunFile(const char* filename)
 
 int main(int nargs, char* argsv[])
 {
-	const char* version = "0.1.3";
+	const char* version = "0.1.4";
 	printf("Launching Tentacode Interpreter v%s\n", version);
 
 	errorHandler = new ErrorHandler();

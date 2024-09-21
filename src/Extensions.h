@@ -50,6 +50,15 @@ public:
 		globals->Define("fabs", fabsLiteral, nspace);
 
 		
+		// floor()
+		Literal floorLiteral = Literal();
+		floorLiteral.SetCallable(1, [](LiteralList args)->Literal
+		{
+			return floor(args[0].DoubleValue());
+		}, nspace);
+		globals->Define("floor", floorLiteral, nspace);
+
+
         // input()
 		Literal inputLiteral = Literal();
 		inputLiteral.SetCallable(0, [](LiteralList args)->Literal
@@ -546,10 +555,14 @@ public:
 		Literal ray_ClearBackground = Literal();
 		ray_ClearBackground.SetCallable(1, [](LiteralList args)->Literal
 		{
-			std::string s;
-            if (args[0].IsEnum()) s = args[0].EnumValue().enumValue;
-			
-            ClearBackground(StringToColor(s));			
+			std::string s = args[0].EnumValue().enumValue;
+			auto d = args[0].VecValue_I();
+            if (args[0].IsEnum())
+			{
+            	ClearBackground(StringToColor(s));
+			} else if (args[0].IsVector() && 4 == d.size()) {
+				ClearBackground((Color){ d[0], d[1], d[2], d[3] });
+			}
 			return 0;
 		}, nspace);
 		globals->Define("ClearBackground", ray_ClearBackground, nspace);
@@ -571,6 +584,32 @@ public:
 			return 0;
 		}, nspace);
 		globals->Define("CloseWindow", ray_CloseWindow, nspace);
+
+
+		// ray_BeginDrawing
+		Literal ray_BeginBlendMode = Literal();
+		ray_BeginBlendMode.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsEnum())
+			{
+				std::string s = args[0].EnumValue().enumValue;
+				if (0 == s.compare(":BLEND_ALPHA")) BeginBlendMode(BLEND_ALPHA);
+				else if (0 == s.compare(":BLEND_ALPHA_PREMULTIPLY")) BeginBlendMode(BLEND_ALPHA_PREMULTIPLY);
+			}
+			return 0;
+		}, nspace);
+		globals->Define("BeginBlendMode", ray_BeginBlendMode, nspace);
+
+		// ray_EndDrawing
+		Literal ray_EndBlendMode = Literal();
+		ray_EndBlendMode.SetCallable(0, [](LiteralList args)->Literal
+		{
+			EndBlendMode();
+			return 0;
+		}, nspace);
+		globals->Define("EndBlendMode", ray_EndBlendMode, nspace);
+
+		
 
 
         ////////////////////////////////////////////////////////////////////////////////////////
@@ -638,6 +677,22 @@ public:
 			return 0;
 		}, nspace);
 		globals->Define("DrawTriangle", ray_DrawTriangle, nspace);
+
+
+		// ray_DrawPixelRGBA
+		Literal ray_DrawPixelRGBA = Literal();
+		ray_DrawPixelRGBA.SetCallable(6, [](LiteralList args)->Literal
+		{
+            int32_t x = args[0].IntValue();
+			int32_t y = args[1].IntValue();
+			int32_t r = args[2].IntValue();
+			int32_t g = args[3].IntValue();
+			int32_t b = args[4].IntValue();
+			int32_t a = args[5].IntValue();
+			DrawPixel(x, y, {r, g, b, a});
+            return 0;
+		}, nspace);
+		globals->Define("DrawPixelRGBA", ray_DrawPixelRGBA, nspace);
 
 
 
@@ -720,7 +775,48 @@ public:
 		}, nspace);
 		globals->Define("LoadImage", ray_LoadImage, nspace);
 
-        // ray_ImageResize
+        // ray_LoadImageFromScreen
+		Literal ray_LoadImageFromScreen = Literal();
+		ray_LoadImageFromScreen.SetCallable(0, [](LiteralList args)->Literal
+		{
+            return LoadImageFromScreen();
+		}, nspace);
+		globals->Define("LoadImageFromScreen", ray_LoadImageFromScreen, nspace);
+
+		// ray_ExportImage
+		Literal ray_ExportImage = Literal();
+		ray_ExportImage.SetCallable(2, [](LiteralList args)->Literal
+		{
+            if (args[0].IsImage() && args[1].IsString())
+            {
+                return ExportImage(args[0].ImageValue(), args[1].StringValue().c_str());
+            }
+            return 0;
+		}, nspace);
+		globals->Define("ExportImage", ray_ExportImage, nspace);
+
+        // ray_ImagePeek
+		Literal ray_ImagePeek = Literal();
+		ray_ImagePeek.SetCallable(4, [](LiteralList args)->Literal
+		{
+            if (args[0].IsImage() && args[1].IsInt() && args[2].IsInt() && args[3].IsInt())
+            {
+				// assumes 32 bpp
+				Image img = args[0].ImageValue();
+				uint8_t* raw = (uint8_t*)img.data;
+				size_t x = args[1].IntValue();
+				size_t y = args[2].IntValue();
+				size_t ofs = args[3].IntValue();
+				if (x >= 0 && y >= 0 && x < img.width && y < img.height && ofs < 4)
+				{
+					return raw[(y * img.width + x) * 4 + ofs];
+				}
+            }
+            return 0;
+		}, nspace);
+		globals->Define("ImagePeek", ray_ImagePeek, nspace);
+
+		// ray_ImageResize
 		Literal ray_ImageResize = Literal();
 		ray_ImageResize.SetCallable(3, [](LiteralList args)->Literal
 		{
@@ -759,7 +855,48 @@ public:
 		globals->Define("ImageHeight", ray_ImageHeight, nspace);
 
 
+		////////////////////////////////////////////////////////////////////////////////////////
+        // Shaders
+        ////////////////////////////////////////////////////////////////////////////////////////
 
+		// ray_LoadShader
+		Literal ray_LoadShader = Literal();
+		ray_LoadShader.SetCallable(2, [](LiteralList args)->Literal
+		{
+			const char* vsFilename = args[0].IsString() ? args[0].StringValue().c_str() : nullptr;
+			const char* fsFilename = args[1].IsString() ? args[1].StringValue().c_str() : nullptr;
+			return LoadShader(vsFilename, fsFilename);
+		}, nspace);
+		globals->Define("LoadShader", ray_LoadShader, nspace);
+
+		// ray_LoadShader
+		Literal ray_UnloadShader = Literal();
+		ray_UnloadShader.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsShader()) UnloadShader(args[0].ShaderValue());
+			return 0;
+		}, nspace);
+		globals->Define("UnloadShader", ray_UnloadShader, nspace);
+
+		// ray_BeginShaderMode
+		Literal ray_BeginShaderMode = Literal();
+		ray_BeginShaderMode.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsShader()) BeginShaderMode(args[0].ShaderValue());
+			return 0;
+		}, nspace);
+		globals->Define("BeginShaderMode", ray_BeginShaderMode, nspace);
+
+		// ray_EndShaderMode
+		Literal ray_EndShaderMode = Literal();
+		ray_EndShaderMode.SetCallable(0, [](LiteralList args)->Literal
+		{
+			EndShaderMode();
+			return 0;
+		}, nspace);
+		globals->Define("EndShaderMode", ray_EndShaderMode, nspace);
+
+        
         ////////////////////////////////////////////////////////////////////////////////////////
         // Sounds
         ////////////////////////////////////////////////////////////////////////////////////////
@@ -840,6 +977,14 @@ public:
 		}, nspace);
 		globals->Define("LoadTexture", ray_LoadTexture, nspace);
 
+		// ray_LoadRenderTexture
+		Literal ray_LoadRenderTexture = Literal();
+		ray_LoadRenderTexture.SetCallable(2, [](LiteralList args)->Literal
+		{
+			return LoadRenderTexture(args[0].IntValue(), args[1].IntValue());
+		}, nspace);
+		globals->Define("LoadRenderTexture", ray_LoadRenderTexture, nspace);
+
         // ray_LoadTextureFromImage
 		Literal ray_LoadTextureFromImage = Literal();
 		ray_LoadTextureFromImage.SetCallable(1, [](LiteralList args)->Literal
@@ -880,17 +1025,35 @@ public:
 		Literal ray_DrawTexture = Literal();
 		ray_DrawTexture.SetCallable(4, [](LiteralList args)->Literal
 		{
-            if (args[0].IsTexture() && args[3].IsEnum())
+            if ((args[0].IsTexture() || args[0].IsRenderTexture2D()) && args[3].IsEnum())
             {
+				Texture tex = args[0].IsTexture() ? args[0].TextureValue() : args[0].RenderTexture2dValue().texture;
                 int32_t x = args[1].IntValue();
                 int32_t y = args[2].IntValue();
                 std::string s = args[3].EnumValue().enumValue;
 
-                DrawTexture(args[0].TextureValue(), x, y, StringToColor(s));
+                DrawTexture(tex, x, y, StringToColor(s));
             }
             return 0;
 		}, nspace);
 		globals->Define("DrawTexture", ray_DrawTexture, nspace);
+
+		// ray_DrawTextureRec
+		Literal ray_DrawTextureRec = Literal();
+		ray_DrawTextureRec.SetCallable(5, [](LiteralList args)->Literal
+		{
+            if ((args[0].IsTexture() || args[0].IsRenderTexture2D()) && args[1].IsVecInteger() && args[4].IsEnum())
+            {
+				Texture tex = args[0].IsTexture() ? args[0].TextureValue() : args[0].RenderTexture2dValue().texture;
+				auto v = args[1].VecValue_I();
+				if (4 == v.size()) {
+					std::string s = args[4].EnumValue().enumValue;
+					DrawTextureRec(tex, { v[0], v[1], v[2], v[3] }, { args[2].IntValue(), args[3].IntValue() }, StringToColor(s));
+				}
+            }
+            return 0;
+		}, nspace);
+		globals->Define("DrawTextureRec", ray_DrawTextureRec, nspace);
 
         // ray_DrawTextureEx
 		Literal ray_DrawTextureEx = Literal();
@@ -910,6 +1073,37 @@ public:
 		}, nspace);
 		globals->Define("DrawTextureEx", ray_DrawTextureEx, nspace);
 
+		// ray_DrawTexturePro
+		Literal ray_DrawTexturePro = Literal();
+		ray_DrawTexturePro.SetCallable(7, [](LiteralList args)->Literal
+		{
+            if ((args[0].IsTexture() || args[0].IsRenderTexture2D()) &&
+				args[1].IsVecInteger() &&
+				args[2].IsVecInteger() &&
+				args[6].IsEnum())
+            {
+				std::vector<int32_t> isrc = args[1].VecValue_I();
+				std::vector<int32_t> idst = args[2].VecValue_I();
+				if (4 == isrc.size() && 4 == idst.size())
+				{
+					Texture tex = args[0].IsTexture() ? args[0].TextureValue() : args[0].RenderTexture2dValue().texture;
+					float x = args[3].DoubleValue();
+					float y = args[4].DoubleValue();
+					double rot = args[5].DoubleValue();
+					std::string s = args[6].EnumValue().enumValue;
+
+					Rectangle src = { isrc[0], isrc[1], isrc[2], isrc[3] };
+					Rectangle dst = { idst[0], idst[1], idst[2], idst[3] };
+					Vector2 org = { x, y };
+
+					DrawTexturePro(tex, src, dst, org, rot, StringToColor(s));
+				}
+            }
+            return 0;
+		}, nspace);
+		globals->Define("DrawTexturePro", ray_DrawTexturePro, nspace);
+
+		
         // ray_DrawTextureTile
 		Literal ray_DrawTextureExTile = Literal();
 		ray_DrawTextureExTile.SetCallable(9, [](LiteralList args)->Literal
@@ -1000,6 +1194,24 @@ public:
             return 0;
 		}, nspace);
 		globals->Define("DrawTextureTileMap", ray_DrawTextureTileMap, nspace);
+
+		// ray_BeginTextureMode
+		Literal ray_BeginTextureMode = Literal();
+		ray_BeginTextureMode.SetCallable(1, [](LiteralList args)->Literal
+		{
+			if (args[0].IsRenderTexture2D()) BeginTextureMode(args[0].RenderTexture2dValue());
+			return 0;
+		}, nspace);
+		globals->Define("BeginTextureMode", ray_BeginTextureMode, nspace);
+
+		// ray_EndTextureMode
+		Literal ray_EndTextureMode = Literal();
+		ray_EndTextureMode.SetCallable(0, [](LiteralList args)->Literal
+		{
+			EndTextureMode();
+			return 0;
+		}, nspace);
+		globals->Define("EndTextureMode", ray_EndTextureMode, nspace);
 
         
         ////////////////////////////////////////////////////////////////////////////////////////

@@ -54,8 +54,10 @@ public:
 		// raylib custom
 		LITERAL_TYPE_FONT,
 		LITERAL_TYPE_IMAGE,
+		LITERAL_TYPE_RENDER_TEXTURE_2D,
 		LITERAL_TYPE_TEXTURE,
 		LITERAL_TYPE_SOUND,
+		LITERAL_TYPE_SHADER,
 	};
 
 	Literal()
@@ -162,15 +164,25 @@ public:
 		m_image = tex;
 		m_type = LITERAL_TYPE_IMAGE;
 	}
+	Literal(RenderTexture2D tex)
+	{
+		m_textureRender2d = tex;
+		m_type = LITERAL_TYPE_RENDER_TEXTURE_2D;
+	}
 	Literal(Texture2D tex)
 	{
 		m_texture = tex;
 		m_type = LITERAL_TYPE_TEXTURE;
 	}
-	Literal(Sound tex)
+	Literal(Sound snd)
 	{
-		m_sound = tex;
+		m_sound = snd;
 		m_type = LITERAL_TYPE_SOUND;
+	}
+	Literal(Shader shdr)
+	{
+		m_shader = shdr;
+		m_type = LITERAL_TYPE_SHADER;
 	}
 #endif
 
@@ -200,8 +212,10 @@ public:
 	// ralylib custom
 	bool IsFont() const { return m_type == LITERAL_TYPE_FONT; }
 	bool IsImage() const { return m_type == LITERAL_TYPE_IMAGE; }
+	bool IsRenderTexture2D() const { return m_type == LITERAL_TYPE_RENDER_TEXTURE_2D; }
 	bool IsTexture() const { return m_type == LITERAL_TYPE_TEXTURE; }
 	bool IsSound() const { return m_type == LITERAL_TYPE_SOUND; }
+	bool IsShader() const { return m_type == LITERAL_TYPE_SHADER; }
 
 	int32_t Len() const
 	{
@@ -241,8 +255,10 @@ public:
 #ifndef NO_RAYLIB
 	// ralylib custom
 	const Font& FontValue() const { return m_font; }
+	const RenderTexture2D& RenderTexture2dValue() const { return m_textureRender2d; }
 	const Texture& TextureValue() const { return m_texture; }
 	const Sound& SoundValue() const { return m_sound; }
+	const Shader& ShaderValue() const { return m_shader; }
 	Image& ImageValue() { return m_image; }
 #endif
 	
@@ -404,9 +420,11 @@ private:
 #ifndef NO_RAYLIB
 	// raylib custom
 	Font m_font;
+	RenderTexture2D m_textureRender2d;
 	Texture2D m_texture;
 	Image m_image;
 	Sound m_sound;
+	Shader m_shader;
 #endif
 
 };

@@ -58,7 +58,9 @@ public:
 		m_keywordList.insert(std::make_pair("ray_font", TOKEN_VAR_FONT));
 		m_keywordList.insert(std::make_pair("ray_image", TOKEN_VAR_IMAGE));
 		m_keywordList.insert(std::make_pair("ray_sound", TOKEN_VAR_SOUND));
+		m_keywordList.insert(std::make_pair("ray_shader", TOKEN_VAR_SHADER));
 		m_keywordList.insert(std::make_pair("ray_texture", TOKEN_VAR_TEXTURE));
+		m_keywordList.insert(std::make_pair("ray_renderTexture2D", TOKEN_VAR_RENDER_TEXTURE_2D));
 	}
 
 	TokenList ScanTokens();

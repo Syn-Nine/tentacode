@@ -60,7 +60,9 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 				if (TOKEN_VAR_FONT == varType) value = Literal(Font());
 				if (TOKEN_VAR_IMAGE == varType) value = Literal(Image());
 				if (TOKEN_VAR_SOUND == varType) value = Literal(Sound());
+				if (TOKEN_VAR_SHADER == varType) value = Literal(Shader());
 				if (TOKEN_VAR_TEXTURE == varType) value = Literal(Texture2D());
+				if (TOKEN_VAR_RENDER_TEXTURE_2D == varType) value = Literal(RenderTexture2D());
 #endif
 
 				// user defined type
@@ -371,8 +373,14 @@ std::string Literal::ToString() const
 	case LITERAL_TYPE_TEXTURE:
 		return "<raylib Texture2D>";
 
+	case LITERAL_TYPE_RENDER_TEXTURE_2D:
+		return "<raylib RenderTexture2D>";
+
 	case LITERAL_TYPE_SOUND:
 		return "<raylib Sound>";
+
+	case LITERAL_TYPE_SHADER:
+		return "<raylib Shader>";
 
 	case LITERAL_TYPE_STRING: // intentional fall-through
 	default:

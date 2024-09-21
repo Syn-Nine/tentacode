@@ -205,7 +205,7 @@ private:
 			return VarDeclaration();
 		
 		// raylib custom
-		if (Match(4, TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND))
+		if (Match(6, TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_RENDER_TEXTURE_2D, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND, TOKEN_VAR_SHADER))
 			return VarDeclaration();
 
 		// udt declaration
@@ -280,11 +280,11 @@ private:
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd())
 		{
-			if (Match(11, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+			if (Match(13, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
 				TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
 
 				// raylib custom
-				TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND))
+				TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_RENDER_TEXTURE_2D, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND, TOKEN_VAR_SHADER))
 			{
 				vars->push_back(VarDeclaration());
 			}
