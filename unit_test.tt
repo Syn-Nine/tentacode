@@ -116,4 +116,46 @@ ee(:B);
 if :B != e0 { println("Test Failed, " + FILELINE); }
 
 
+// string access using bracket notation
+CLEARENV
+string mystr = "abcdef";
+if "a" != mystr[0] { println("Test Failed, " + FILELINE); }
+if "f" != mystr[len(mystr)-1] { println("Test Failed, " + FILELINE); }
+if "bcd" != mystr[1..4] { println("Test Failed, " + FILELINE); }
 
+// string replication
+CLEARENV
+string mystr = "abc" * 3;
+if "abcabcabc" != mystr { println("Test Failed, " + FILELINE); }
+if 0 != len(mystr*0) { println("Test Failed, " + FILELINE); }
+
+
+// hash map tests
+CLEARENV
+map<i32, string> map_a;
+map_a = map::insert(map_a, 1, "test");
+if "test" != map_a[1] { println("Test Failed, " + FILELINE); }
+
+map<enum, i32> map_b;
+map_b = map::insert(map_b, :BLUE, 1);
+map_b = map::insert(map_b, :GREEN, 2);
+map_b = map::insert(map_b, :BLUE, 5);
+if 5 != map_b[:BLUE] { println("Test Failed, " + FILELINE); }
+if 2 != map_b[:GREEN] { println("Test Failed, " + FILELINE); }
+map_b[:GREEN] = 7;
+if 7 != map_b[:GREEN] { println("Test Failed, " + FILELINE); }
+if !map::contains(map_b, :GREEN) { println("Test Failed, " + FILELINE); }
+if map::contains(map_b, :RED) { println("Test Failed, " + FILELINE); }
+
+
+// vector sorting test
+CLEARENV
+vec<f32> v = rand(5);
+println(v);
+
+vec<string> s = ["a", "b", "c", "d", "e"];
+s = vec::sort_by_key(s, v);
+
+v = vec::sort(v);
+println(v);
+println(s);

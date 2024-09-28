@@ -225,6 +225,30 @@ private:
 };
 
 
+class PairExpr : public Expr
+{
+public:
+	PairExpr() = delete;
+	PairExpr(Token* paren, Expr* key, Expr* value)
+	{
+		m_token = paren;
+		m_key = key;
+		m_value = value;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_PAIR; }
+
+	Token* Operator() { return m_token; }
+	Expr* GetKey() { return m_key; }
+	Expr* GetValue() { return m_value; }
+
+private:
+	Token* m_token;
+	Expr* m_key;
+	Expr* m_value;
+};
+
+
 class RangeExpr : public Expr
 {
 public:

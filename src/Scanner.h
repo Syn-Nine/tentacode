@@ -27,11 +27,13 @@ public:
 		m_keywordList.insert(std::make_pair("print", TOKEN_PRINT));
 		m_keywordList.insert(std::make_pair("println", TOKEN_PRINTLN));
 		m_keywordList.insert(std::make_pair("format", TOKEN_FORMAT));
+		m_keywordList.insert(std::make_pair("pair", TOKEN_PAIR));
 		m_keywordList.insert(std::make_pair("false", TOKEN_FALSE));
 		m_keywordList.insert(std::make_pair("true", TOKEN_TRUE));
 		m_keywordList.insert(std::make_pair("i32", TOKEN_VAR_I32));
 		m_keywordList.insert(std::make_pair("f32", TOKEN_VAR_F32));
 		m_keywordList.insert(std::make_pair("vec", TOKEN_VAR_VEC));
+		m_keywordList.insert(std::make_pair("map", TOKEN_VAR_MAP));
 		m_keywordList.insert(std::make_pair("enum", TOKEN_VAR_ENUM));
 		m_keywordList.insert(std::make_pair("string", TOKEN_VAR_STRING));
 		m_keywordList.insert(std::make_pair("bool", TOKEN_VAR_BOOL));

@@ -31,7 +31,7 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 
 				Literal value;
 				TokenTypeEnum varType = stmt->VarType()->GetType();
-				Literal::LiteralTypeEnum vecType = stmt->VarVecType();
+				LiteralTypeEnum vecType = stmt->VarVecType();
 
 				// duplicate code in interpreter.h
 				if (TOKEN_VAR_I32 == varType) value = Literal(int32_t(0));
@@ -42,17 +42,17 @@ Literal Literal::Call(Interpreter* interpreter, LiteralList args)
 				if (TOKEN_DEF == varType) value = Literal(FunctorLiteral());
 				if (TOKEN_VAR_VEC == varType)
 				{
-					if (Literal::LITERAL_TYPE_BOOL == vecType)
+					if (LITERAL_TYPE_BOOL == vecType)
 						value = Literal(std::vector<bool>());
-					else if (Literal::LITERAL_TYPE_INTEGER == vecType)
+					else if (LITERAL_TYPE_INTEGER == vecType)
 						value = Literal(std::vector<int32_t>());
-					else if (Literal::LITERAL_TYPE_DOUBLE == vecType)
+					else if (LITERAL_TYPE_DOUBLE == vecType)
 						value = Literal(std::vector<double>());
-					else if (Literal::LITERAL_TYPE_STRING == vecType)
+					else if (LITERAL_TYPE_STRING == vecType)
 						value = Literal(std::vector<std::string>());
-					else if (Literal::LITERAL_TYPE_ENUM == vecType)
+					else if (LITERAL_TYPE_ENUM == vecType)
 						value = Literal(std::vector<EnumLiteral>());
-					else if (Literal::LITERAL_TYPE_TT_STRUCT == vecType)
+					else if (LITERAL_TYPE_TT_STRUCT == vecType)
 						value = Literal(std::vector<Literal>(), vecType);
 				}
 
@@ -249,6 +249,9 @@ std::string Literal::ToString() const
 	case LITERAL_TYPE_ENUM:
 		return "<enum " + m_enumValue.enumValue + ">";
 
+	case LITERAL_TYPE_PAIR:
+		return "<pair " + m_pairKey->ToString() + ": " + m_pairValue->ToString() + ">";
+
 	case LITERAL_TYPE_FUNCTOR:
 		if (m_functorExpr) return "<anonymous ftn, arity=" + std::to_string(m_functorExpr->GetParams().size()) + ">";
 		return "<anonymous ftn, not assigned>";
@@ -361,6 +364,86 @@ std::string Literal::ToString() const
 		};
 		
 		return ret + "]";
+	}
+
+	case LITERAL_TYPE_MAP:
+	{
+		std::string ret = "<Map,";
+
+		LiteralTypeEnum keyType = m_mapValue.keyType;
+		LiteralTypeEnum valueType = m_mapValue.valueType;
+
+		if (LITERAL_TYPE_INTEGER == keyType) ret.append("i32");
+		else if (LITERAL_TYPE_STRING == keyType) ret.append("string");
+		else if (LITERAL_TYPE_ENUM == keyType) ret.append("enum");
+		else
+			ret.append("invalid");
+		
+		ret.append(",");
+
+		if (LITERAL_TYPE_BOOL == valueType) ret.append("bool");
+		else if (LITERAL_TYPE_INTEGER == valueType) ret.append("i32");
+		else if (LITERAL_TYPE_DOUBLE == valueType) ret.append("f32");
+		else if (LITERAL_TYPE_STRING == valueType) ret.append("string");
+		else if (LITERAL_TYPE_ENUM == valueType) ret.append("enum");
+		else if (LITERAL_TYPE_TT_STRUCT == valueType) ret.append("struct");
+		else
+			ret.append("invalid");
+
+		ret.append(">[");
+
+		if (LITERAL_TYPE_INTEGER == keyType)
+		{
+			int i = 0;
+			for (auto& v : m_mapValue.intMap)
+			{
+				if (0 == i)
+				{
+					ret.append(std::to_string(v.first) + ":" + v.second->ToString());
+				}
+				else
+				{
+					ret.append(", " + std::to_string(v.first) + ":" + v.second->ToString());
+				}
+				i++;
+			}
+		}
+		else if (LITERAL_TYPE_STRING == keyType)
+		{
+			int i = 0;
+			for (auto& v : m_mapValue.stringMap)
+			{
+				if (0 == i)
+				{
+					ret.append(v.first + ":" + v.second->ToString());
+				}
+				else
+				{
+					ret.append(", " + v.first + ":" + v.second->ToString());
+				}
+				i++;
+			}
+		}
+		else if (LITERAL_TYPE_ENUM == keyType)
+		{
+			int i = 0;
+			for (auto& v : m_mapValue.enumMap)
+			{
+				if (0 == i)
+				{
+					ret.append(v.first + ":" + v.second->ToString());
+				}
+				else
+				{
+					ret.append(", " + v.first + ":" + v.second->ToString());
+				}
+				i++;
+			}
+		}
+
+		ret.append("]");
+
+		return ret;
 	}
 
 	// raylib custom

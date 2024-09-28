@@ -200,7 +200,7 @@ class DestructStmt : public Stmt
 public:
 	DestructStmt() = delete;
 
-	DestructStmt(std::vector<Token*> types, std::vector<Token*> names, Expr* expr, std::vector<Literal::LiteralTypeEnum> vtypes, std::string fqns, bool internal = true)
+	DestructStmt(std::vector<Token*> types, std::vector<Token*> names, Expr* expr, std::vector<LiteralTypeEnum> vtypes, std::vector<LiteralTypeEnum> mapKeyTypes, std::vector<LiteralTypeEnum> mapValueTypes, std::string fqns, bool internal = true)
 	{
 		assert(types.size() == names.size());
 		assert(types.size() == vtypes.size());
@@ -208,6 +208,8 @@ public:
 		m_tokens = names;
 		m_expr = expr;
 		m_vecTypes = vtypes;
+		m_mapKeyTypes = mapKeyTypes;
+		m_mapValueTypes = mapValueTypes;
 		m_fqns = fqns;
 		m_internal = internal;
 	}
@@ -215,7 +217,9 @@ public:
 	Expr* Expression() { return m_expr; }
 	const std::vector<Token*>& Operators() { return m_tokens; }
 	const std::vector<Token*>& VarTypes() { return m_types; }
-	const std::vector<Literal::LiteralTypeEnum>& VarVecTypes() { return m_vecTypes; }
+	const std::vector<LiteralTypeEnum>& VarVecTypes() { return m_vecTypes; }
+	const std::vector<LiteralTypeEnum>& MapKeyTypes() { return m_mapKeyTypes; }
+	const std::vector<LiteralTypeEnum>& MapValueTypes() { return m_mapValueTypes; }
 	std::string FQNS() { return m_fqns; }
 	bool Internal() { return m_internal; }
 
@@ -225,7 +229,9 @@ private:
 	std::vector<Token*> m_types;
 	std::vector<Token*> m_tokens;
 	Expr* m_expr;
-	std::vector<Literal::LiteralTypeEnum> m_vecTypes;
+	std::vector<LiteralTypeEnum> m_vecTypes;
+	std::vector<LiteralTypeEnum> m_mapKeyTypes;
+	std::vector<LiteralTypeEnum> m_mapValueTypes;
 	std::string m_fqns;
 	bool m_internal;
 };
@@ -286,12 +292,14 @@ class VarStmt : public Stmt
 public:
 	VarStmt() = delete;
 
-	VarStmt(Token* type, Token* name, Expr* expr, Literal::LiteralTypeEnum vtype, std::string fqns, bool internal = true)
+	VarStmt(Token* type, Token* name, Expr* expr, LiteralTypeEnum vtype, LiteralTypeEnum mapKeyType, LiteralTypeEnum mapValueType, std::string fqns, bool internal = true)
 	{
 		m_type = type;
 		m_token = name;
 		m_expr = expr;
 		m_vecType = vtype;
+		m_mapKeyType = mapKeyType;
+		m_mapValueType = mapValueType;
 		m_fqns = fqns;
 		m_internal = internal;
 	}
@@ -299,7 +307,9 @@ public:
 	Expr* Expression() { return m_expr; }
 	Token* Operator() { return m_token; }
 	Token* VarType() { return m_type; }
-	Literal::LiteralTypeEnum VarVecType() { return m_vecType; }
+	LiteralTypeEnum VarVecType() { return m_vecType; }
+	LiteralTypeEnum MapKeyType() { return m_mapKeyType; }
+	LiteralTypeEnum MapValueType() { return m_mapValueType; }
 	std::string FQNS() { return m_fqns; }
 	bool Internal() { return m_internal; }
 
@@ -309,7 +319,9 @@ private:
 	Token* m_type;
 	Token* m_token;
 	Expr* m_expr;
-	Literal::LiteralTypeEnum m_vecType;
+	LiteralTypeEnum m_vecType;
+	LiteralTypeEnum m_mapKeyType;
+	LiteralTypeEnum m_mapValueType;
 	std::string m_fqns;
 	bool m_internal;
 };

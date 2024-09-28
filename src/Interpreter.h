@@ -151,6 +151,7 @@ private:
 		case EXPRESSION_SET: return VisitSet((SetExpr*)expr);
 		case EXPRESSION_FORMAT: return VisitFormat((FormatExpr*)expr);
 		case EXPRESSION_FUNCTOR: return VisitFunctor((FunctorExpr*)expr);
+		case EXPRESSION_PAIR: return VisitPair((PairExpr*)expr);
 		}
 
 		return Literal();
@@ -213,7 +214,7 @@ private:
 
 		const std::vector<Token*>& names = stmt->Operators();
 		const std::vector<Token*>& varTypes = stmt->VarTypes();
-		const std::vector<Literal::LiteralTypeEnum>& vecTypes = stmt->VarVecTypes();
+		const std::vector<LiteralTypeEnum>& vecTypes = stmt->VarVecTypes();
 
 		// if value is invalid, nothing to assign
 		if (value.IsInvalid())
@@ -230,17 +231,17 @@ private:
 				if (TOKEN_VAR_BOOL == varType) value = Literal(false);
 				if (TOKEN_VAR_VEC == varType)
 				{
-					if (Literal::LITERAL_TYPE_BOOL == vecType)
+					if (LITERAL_TYPE_BOOL == vecType)
 						value = Literal(std::vector<bool>());
-					else if (Literal::LITERAL_TYPE_INTEGER == vecType)
+					else if (LITERAL_TYPE_INTEGER == vecType)
 						value = Literal(std::vector<int32_t>());
-					else if (Literal::LITERAL_TYPE_DOUBLE == vecType)
+					else if (LITERAL_TYPE_DOUBLE == vecType)
 						value = Literal(std::vector<double>());
-					else if (Literal::LITERAL_TYPE_STRING == vecType)
+					else if (LITERAL_TYPE_STRING == vecType)
 						value = Literal(std::vector<std::string>());
-					else if (Literal::LITERAL_TYPE_ENUM == vecType)
+					else if (LITERAL_TYPE_ENUM == vecType)
 						value = Literal(std::vector<EnumLiteral>());
-					else if (Literal::LITERAL_TYPE_TT_STRUCT == vecType)
+					else if (LITERAL_TYPE_TT_STRUCT == vecType)
 						value = Literal(std::vector<Literal>(), vecType);
 				}
 
@@ -315,7 +316,9 @@ private:
 		// check for type casting
 		bool pass = false;
 		TokenTypeEnum varType = stmt->VarType()->GetType();
-		Literal::LiteralTypeEnum vecType = stmt->VarVecType();
+		LiteralTypeEnum vecType = stmt->VarVecType();
+		LiteralTypeEnum mapKeyType = stmt->MapKeyType();
+		LiteralTypeEnum mapValueType = stmt->MapValueType();
 
 		if (!value.IsRange())
 		{
@@ -330,18 +333,22 @@ private:
 				if (TOKEN_DEF == varType) value = Literal(FunctorLiteral());
 				if (TOKEN_VAR_VEC == varType)
 				{
-					if (Literal::LITERAL_TYPE_BOOL == vecType)
+					if (LITERAL_TYPE_BOOL == vecType)
 						value = Literal(std::vector<bool>());
-					else if (Literal::LITERAL_TYPE_INTEGER == vecType)
+					else if (LITERAL_TYPE_INTEGER == vecType)
 						value = Literal(std::vector<int32_t>());
-					else if (Literal::LITERAL_TYPE_DOUBLE == vecType)
+					else if (LITERAL_TYPE_DOUBLE == vecType)
 						value = Literal(std::vector<double>());
-					else if (Literal::LITERAL_TYPE_STRING == vecType)
+					else if (LITERAL_TYPE_STRING == vecType)
 						value = Literal(std::vector<std::string>());
-					else if (Literal::LITERAL_TYPE_ENUM == vecType)
+					else if (LITERAL_TYPE_ENUM == vecType)
 						value = Literal(std::vector<EnumLiteral>());
-					else if (Literal::LITERAL_TYPE_TT_STRUCT == vecType)
+					else if (LITERAL_TYPE_TT_STRUCT == vecType)
 						value = Literal(std::vector<Literal>(), vecType);
+				}
+				if (TOKEN_VAR_MAP == varType)
+				{
+					value = Literal(MapLiteral(mapKeyType, mapValueType));
 				}
 
 				// user defined type
@@ -367,7 +374,8 @@ private:
 					(TOKEN_VAR_VEC == varType && !value.IsVector()) ||
 					(TOKEN_VAR_VEC != varType && value.IsVector()) ||
 					(TOKEN_VAR_ENUM == varType && !value.IsEnum()) ||
-					(TOKEN_VAR_VEC == varType && value.IsVector() && vecType != value.GetVecType())
+					(TOKEN_VAR_VEC == varType && value.IsVector() && vecType != value.GetVecType()) ||
+					(TOKEN_VAR_MAP == varType && (mapKeyType != value.GetMapKeyType() || mapValueType != value.GetMapValueType()))
 					)
 				{
 					m_errorHandler->Error("", 0, "Unable to cast between types.");
@@ -473,8 +481,8 @@ private:
 	Literal VisitAssign(AssignExpr* expr)
 	{
 		Literal value = Evaluate(expr->Right());
-		int idx = -1;
-		if (expr->VecIndex()) idx = Evaluate(expr->VecIndex()).IntValue();
+		Literal idx;
+		if (expr->VecIndex()) idx = Evaluate(expr->VecIndex());
 		m_environment->Assign(expr->Operator()->Lexeme(), value, idx, expr->FQNS());
 		return value;
 	}
@@ -594,15 +602,34 @@ private:
 			return Literal(left.DoubleValue() / right.DoubleValue());
 
 		case TOKEN_STAR:
-			CheckNumberOperand(expr->Operator(), left, right);
-			if (left.IsDouble() || right.IsDouble())
+			if (left.IsString())
 			{
-				// auto convert to double if one side is double
-				return Literal(left.DoubleValue() * right.DoubleValue());
+				// string replication
+				CheckNumberOperand(expr->Operator(), right);
+				if (right.IsNumeric())
+				{
+					int reps = std::max(0, right.IntValue());
+					std::string lval = left.StringValue();
+					std::string ret;
+					for (size_t i = 0; i < reps; ++i)
+					{
+						ret.append(lval);
+					}
+					return Literal(ret);
+				}
 			}
 			else
 			{
-				return Literal(left.IntValue() * right.IntValue());
+				CheckNumberOperand(expr->Operator(), left, right);
+				if (left.IsDouble() || right.IsDouble())
+				{
+					// auto convert to double if one side is double
+					return Literal(left.DoubleValue() * right.DoubleValue());
+				}
+				else
+				{
+					return Literal(left.IntValue() * right.IntValue());
+				}
 			}
 
 		case TOKEN_PERCENT:
@@ -656,7 +683,7 @@ private:
 	Literal VisitBracket(BracketExpr* expr)
 	{
 		
-		Literal::LiteralTypeEnum vecType = Literal::LITERAL_TYPE_INVALID;
+		LiteralTypeEnum vecType = LITERAL_TYPE_INVALID;
 
 		std::vector<bool> args_b;
 		std::vector<int32_t> args_i;
@@ -683,32 +710,32 @@ private:
 				{
 					if (lhs.IsBool())
 					{
-						vecType = Literal::LITERAL_TYPE_BOOL;
+						vecType = LITERAL_TYPE_BOOL;
 						args_b.push_back(lhs.BoolValue());
 					}
 					else if (lhs.IsInt())
 					{
-						vecType = Literal::LITERAL_TYPE_INTEGER;
+						vecType = LITERAL_TYPE_INTEGER;
 						args_i.push_back(lhs.IntValue());
 					}
 					else if (lhs.IsDouble())
 					{
-						vecType = Literal::LITERAL_TYPE_DOUBLE;
+						vecType = LITERAL_TYPE_DOUBLE;
 						args_d.push_back(lhs.DoubleValue());
 					}
 					else if (lhs.IsString())
 					{
-						vecType = Literal::LITERAL_TYPE_STRING;
+						vecType = LITERAL_TYPE_STRING;
 						args_s.push_back(lhs.StringValue());
 					}
 					else if (lhs.IsEnum())
 					{
-						vecType = Literal::LITERAL_TYPE_ENUM;
+						vecType = LITERAL_TYPE_ENUM;
 						args_e.push_back(lhs.EnumValue());
 					}
 					else if (lhs.IsInstance())
 					{
-						vecType = Literal::LITERAL_TYPE_TT_STRUCT;
+						vecType = LITERAL_TYPE_TT_STRUCT;
 						args_u.push_back(lhs);
 					}
 				}
@@ -720,9 +747,9 @@ private:
 			{
 				/*if (x.IsVecBool())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_BOOL == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_BOOL == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_BOOL;
+						vecType = LITERAL_TYPE_BOOL;
 						std::vector<bool> v = x.VecValue_B();
 						if (!args_b.empty()) {
 							args_b.insert(args_b.end(), v.begin(), v.end());
@@ -737,9 +764,9 @@ private:
 				}
 				else if (x.IsVecInteger())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_INTEGER == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_INTEGER == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_INTEGER;
+						vecType = LITERAL_TYPE_INTEGER;
 						std::vector<int32_t> v = x.VecValue_I();
 						if (!args_i.empty()) {
 							args_i.insert(args_i.end(), v.begin(), v.end());
@@ -754,9 +781,9 @@ private:
 				}
 				else if (x.IsVecDouble())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_DOUBLE == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_DOUBLE == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_DOUBLE;
+						vecType = LITERAL_TYPE_DOUBLE;
 						std::vector<double> v = x.VecValue_D();
 						if (!args_d.empty()) {
 							args_d.insert(args_d.end(), v.begin(), v.end());
@@ -771,9 +798,9 @@ private:
 				}
 				else if (x.IsVecString())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_STRING == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_STRING == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_STRING;
+						vecType = LITERAL_TYPE_STRING;
 						std::vector<std::string> v = x.VecValue_S();
 						if (!args_s.empty()) {
 							args_s.insert(args_s.end(), v.begin(), v.end());
@@ -788,9 +815,9 @@ private:
 				}
 				else if (x.IsVecEnum())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_ENUM == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_ENUM == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_ENUM;
+						vecType = LITERAL_TYPE_ENUM;
 						std::vector<EnumLiteral> v = x.VecValue_E();
 						if (!args_e.empty()) {
 							args_e.insert(args_e.end(), v.begin(), v.end());
@@ -805,9 +832,9 @@ private:
 				}
 				else if (x.IsVecStruct())
 				{
-					if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_TT_STRUCT == vecType)
+					if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_TT_STRUCT == vecType)
 					{
-						vecType = Literal::LITERAL_TYPE_TT_STRUCT;
+						vecType = LITERAL_TYPE_TT_STRUCT;
 						std::vector<Literal> v = x.VecValue_U();
 						if (!args_u.empty()) {
 							args_u.insert(args_u.end(), v.begin(), v.end());
@@ -824,9 +851,9 @@ private:
 			}
 			else if (x.IsRange())
 			{
-				if (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_INTEGER == vecType)
+				if (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_INTEGER == vecType)
 				{
-					vecType = Literal::LITERAL_TYPE_INTEGER;
+					vecType = LITERAL_TYPE_INTEGER;
 					int lhs = x.LeftValue();
 					int rhs = x.RightValue();
 					/*int newsz = args_i.size() + rhs - lhs;
@@ -840,34 +867,34 @@ private:
 			}
 			else
 			{
-				if (x.IsBool() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_BOOL == vecType))
+				if (x.IsBool() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_BOOL == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_BOOL;
+					vecType = LITERAL_TYPE_BOOL;
 					args_b.push_back(x.BoolValue());
 				}
-				else if (x.IsInt() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_INTEGER == vecType))
+				else if (x.IsInt() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_INTEGER == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_INTEGER;
+					vecType = LITERAL_TYPE_INTEGER;
 					args_i.push_back(x.IntValue());
 				}
-				else if (x.IsDouble() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_DOUBLE == vecType))
+				else if (x.IsDouble() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_DOUBLE == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_DOUBLE;
+					vecType = LITERAL_TYPE_DOUBLE;
 					args_d.push_back(x.DoubleValue());
 				}
-				else if (x.IsString() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_STRING == vecType))
+				else if (x.IsString() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_STRING == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_STRING;
+					vecType = LITERAL_TYPE_STRING;
 					args_s.push_back(x.StringValue());
 				}
-				else if (x.IsEnum() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_ENUM == vecType))
+				else if (x.IsEnum() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_ENUM == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_ENUM;
+					vecType = LITERAL_TYPE_ENUM;
 					args_e.push_back(x.EnumValue());
 				}
-				else if (x.IsInstance() && (Literal::LITERAL_TYPE_INVALID == vecType || Literal::LITERAL_TYPE_TT_STRUCT == vecType))
+				else if (x.IsInstance() && (LITERAL_TYPE_INVALID == vecType || LITERAL_TYPE_TT_STRUCT == vecType))
 				{
-					vecType = Literal::LITERAL_TYPE_TT_STRUCT;
+					vecType = LITERAL_TYPE_TT_STRUCT;
 					args_u.push_back(x);
 				}
 				else
@@ -877,12 +904,12 @@ private:
 			}
 		}
 
-		if (Literal::LITERAL_TYPE_BOOL == vecType) return Literal(args_b);
-		if (Literal::LITERAL_TYPE_INTEGER == vecType) return Literal(args_i);
-		if (Literal::LITERAL_TYPE_DOUBLE == vecType) return Literal(args_d);
-		if (Literal::LITERAL_TYPE_STRING == vecType) return Literal(args_s);
-		if (Literal::LITERAL_TYPE_ENUM == vecType) return Literal(args_e);
-		if (Literal::LITERAL_TYPE_TT_STRUCT == vecType) return Literal(args_u, vecType);
+		if (LITERAL_TYPE_BOOL == vecType) return Literal(args_b);
+		if (LITERAL_TYPE_INTEGER == vecType) return Literal(args_i);
+		if (LITERAL_TYPE_DOUBLE == vecType) return Literal(args_d);
+		if (LITERAL_TYPE_STRING == vecType) return Literal(args_s);
+		if (LITERAL_TYPE_ENUM == vecType) return Literal(args_e);
+		if (LITERAL_TYPE_TT_STRUCT == vecType) return Literal(args_u, vecType);
 
 		return Literal();
 	}
@@ -1038,6 +1065,41 @@ private:
 	}
 
 
+	Literal VisitPair(PairExpr* expr)
+	{
+		Literal ret = Literal();
+
+		Expr* key = expr->GetKey();
+		if (key)
+		{
+			Expr* value = expr->GetValue();
+			if (value)
+			{
+				Literal lhs = Evaluate(key);
+				Literal rhs = Evaluate(value);
+				if (lhs.IsInt() || lhs.IsString() || lhs.IsEnum())
+				{
+					ret = Literal(lhs, rhs);
+				}
+				else
+				{
+					printf("Pair key must be of type i32, string, or enum..\n");
+				}
+			}
+			else
+			{
+				printf("Missing Value in Key-Value pair.\n");
+			}
+		}
+		else
+		{
+			printf("Missing Key in Key-Value pair.\n");
+		}
+		
+		return ret;
+	}
+
+
 	Literal VisitFunctor(FunctorExpr* expr)
 	{
 		Literal ftn = Literal();
@@ -1102,7 +1164,7 @@ private:
 			args.push_back(Evaluate(arg));
 		}
 
-		return Literal(args, Literal::LITERAL_TYPE_ANONYMOUS);
+		return Literal(args, LITERAL_TYPE_ANONYMOUS);
 	}
 
 
@@ -1133,7 +1195,60 @@ private:
 	Literal VisitVariable(VariableExpr* expr)
 	{
 		Literal v = m_environment->Get(expr->Operator(), expr->FQNS());
-		if (v.IsVector())
+		if (v.IsMap())
+		{
+			if (expr->VecIndex())
+			{
+				Literal x = Evaluate(expr->VecIndex());
+				LiteralTypeEnum keyType = v.GetMapKeyType();
+				if (x.GetType() == keyType)
+				{
+					MapLiteral mp = v.MapValue();
+					if (LITERAL_TYPE_INTEGER == keyType)
+					{
+						int idx = x.IntValue();
+						if (0 != mp.intMap.count(idx))
+						{
+							return *(mp.intMap.at(idx));
+						}
+						else
+						{
+							m_errorHandler->Error(expr->Operator()->Filename(), expr->Operator()->Line(), "Invalid key '" + std::to_string(idx) + "' for map '" + v.ToString() + "'.");
+						}
+					}
+					else if (LITERAL_TYPE_STRING == keyType)
+					{
+						std::string idx = x.StringValue();
+						if (0 != mp.stringMap.count(idx))
+						{
+							return *(mp.stringMap.at(idx));
+						}
+						else
+						{
+							m_errorHandler->Error(expr->Operator()->Filename(), expr->Operator()->Line(), "Invalid key '" + idx + "' for map '" + v.ToString() + "'.");
+						}
+					}
+					else if (LITERAL_TYPE_ENUM == keyType)
+					{
+						std::string idx = x.EnumValue().enumValue;
+						if (0 != mp.enumMap.count(idx))
+						{
+							return *(mp.enumMap.at(idx));
+						}
+						else
+						{
+							m_errorHandler->Error(expr->Operator()->Filename(), expr->Operator()->Line(), "Invalid key '" + idx + "' for map '" + v.ToString() + "'.");
+						}
+					}
+				}
+				else
+				{
+					m_errorHandler->Error(expr->Operator()->Filename(), expr->Operator()->Line(), "Invalid key type for map index of" + v.ToString() + ".");
+				}
+
+			}
+		}
+		else if (v.IsVector() || v.IsString())
 		{
 			if (expr->VecIndex())
 			{
@@ -1147,12 +1262,19 @@ private:
 					}
 					else
 					{
-						if (v.IsVecBool()) return Literal(v.VecValueAt_B(idx));
-						if (v.IsVecInteger()) return Literal(v.VecValueAt_I(idx));
-						if (v.IsVecDouble()) return Literal(v.VecValueAt_D(idx));
-						if (v.IsVecString()) return Literal(v.VecValueAt_S(idx));
-						if (v.IsVecEnum()) return Literal(v.VecValueAt_E(idx));
-						if (v.IsVecStruct()) return Literal(v.VecValueAt_U(idx));
+						if (v.IsVector())
+						{
+							if (v.IsVecBool()) return Literal(v.VecValueAt_B(idx));
+							if (v.IsVecInteger()) return Literal(v.VecValueAt_I(idx));
+							if (v.IsVecDouble()) return Literal(v.VecValueAt_D(idx));
+							if (v.IsVecString()) return Literal(v.VecValueAt_S(idx));
+							if (v.IsVecEnum()) return Literal(v.VecValueAt_E(idx));
+							if (v.IsVecStruct()) return Literal(v.VecValueAt_U(idx));
+						}
+						else if (v.IsString())
+						{
+							return Literal(v.StringValue().substr(idx, 1));
+						}
 					}
 				}
 				else if (x.IsRange())
@@ -1170,47 +1292,54 @@ private:
 					}
 					else
 					{
-						if (v.IsVecBool())
+						if (v.IsVector())
 						{
-							std::vector<bool> temp = v.VecValue_B();
-							std::vector<bool> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return ret;
+							if (v.IsVecBool())
+							{
+								std::vector<bool> temp = v.VecValue_B();
+								std::vector<bool> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return ret;
+							}
+							else if (v.IsVecInteger())
+							{
+								std::vector<int32_t> temp = v.VecValue_I();
+								std::vector<int32_t> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return ret;
+							}
+							else if (v.IsVecDouble())
+							{
+								std::vector<double> temp = v.VecValue_D();
+								std::vector<double> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return ret;
+							}
+							else if (v.IsVecString())
+							{
+								std::vector<std::string> temp = v.VecValue_S();
+								std::vector<std::string> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return ret;
+							}
+							else if (v.IsVecEnum())
+							{
+								std::vector<EnumLiteral> temp = v.VecValue_E();
+								std::vector<EnumLiteral> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return ret;
+							}
+							else if (v.IsVecStruct())
+							{
+								std::vector<Literal> temp = v.VecValue_U();
+								std::vector<Literal> ret;
+								ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
+								return Literal(ret, LITERAL_TYPE_TT_STRUCT);
+							}
 						}
-						else if (v.IsVecInteger())
+						else if (v.IsString())
 						{
-							std::vector<int32_t> temp = v.VecValue_I();
-							std::vector<int32_t> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return ret;
-						}
-						else if (v.IsVecDouble())
-						{
-							std::vector<double> temp = v.VecValue_D();
-							std::vector<double> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return ret;
-						}
-						else if (v.IsVecString())
-						{
-							std::vector<std::string> temp = v.VecValue_S();
-							std::vector<std::string> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return ret;
-						}
-						else if (v.IsVecEnum())
-						{
-							std::vector<EnumLiteral> temp = v.VecValue_E();
-							std::vector<EnumLiteral> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return ret;
-						}
-						else if (v.IsVecStruct())
-						{
-							std::vector<Literal> temp = v.VecValue_U();
-							std::vector<Literal> ret;
-							ret.insert(ret.begin(), temp.begin() + lhs, temp.begin() + rhs);
-							return Literal(ret, Literal::LITERAL_TYPE_TT_STRUCT);
+							return Literal(v.StringValue().substr(lhs, rhs-lhs));
 						}
 					}
 				}
@@ -1237,16 +1366,34 @@ private:
 			}
 			else
 			{
-				int idx = -1;
-				if (expr->VecIndex()) idx = Evaluate(expr->VecIndex()).IntValue();
-				if (idx != -1 && ret.IsVector())
+				if (ret.IsVector() || ret.IsString())
 				{
-					if (ret.IsVecBool()) return ret.VecValueAt_B(idx);
-					if (ret.IsVecInteger()) return ret.VecValueAt_I(idx);
-					if (ret.IsVecDouble()) return ret.VecValueAt_D(idx);
-					if (ret.IsVecString()) return ret.VecValueAt_S(idx);
-					if (ret.IsVecEnum()) return ret.VecValueAt_E(idx);
-					if (ret.IsVecStruct()) return ret.VecValueAt_U(idx);
+					int idx = -1;
+					if (expr->VecIndex()) idx = Evaluate(expr->VecIndex()).IntValue();
+					if (idx != -1)
+					{
+						if (ret.IsVector())
+						{
+							if (ret.IsVecBool()) return ret.VecValueAt_B(idx);
+							if (ret.IsVecInteger()) return ret.VecValueAt_I(idx);
+							if (ret.IsVecDouble()) return ret.VecValueAt_D(idx);
+							if (ret.IsVecString()) return ret.VecValueAt_S(idx);
+							if (ret.IsVecEnum()) return ret.VecValueAt_E(idx);
+							if (ret.IsVecStruct()) return ret.VecValueAt_U(idx);
+						}
+						else if (ret.IsString())
+						{
+							return ret.StringValue().substr(idx, 1);
+						}
+					}
+				}
+				else if (ret.IsMap())
+				{
+					if (expr->VecIndex())
+					{
+						Literal idx = Evaluate(expr->VecIndex());
+						printf("attempting to access map with idx: %s\n", idx.ToString());
+					}
 				}
 			}
 			return ret;

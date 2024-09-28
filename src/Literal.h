@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <cfloat>
 #include <cmath>
+#include <memory>
 
 #ifndef NO_RAYLIB
 #include <raylib.h>
@@ -21,11 +22,51 @@ class Literal;
 
 typedef std::vector<Literal> LiteralList;
 
+enum LiteralTypeEnum
+{
+	LITERAL_TYPE_INVALID,
+	LITERAL_TYPE_DOUBLE,
+	LITERAL_TYPE_INTEGER,
+	LITERAL_TYPE_STRING,
+	LITERAL_TYPE_BOOL,
+	LITERAL_TYPE_ENUM,
+	LITERAL_TYPE_RANGE,
+	LITERAL_TYPE_VEC,
+	LITERAL_TYPE_MAP,
+	LITERAL_TYPE_PAIR,
+	LITERAL_TYPE_ANONYMOUS, // used for destructuring comma separated values
+	LITERAL_TYPE_FUNCTION,
+	LITERAL_TYPE_TT_FUNCTION,
+	LITERAL_TYPE_TT_STRUCT,
+	LITERAL_TYPE_FUNCTOR,
+
+	// raylib custom
+	LITERAL_TYPE_FONT,
+	LITERAL_TYPE_IMAGE,
+	LITERAL_TYPE_RENDER_TEXTURE_2D,
+	LITERAL_TYPE_TEXTURE,
+	LITERAL_TYPE_SOUND,
+	LITERAL_TYPE_SHADER,
+};
+
 struct EnumLiteral
 {
 	std::string enumValue;
 	EnumLiteral() {}
 	EnumLiteral(std::string v) : enumValue(v) {}
+};
+
+class Literal;
+
+struct MapLiteral
+{
+	LiteralTypeEnum keyType;
+	LiteralTypeEnum valueType;
+	std::map<int, std::shared_ptr<Literal> > intMap;
+	std::map<std::string, std::shared_ptr<Literal> > stringMap;
+	std::map<std::string, std::shared_ptr<Literal> > enumMap;
+	MapLiteral() {};
+	MapLiteral(LiteralTypeEnum ktype, LiteralTypeEnum vtype) : keyType(ktype), valueType(vtype) {}
 };
 
 struct FunctorLiteral
@@ -35,30 +76,7 @@ struct FunctorLiteral
 class Literal
 {
 public:
-	enum LiteralTypeEnum
-	{
-		LITERAL_TYPE_INVALID,
-		LITERAL_TYPE_DOUBLE,
-		LITERAL_TYPE_INTEGER,
-		LITERAL_TYPE_STRING,
-		LITERAL_TYPE_BOOL,
-		LITERAL_TYPE_ENUM,
-		LITERAL_TYPE_RANGE,
-		LITERAL_TYPE_VEC,
-		LITERAL_TYPE_ANONYMOUS, // used for destructuring comma separated values
-		LITERAL_TYPE_FUNCTION,
-		LITERAL_TYPE_TT_FUNCTION,
-		LITERAL_TYPE_TT_STRUCT,
-		LITERAL_TYPE_FUNCTOR,
-		
-		// raylib custom
-		LITERAL_TYPE_FONT,
-		LITERAL_TYPE_IMAGE,
-		LITERAL_TYPE_RENDER_TEXTURE_2D,
-		LITERAL_TYPE_TEXTURE,
-		LITERAL_TYPE_SOUND,
-		LITERAL_TYPE_SHADER,
-	};
+	
 
 	Literal()
 	{
@@ -90,6 +108,19 @@ public:
 	{
 		m_enumValue = val;
 		m_type = LITERAL_TYPE_ENUM;
+	}
+
+	Literal(MapLiteral val)
+	{
+		m_mapValue = val;
+		m_type = LITERAL_TYPE_MAP;
+	}
+
+	Literal(Literal key, Literal value)
+	{
+		m_pairKey = std::make_shared<Literal>(key);
+		m_pairValue = std::make_shared<Literal>(value);
+		m_type = LITERAL_TYPE_PAIR;
 	}
 
 	Literal(FunctorLiteral val)
@@ -201,8 +232,10 @@ public:
 	bool IsBool() const { return m_type == LITERAL_TYPE_BOOL; }
 	bool IsFunctor() const { return m_type == LITERAL_TYPE_FUNCTOR; }
 	bool IsRange() const { return m_type == LITERAL_TYPE_RANGE; }
+	bool IsPair() const { return m_type == LITERAL_TYPE_PAIR; }
 	bool IsInvalid() const { return m_type == LITERAL_TYPE_INVALID; }
 	bool IsVector() const { return m_type == LITERAL_TYPE_VEC; }
+	bool IsMap() const { return m_type == LITERAL_TYPE_MAP; }
 	bool IsInstance() const {
 		return (m_type == LITERAL_TYPE_TT_STRUCT && m_isInstance);
 	}
@@ -249,8 +282,10 @@ public:
 	EnumLiteral EnumValue() const { return m_enumValue; }
 	double DoubleValue() const{ return m_doubleValue; }
 	int32_t IntValue() const{ return m_intValue; }
+	MapLiteral MapValue() const { return m_mapValue; }
 	int32_t LeftValue() const{ return m_leftValue; }
 	int32_t RightValue() const{ return m_rightValue; }
+	std::pair<Literal, Literal> PairValue() const { return std::make_pair(*m_pairKey, *m_pairValue); }
 
 #ifndef NO_RAYLIB
 	// ralylib custom
@@ -284,6 +319,10 @@ public:
 	bool IsVecStruct() const { return LITERAL_TYPE_TT_STRUCT == m_vecType; }
 	bool IsVecAnonymous() const { return LITERAL_TYPE_ANONYMOUS == m_vecType; }
 
+	LiteralTypeEnum GetMapKeyType() const { return m_mapValue.keyType; }
+	LiteralTypeEnum GetMapValueType() const { return m_mapValue.valueType; }
+	
+
 	Literal GetParameter(const std::string& name);
 	bool SetParameter(const std::string& name, Literal value, size_t index);
 
@@ -298,6 +337,20 @@ public:
 		m_ftn = ftn;
 		m_type = LITERAL_TYPE_FUNCTION;
 		m_fqns = fqns;
+	}
+
+	// set values in maps
+	void SetMapValueAt_I(std::shared_ptr<Literal> value, int idx)
+	{
+		m_mapValue.intMap[idx] = value;
+	}
+	void SetMapValueAt_S(std::shared_ptr<Literal> value, std::string idx)
+	{
+		m_mapValue.stringMap[idx] = value;
+	}
+	void SetMapValueAt_E(std::shared_ptr<Literal> value, std::string idx)
+	{
+		m_mapValue.enumMap[idx] = value;
 	}
 
 	// set values in arrays
@@ -393,6 +446,9 @@ private:
 	int32_t m_rightValue;
 	std::string m_stringValue;
 	EnumLiteral m_enumValue;
+	MapLiteral m_mapValue;
+	std::shared_ptr<Literal> m_pairKey;
+	std::shared_ptr<Literal> m_pairValue;
 	FunctorLiteral m_functorValue;
 	std::vector<bool> m_vecValue_b;
 	std::vector<int32_t> m_vecValue_i;
@@ -429,6 +485,6 @@ private:
 
 };
 
-
+typedef std::pair<Literal, Literal> PairLiteral;
 
 #endif // LITERAL_H

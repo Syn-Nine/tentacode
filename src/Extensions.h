@@ -120,6 +120,7 @@ public:
             double ret = unif(rng);
 			if (1 == args.size() && args[0].IsRange())
 			{
+				// return a value within a range
 				int32_t lhs = args[0].LeftValue();
 				int32_t rhs = args[0].RightValue();
 				int32_t delta = rhs - lhs;
@@ -127,6 +128,7 @@ public:
 			}
 			else if (1 == args.size() && args[0].IsInt())
 			{
+				// return a vector of N values
 				int sz = args[0].IntValue();
 				if (0 < sz)
 				{
@@ -141,6 +143,7 @@ public:
 			}
 			else if (2 == args.size() && args[0].IsRange() && args[1].IsInt())
 			{
+				// return a vector within a range
 				int sz = args[1].IntValue();
 				if (0 < sz)
 				{
@@ -344,8 +347,131 @@ public:
 		}, nspace);
 		globals->Define("trim", strTrim, "global::str::");
 		
+		
+		///////////////////////
+		// Map
 		///////////////////////
 
+		// map::contains
+		Literal mapContainsLiteral = Literal();
+		mapContainsLiteral.SetCallable(2, [](LiteralList args)->Literal
+		{
+			Literal lhs = args[0];
+			Literal rhs = args[1];
+
+			if (lhs.IsMap())
+			{
+				MapLiteral mp = lhs.MapValue();
+				if (rhs.GetType() == mp.keyType &&
+					(LITERAL_TYPE_INTEGER == mp.keyType ||
+					LITERAL_TYPE_STRING == mp.keyType ||
+					LITERAL_TYPE_ENUM == mp.keyType))
+				{
+					if (LITERAL_TYPE_INTEGER == mp.keyType)
+					{
+						int idx = rhs.IntValue();
+						return 0 != mp.intMap.count(idx);
+					}
+					else if (LITERAL_TYPE_STRING == mp.keyType)
+					{
+						std::string idx = rhs.StringValue();
+						return 0 != mp.stringMap.count(idx);
+					}
+					else if (LITERAL_TYPE_ENUM == mp.keyType)
+					{
+						std::string idx = rhs.EnumValue().enumValue;
+						return 0 != mp.enumMap.count(idx);
+					}
+				}
+				else
+				{
+					printf("Invalid key type in map::insert\n");
+				}
+			}
+		
+			printf("Error in map::insert() arguments.\n");
+			return 0;
+		}, nspace);
+		globals->Define("contains", mapContainsLiteral, "global::map::");
+
+
+		// map::insert
+		Literal mapInsertLiteral = Literal();
+		mapInsertLiteral.SetCallable(3, [](LiteralList args)->Literal
+		{
+			Literal lhs = args[0];
+			Literal mhs = args[1];
+			Literal rhs = args[2];
+
+			if (lhs.IsMap())
+			{
+				MapLiteral mp = lhs.MapValue();
+				if (mhs.GetType() == mp.keyType &&
+					(LITERAL_TYPE_INTEGER == mp.keyType ||
+					LITERAL_TYPE_STRING == mp.keyType ||
+					LITERAL_TYPE_ENUM == mp.keyType))
+				{
+					if (rhs.GetType() == mp.valueType)
+					{
+						if (LITERAL_TYPE_INTEGER == mp.keyType)
+						{
+							int idx = mhs.IntValue();
+							if (0 == mp.intMap.count(idx))
+							{
+								mp.intMap.insert(std::make_pair(idx, std::shared_ptr<Literal>(new Literal(rhs))));
+							}
+							else
+							{
+								mp.intMap[idx] = std::shared_ptr<Literal>(new Literal(rhs));
+							}
+							return mp;
+						}
+						else if (LITERAL_TYPE_STRING == mp.keyType)
+						{
+							std::string idx = mhs.StringValue();
+							if (0 == mp.stringMap.count(idx))
+							{
+								mp.stringMap.insert(std::make_pair(idx, std::shared_ptr<Literal>(new Literal(rhs))));
+							}
+							else
+							{
+								mp.stringMap[idx] = std::shared_ptr<Literal>(new Literal(rhs));
+							}
+							return mp;
+						}
+						else if (LITERAL_TYPE_ENUM == mp.keyType)
+						{
+							std::string idx = mhs.EnumValue().enumValue;
+							if (0 == mp.enumMap.count(idx))
+							{
+								mp.enumMap.insert(std::make_pair(idx, std::shared_ptr<Literal>(new Literal(rhs))));
+							}
+							else
+							{
+								mp.enumMap[idx] = std::shared_ptr<Literal>(new Literal(rhs));
+							}
+							return mp;
+						}
+					}
+					else
+					{
+						printf("Invalid value type in map::insert\n");
+					}
+				}
+				else
+				{
+					printf("Invalid key type in map::insert\n");
+				}
+			}
+
+			printf("Error in map::insert() arguments.\n");
+			return 0;
+		}, nspace);
+		globals->Define("insert", mapInsertLiteral, "global::map::");
+		
+		///////////////////////
+		// Vec
+		///////////////////////
 
 		// vec::append()
 		Literal vecAppendLiteral = Literal();
@@ -454,7 +580,7 @@ public:
 						vals.insert(vals.end(), vals_b.begin(), vals_b.end());
 					}
 				}
-				return Literal(vals, Literal::LITERAL_TYPE_TT_STRUCT);
+				return Literal(vals, LITERAL_TYPE_TT_STRUCT);
 			}
 			
 
@@ -462,6 +588,68 @@ public:
 			return 0;
 		}, nspace);
 		globals->Define("append", vecAppendLiteral, "global::vec::");
+
+		// vec::sort
+		Literal vecSortLiteral = Literal();
+		vecSortLiteral.SetCallable(1, [](LiteralList args)->Literal
+		{
+			Literal vals = args[0];
+			if (vals.IsVector())
+			{
+				if (vals.IsVecDouble())
+				{
+					auto v = vals.VecValue_D();
+					std::sort(v.begin(), v.end());
+					return v;
+				
+				}
+				else if (vals.IsVecInteger())
+				{
+					auto v = vals.VecValue_I();
+					std::sort(v.begin(), v.end());
+					return v;
+				}
+			}
+		
+			printf("Error in vec::sort() arguments.\n");
+			return 0;
+		}, nspace);
+		globals->Define("sort", vecSortLiteral, "global::vec::");
+
+		// vec::sort_by_key
+		Literal vecSortByKeyLiteral = Literal();
+		vecSortByKeyLiteral.SetCallable(2, [](LiteralList args)->Literal
+		{
+			Literal vals = args[0];
+			Literal keys = args[1];
+			if (vals.IsVector() && keys.IsVector() && (keys.IsVecDouble() || keys.IsVecInteger()))
+			{
+				std::vector<int> inc(vals.Len(), 0);
+				std::iota(inc.begin(), inc.end(), 0);
+				if (keys.IsVecDouble())
+				{
+					std::sort(inc.begin(), inc.end(), [&](auto &i0, auto &i1) { return keys.VecValueAt_D(i0) < keys.VecValueAt_D(i1); });
+				} else {
+					std::sort(inc.begin(), inc.end(), [&](auto &i0, auto &i1) { return keys.VecValueAt_I(i0) < keys.VecValueAt_I(i1); });
+				}
+
+				Literal ret = vals;
+				for (size_t i = 0; i < ret.Len(); ++i)
+				{
+					if (vals.IsVecBool())         { ret.SetValueAt(vals.VecValueAt_B(inc[i]), i); }
+					else if (vals.IsVecDouble())  { ret.SetValueAt(vals.VecValueAt_D(inc[i]), i); }
+					else if (vals.IsVecEnum())    { ret.SetValueAt(vals.VecValueAt_E(inc[i]), i); }
+					else if (vals.IsVecInteger()) { ret.SetValueAt(vals.VecValueAt_I(inc[i]), i); }
+					else if (vals.IsVecString())  { ret.SetValueAt(vals.VecValueAt_S(inc[i]), i); }
+					else if (vals.IsVecStruct())  { ret.SetValueAt(vals.VecValueAt_U(inc[i]), i); }
+				}
+				return ret;
+			}
+		
+			printf("Error in vec::sort_by_key() arguments.\n");
+			return 0;
+		}, nspace);
+		globals->Define("sort_by_key", vecSortByKeyLiteral, "global::vec::");
 
         
         //////////////////////////////////////////////

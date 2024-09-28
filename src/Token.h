@@ -87,10 +87,12 @@ public:
 		case TOKEN_PRINT: type = "TOKEN_PRINT"; break;
 		case TOKEN_PRINTLN: type = "TOKEN_PRINTLN"; break;
 		case TOKEN_FORMAT: type = "TOKEN_FORMAT"; break;
+		case TOKEN_PAIR: type = "TOKEN_PAIR"; break;
 		case TOKEN_VAR_I32: type = "TOKEN_VAR_I32"; break;
 		case TOKEN_VAR_F32: type = "TOKEN_VAR_F32"; break;
 		case TOKEN_VAR_STRING: type = "TOKEN_VAR_STRING"; break;
 		case TOKEN_VAR_VEC: type = "TOKEN_VAR_VEC"; break;
+		case TOKEN_VAR_MAP: type = "TOKEN_VAR_MAP"; break;
 		case TOKEN_VAR_ENUM: type = "TOKEN_VAR_ENUM"; break;
 		case TOKEN_VAR_BOOL: type = "TOKEN_VAR_BOOL"; break;
 		case TOKEN_AND: type = "TOKEN_AND"; break;

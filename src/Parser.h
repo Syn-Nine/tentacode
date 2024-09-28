@@ -200,8 +200,8 @@ private:
 
 		if (Check(TOKEN_DEF) && CheckNext(TOKEN_IDENTIFIER) && CheckNextNext(TOKEN_LEFT_PAREN)) return Function("function");
 		
-		if (Match(7, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
-			TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
+		if (Match(8, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+			TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
 			return VarDeclaration();
 		
 		// raylib custom
@@ -280,8 +280,8 @@ private:
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd())
 		{
-			if (Match(13, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
-				TOKEN_VAR_VEC, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
+			if (Match(14, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+				TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
 
 				// raylib custom
 				TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_RENDER_TEXTURE_2D, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND, TOKEN_VAR_SHADER))
@@ -314,7 +314,7 @@ private:
 		bool internal = m_internal;
 		Token* type = new Token(Previous());
 
-		Literal::LiteralTypeEnum vtype = Literal::LITERAL_TYPE_INVALID; 
+		LiteralTypeEnum vtype = LITERAL_TYPE_INVALID; 
 		if (TOKEN_VAR_VEC == type->GetType())
 		{
 			if (Consume(TOKEN_LESS, "Expected <type> after vec."))
@@ -324,19 +324,19 @@ private:
 				{
 					TokenTypeEnum prevType = Previous().GetType();
 					if (TOKEN_VAR_BOOL == prevType)
-						vtype = Literal::LITERAL_TYPE_BOOL;
+						vtype = LITERAL_TYPE_BOOL;
 					else if (TOKEN_VAR_I32 == prevType)
-						vtype = Literal::LITERAL_TYPE_INTEGER;
+						vtype = LITERAL_TYPE_INTEGER;
 					else if (TOKEN_VAR_F32 == prevType)
-						vtype = Literal::LITERAL_TYPE_DOUBLE;
+						vtype = LITERAL_TYPE_DOUBLE;
 					else if (TOKEN_VAR_STRING == prevType)
-						vtype = Literal::LITERAL_TYPE_STRING;
+						vtype = LITERAL_TYPE_STRING;
 					else if (TOKEN_VAR_ENUM == prevType)
-						vtype = Literal::LITERAL_TYPE_ENUM;
+						vtype = LITERAL_TYPE_ENUM;
 				}
 				else if (Match(1, TOKEN_IDENTIFIER))
 				{
-					vtype = Literal::LITERAL_TYPE_TT_STRUCT;
+					vtype = LITERAL_TYPE_TT_STRUCT;
 				}
 				else
 				{
@@ -346,9 +346,62 @@ private:
 			}
 		}
 
+		LiteralTypeEnum mapKeyType = LITERAL_TYPE_INVALID;
+		LiteralTypeEnum mapValueType = LITERAL_TYPE_INVALID;
+		if (TOKEN_VAR_MAP == type->GetType())
+		{
+			if (Consume(TOKEN_LESS, "Expected <key,value> after map."))
+			{
+				if (Match(3, TOKEN_VAR_I32, TOKEN_VAR_STRING, TOKEN_VAR_ENUM))
+				{
+					TokenTypeEnum prevType = Previous().GetType();
+					if (TOKEN_VAR_I32 == prevType)
+						mapKeyType = LITERAL_TYPE_INTEGER;
+					else if (TOKEN_VAR_STRING == prevType)
+						mapKeyType = LITERAL_TYPE_STRING;
+					else if (TOKEN_VAR_ENUM == prevType)
+						mapKeyType = LITERAL_TYPE_ENUM;
+
+					if (Consume(TOKEN_COMMA, "Expected <key,value> after map."))
+					{
+						if (Match(5, TOKEN_VAR_BOOL, TOKEN_VAR_I32, TOKEN_VAR_F32,
+							TOKEN_VAR_STRING, TOKEN_VAR_ENUM))
+						{
+							TokenTypeEnum prevType = Previous().GetType();
+							if (TOKEN_VAR_BOOL == prevType)
+								mapValueType = LITERAL_TYPE_BOOL;
+							else if (TOKEN_VAR_I32 == prevType)
+								mapValueType = LITERAL_TYPE_INTEGER;
+							else if (TOKEN_VAR_F32 == prevType)
+								mapValueType = LITERAL_TYPE_DOUBLE;
+							else if (TOKEN_VAR_STRING == prevType)
+								mapValueType = LITERAL_TYPE_STRING;
+							else if (TOKEN_VAR_ENUM == prevType)
+								mapValueType = LITERAL_TYPE_ENUM;
+						}
+						else if (Match(1, TOKEN_IDENTIFIER))
+						{
+							mapValueType = LITERAL_TYPE_TT_STRUCT;
+						}
+						else
+						{
+							Error(Previous(), "Invalid map value type.");
+						}
+						Consume(TOKEN_GREATER, "Expected '>' after map type.");
+					}
+				}
+				else
+				{
+					Error(Previous(), "Invalid map key type, must be i32, string, or enum.");
+				}
+			}
+		}
+
 		std::vector<Token*> ids;
 		std::vector<Token*> types;
-		std::vector<Literal::LiteralTypeEnum> vtypes;
+		std::vector<LiteralTypeEnum> vtypes;
+		std::vector<LiteralTypeEnum> mktypes;
+		std::vector<LiteralTypeEnum> mvtypes;
 
 		do
 		{
@@ -356,6 +409,8 @@ private:
 			ids.push_back(new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), type->Line(), type->Filename()));
 			types.push_back(type);
 			vtypes.push_back(vtype);
+			mktypes.push_back(mapKeyType);
+			mvtypes.push_back(mapValueType);
 		
 		} while (Match(1, TOKEN_COMMA));
 
@@ -366,10 +421,10 @@ private:
 
 		if (1 < ids.size())
 		{
-			return new DestructStmt(types, ids, expr, vtypes, fqns, internal);
+			return new DestructStmt(types, ids, expr, vtypes, mktypes, mvtypes, fqns, internal);
 		}
 
-		return new VarStmt(type, ids[0], expr, vtype, fqns, internal);
+		return new VarStmt(type, ids[0], expr, vtype, mapKeyType, mapValueType, fqns, internal);
 	}
 
 	Stmt* UdtDeclaration()
@@ -391,7 +446,7 @@ private:
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, Literal::LITERAL_TYPE_INVALID, fqns, internal);
+		return new VarStmt(type, id, expr, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, fqns, internal);
 	}
 
 	Stmt* VarDeclarationForInRange()
@@ -415,7 +470,7 @@ private:
 						expr = new RangeExpr(r->Left(), r->Operator(), temp);
 						delete old;
 					}
-					return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, Literal::LITERAL_TYPE_INVALID, m_fqns);
+					return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, m_fqns);
 				}
 			}
 		}
@@ -455,7 +510,7 @@ private:
 				body = new WhileStmt(condition, body, increment, label);
 
 				// build new initializer
-				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, rangeLeft, Literal::LITERAL_TYPE_INVALID, m_fqns);
+				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, rangeLeft, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, LITERAL_TYPE_INVALID, m_fqns);
 
 				// build outer block
 				StmtList* list = new StmtList();
@@ -879,6 +934,12 @@ private:
 			return FinishFormat();
 		}
 
+		if (Match(1, TOKEN_PAIR))
+		{
+			Consume(TOKEN_LEFT_PAREN, "Expect '(' after pair.");
+			return FinishPair();
+		}
+
 		if (Match(1, TOKEN_IDENTIFIER))
 		{
 			Token prev = Previous();
@@ -961,7 +1022,7 @@ private:
 
 	Expr* FinishCall(Expr* callee)
 	{
-		// similar to FinishFormat
+		// similar to FinishFormat and FinishPair
 		ArgList args;
 		if (!Check(TOKEN_RIGHT_PAREN))
 		{
@@ -982,7 +1043,7 @@ private:
 
 	Expr* FinishFormat()
 	{
-		// similar to FinishCall
+		// similar to FinishCall and FinishPair
 		ArgList args;
 		if (!Check(TOKEN_RIGHT_PAREN)) args.push_back(Expression());
 
@@ -994,6 +1055,37 @@ private:
 
 		return new FormatExpr(paren, args, m_fqns);
 	}
+
+
+	Expr* FinishPair()
+	{
+		// similar to FinishCall and FinishPair
+		Expr* expr = Expression();
+		if (EXPRESSION_STRUCTURE != expr->GetType())
+		{
+			Error(Peek(), "Parser Error: Expected key value pair.");
+		}
+		else
+		{
+			StructExpr* temp = (StructExpr*)expr;
+			ArgList args = temp->GetArguments();
+			if (args.size() != 2)
+			{
+				Error(Peek(), "Parser Error: Expected key value pair.");
+			}
+			else
+			{
+				if (Consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments."))
+				{
+					Token* paren = new Token(Previous());
+					return new PairExpr(paren, args[0], args[1]);
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
 
 	Expr* FinishFunctor(Token* oper)
 	{

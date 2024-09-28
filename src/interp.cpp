@@ -114,11 +114,17 @@ void RunPrompt()
 	//char* cmd = "def factorial = @(x) {\n  if x == 0 { return 1; }\n  return x * factorial(x - 1);\n};\n\nprintln(factorial(5));";
 	//char* cmd = "enum e0 = :A;	def ee = @() { println(e0); e0 = :B; };	ee(); ee(); ";
 	//char* cmd = "enum e0 = :A;	def ee = @(x) { println(e0); e0 = x; };	ee(:B); ee(e0); ";
-	char* cmd = "string a = \"aa\";\nstring b = format(\"b{a}\");\nprintln(a);\nprintln(b);\nprintln(format(\"c{b}\"));";
+	//char* cmd = "string a = \"aa\";\nstring b = format(\"b{a}\");\nprintln(a);\nprintln(b);\nprintln(format(\"c{b}\"));";
 	//char* cmd = "string a = \"aa\";\ni32 b = 66;\nstring c = format(\"c{}{a}\", b);\nprintln(c);";
 
-//	printf("%s\n", cmd);
-//	Run(cmd, "Console");
+	//char* cmd = "string mystr = \"abcdef\";\nprintln(mystr[0]);\nprintln(mystr[len(mystr)-1]);\nprintln(mystr[1..4]);";
+	//char* cmd = "string mystr = \"abc\" * 3;\nprintln(mystr);\nprintln(len(mystr*0));";
+
+	char* cmd = "vec<f32> v = rand(5);\nprintln(v);\n\nvec<string> s = [\"a\", \"b\", \"c\", \"d\", \"e\"];\ns = vec::sort_by_key(s, v);\n\nv = vec::sort(v);\nprintln(v);\nprintln(s);";
+
+
+	printf("%s\n", cmd);
+	Run(cmd, "Console");
 
 
 	// play game override

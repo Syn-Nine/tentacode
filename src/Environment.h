@@ -77,7 +77,7 @@ public:
 		//m_nextScopeLabel.clear();
 	}
 
-	void Assign(std::string name, Literal value, int index, std::string fqns)
+	void Assign(std::string name, Literal value, Literal index, std::string fqns)
 	{
 		//printf("Environment::Assign: %s, %s, %d\n", name.c_str(), value.ToString().c_str(), index);
 
@@ -117,30 +117,78 @@ public:
 				{
 					v = value;
 				}
+				else if (v.IsMap())
+				{
+					LiteralTypeEnum keyType = v.GetMapKeyType();
+					if (index.GetType() == keyType)
+					{
+						MapLiteral mp = v.MapValue();
+						if (LITERAL_TYPE_INTEGER == keyType)
+						{
+							int idx = index.IntValue();
+							if (0 != mp.intMap.count(idx))
+							{
+								v.SetMapValueAt_I(std::shared_ptr<Literal>(new Literal(value)), idx);
+							}
+							else
+							{
+								m_errorHandler->Error("", 0, "Unable to map '" + name + " at index " + index.ToString() + ".");
+							}
+						}
+						else if (LITERAL_TYPE_STRING == keyType)
+						{
+							std::string idx = index.StringValue();
+							if (0 != mp.stringMap.count(idx))
+							{
+								v.SetMapValueAt_S(std::shared_ptr<Literal>(new Literal(value)), idx);
+							}
+							else
+							{
+								m_errorHandler->Error("", 0, "Unable to map '" + name + " at index " + index.ToString() + ".");
+							}
+						}
+						else if (LITERAL_TYPE_ENUM == keyType)
+						{
+							std::string idx = index.EnumValue().enumValue;
+							if (0 != mp.enumMap.count(idx))
+							{
+								v.SetMapValueAt_E(std::shared_ptr<Literal>(new Literal(value)), idx);
+							}
+							else
+							{
+								m_errorHandler->Error("", 0, "Unable to map '" + name + " at index " + index.ToString() + ".");
+							}
+						}
+					}
+				}
 				else if (v.IsVector())
 				{
-					if (index < v.Len() && index != -1)
-					{
-						if (v.IsVecBool())
-							v.SetValueAt(value.BoolValue(), index);
-						else if (v.IsVecInteger())
-							v.SetValueAt(value.IntValue(), index);
-						else if (v.IsVecDouble())
-							v.SetValueAt(value.DoubleValue(), index);
-						else if (v.IsVecString())
-							v.SetValueAt(value.StringValue(), index);
-						else if (v.IsVecEnum())
-							v.SetValueAt(value.EnumValue(), index);
-						else if (v.IsVecStruct())
-							v.SetValueAt(value, index);
-					}
-					else if (-1 == index)
+					if (LITERAL_TYPE_INVALID == index.GetType())
 					{
 						m_errorHandler->Error("", 0, "No vector index provided.");
 					}
 					else
 					{
-						m_errorHandler->Error("", 0, "Vector index [" + std::to_string(index) + "] out of bounds during assignment (Size: " + std::to_string(v.Len()) + ").");
+						int idx = index.IntValue();
+						if (idx < v.Len() && idx != -1)
+						{
+							if (v.IsVecBool())
+								v.SetValueAt(value.BoolValue(), idx);
+							else if (v.IsVecInteger())
+								v.SetValueAt(value.IntValue(), idx);
+							else if (v.IsVecDouble())
+								v.SetValueAt(value.DoubleValue(), idx);
+							else if (v.IsVecString())
+								v.SetValueAt(value.StringValue(), idx);
+							else if (v.IsVecEnum())
+								v.SetValueAt(value.EnumValue(), idx);
+							else if (v.IsVecStruct())
+								v.SetValueAt(value, idx);
+						}
+						else
+						{
+							m_errorHandler->Error("", 0, "Vector index [" + std::to_string(idx) + "] out of bounds during assignment (Size: " + std::to_string(v.Len()) + ").");
+						}
 					}
 				}
 				else
