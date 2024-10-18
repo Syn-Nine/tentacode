@@ -1,6 +1,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
+#include <sstream>
+#include <iomanip>
 #include <vector>
 #include <string>
 
@@ -40,6 +42,28 @@ static std::string StrReplace(std::string str, const std::string& from, const st
         start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
     }
 	return str;
+}
+
+
+std::string GenerateUUID()
+{
+    unsigned char bytes[16];
+
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+
+    for (unsigned i = 0; i < 16; i++)
+    {
+        bytes[i] = rand() % 256;
+        if (i == 0) bytes[i] = bytes[i] & 0x0f;
+        if (i == 6) bytes[i] = 0x40 | (bytes[i] & 0x0F);
+        if (i == 8) bytes[i] = 0x80 | (bytes[i] & 0x3F);
+
+        ss << std::setw(2) << static_cast<unsigned>(bytes[i]);
+        if (i == 3 || i == 5 || i == 7 || i == 9) ss << '-';
+    }
+
+    return ss.str();
 }
 
 #endif
