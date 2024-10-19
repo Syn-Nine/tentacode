@@ -150,12 +150,19 @@ if map::contains(map_b, :RED) { println("Test Failed, " + FILELINE); }
 
 // vector sorting test
 CLEARENV
-vec<f32> v = rand(5);
-println(v);
-
+vec<f32> v = [0.566717, 0.343530, 0.168039, 0.920681, 0.690629];
 vec<string> s = ["a", "b", "c", "d", "e"];
 s = vec::sort_by_key(s, v);
+if "c" != s[0] { println("Test Failed, " + FILELINE); }
+if "b" != s[1] { println("Test Failed, " + FILELINE); }
+if "a" != s[2] { println("Test Failed, " + FILELINE); }
+if "e" != s[3] { println("Test Failed, " + FILELINE); }
+if "d" != s[4] { println("Test Failed, " + FILELINE); }
 
-v = vec::sort(v);
-println(v);
-println(s);
+
+// thread pooling
+CLEARENV
+vec<i32> src = [0..9];
+println(src);
+sys::batch(len(src), @(x) { src[x] = src[x] * src[x]; });
+println(src);

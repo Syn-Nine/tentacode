@@ -74,22 +74,6 @@ public:
 	bool IsString() const { return m_type == LITERAL_TYPE_STRING; }
 	bool IsBool() const { return m_type == LITERAL_TYPE_BOOL; }
 	bool IsInvalid() const { return m_type == LITERAL_TYPE_INVALID; }
-	
-	int32_t Len() const
-	{
-		switch (m_type)
-		{
-		case LITERAL_TYPE_STRING:
-			return m_stringValue.size();
-
-		case LITERAL_TYPE_BOOL:
-		case LITERAL_TYPE_DOUBLE:
-		case LITERAL_TYPE_INTEGER:
-			return 1;
-
-		}
-		return 0;
-	}
 
 	LiteralTypeEnum GetType() const { return m_type; }
 	
@@ -100,53 +84,6 @@ public:
 
 	std::string ToString() const;
 
-	bool Equals(const Literal& val) const
-	{
-		if (val.IsDouble()) return Equals(val.DoubleValue());
-		if (val.IsInt()) return Equals(val.IntValue());
-		if (val.IsString()) return Equals(val.StringValue());
-		if (val.IsBool()) return Equals(val.BoolValue());
-
-		return false;
-	}
-
-	bool Equals(double val) const
-	{
-		if (!IsDouble() && !IsInt()) return false;
-		
-		double rhs = m_doubleValue;
-		if (IsInt()) rhs = double(m_intValue);
-		
-		if (std::fabs(val - rhs) > DBL_MIN) return false;
-		
-		return true;
-	}
-
-	bool Equals(int32_t val) const
-	{
-		if (!IsDouble() && !IsInt()) return false;
-
-		if (IsDouble())
-		{
-			if (std::fabs(double(val) - m_doubleValue) > DBL_MIN) return false;
-			return true;
-		}
-		
-		return m_intValue == val;
-	}
-
-	bool Equals(std::string val) const
-	{
-		if (!IsString()) return false;
-		if (m_stringValue.compare(val) != 0) return false;
-		return true;
-	}
-
-	bool Equals(bool val) const
-	{
-		if (!IsBool()) return false;
-		return m_boolValue == val;
-	}
 
 private:
 
