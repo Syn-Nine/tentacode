@@ -10,6 +10,9 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+#include <random>
+#include <istream>
 
 using namespace llvm;
 
@@ -19,12 +22,17 @@ using namespace llvm;
 #define DLLEXPORT
 #endif
 
-extern "C" DLLEXPORT void print(int32_t* p)
+extern "C" DLLEXPORT void input(char* p)
+{
+	if (p) std::cin.getline(p, 255);
+}
+
+extern "C" DLLEXPORT void print(char* p)
 {
 	if (p) printf("%s", p);
 }
 
-extern "C" DLLEXPORT void println(int32_t* p)
+extern "C" DLLEXPORT void println(char* p)
 {
 	if (p) printf("%s\n", p);
 }
@@ -50,21 +58,43 @@ extern "C" DLLEXPORT void btoa2(int d, char* p)
 	}
 }
 
+/*inline int32_t random(int32_t low, int32_t high) {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	static std::uniform_int_distribution<> dist(low, high);
+	return dist(gen);
+}*/
+
 extern "C" DLLEXPORT double rand_impl()
 {
-	return (rand() % 10000) / 10000.0;
+	// todo - go back and profile
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	static std::uniform_real_distribution<> dist(0.0, 1.0);
+	return dist(gen);
 }
 
 static void LoadExtensions(std::unique_ptr<IRBuilder<>>& builder, std::unique_ptr<Module>& module, Environment* env)
 {
-	// seed the rng with the time
-	srand(time(nullptr));
 
 	{
 		std::vector<Type*> args(1, builder->getInt32Ty());
 		FunctionType* FT = FunctionType::get(builder->getVoidTy(), args, false);
 		Function::Create(FT, Function::InternalLinkage, "println", *module);
 		Function::Create(FT, Function::InternalLinkage, "print", *module);
+		Function::Create(FT, Function::InternalLinkage, "input", *module);
+	}
+
+	{
+		std::vector<Type*> args(1, builder->getInt32Ty());
+		FunctionType* FT = FunctionType::get(builder->getInt32Ty(), args, false);
+		Function::Create(FT, Function::InternalLinkage, "atoi", *module);
+	}
+
+	{
+		std::vector<Type*> args(1, builder->getInt32Ty());
+		FunctionType* FT = FunctionType::get(builder->getDoubleTy(), args, false);
+		Function::Create(FT, Function::InternalLinkage, "atof", *module);
 	}
 
 	{

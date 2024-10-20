@@ -523,6 +523,13 @@ private:
 	{
 		Expr* expr = Primary();
 
+		while (Match(1, TOKEN_AS))
+		{
+			Token* oper = new Token(Previous());
+			Expr* right = Primary();
+			expr = new BinaryExpr(expr, oper, right);
+		}
+
 		return expr;
 	}
 
@@ -543,6 +550,9 @@ private:
 			Consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 			return new GroupExpr(expr);
 		}
+
+		// used for AS syntax
+		if (Match(4, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING, TOKEN_VAR_ENUM)) return new VariableExpr(new Token(Previous()), nullptr);
 
 		if (Match(1, TOKEN_IDENTIFIER))
 		{

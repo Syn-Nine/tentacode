@@ -31,6 +31,51 @@ public:
 typedef std::vector<Expr*> ArgList;
 
 
+//-----------------------------------------------------------------------------
+class VariableExpr : public Expr
+{
+public:
+	VariableExpr() = delete;
+	VariableExpr(Token* name, Expr* right)
+	{
+		m_token = name;
+		m_right = right;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_VARIABLE; }
+
+	Token* Operator() { return m_token; }
+	Expr* VecIndex() { return m_right; }
+
+	LiteralTypeEnum GetLiteralType(Environment* env) { return env->GetVariableType(m_token->Lexeme()); }
+
+	Value* codegen(std::unique_ptr<LLVMContext>& context,
+		std::unique_ptr<IRBuilder<>>& builder,
+		std::unique_ptr<Module>& module,
+		Environment* env,
+		LiteralTypeEnum typeHint = LITERAL_TYPE_INVALID)
+	{
+		printf("VariableExpr::codegen()\n");
+		AllocaInst* a = env->GetVariable(m_token->Lexeme());
+		LiteralTypeEnum type = env->GetVariableType(m_token->Lexeme());
+
+		if (LITERAL_TYPE_INTEGER == type || LITERAL_TYPE_BOOL == type || LITERAL_TYPE_DOUBLE == type)
+		{
+			return builder->CreateLoad(a->getAllocatedType(), a, "loadtmp");
+		}
+		else if (LITERAL_TYPE_STRING == type)
+		{
+			return builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
+		}
+
+		return nullptr;
+	}
+
+private:
+	Token* m_token;
+	Expr* m_right;
+};
+
 
 //-----------------------------------------------------------------------------
 class AssignExpr : public Expr
@@ -123,6 +168,10 @@ public:
 		case TOKEN_SLASH:
 			return LITERAL_TYPE_DOUBLE;
 			break;
+
+		case TOKEN_AS:
+			return rtype;
+			break;
 		}
 		
 		return LITERAL_TYPE_INVALID;
@@ -145,20 +194,96 @@ public:
 
 		if (!m_left || !m_right) return nullptr;
 		Value* lhs = m_left->codegen(context, builder, module, env, lt);
+		if (!lhs) return nullptr;
+
+		if (TOKEN_AS == m_token->GetType() && EXPRESSION_VARIABLE == m_right->GetType())
+		{
+			Type* ltype = lhs->getType();
+			TokenTypeEnum new_type = (static_cast<VariableExpr*>(m_right))->Operator()->GetType();
+
+			if (TOKEN_VAR_I32 == new_type)
+			{
+				if (ltype->isIntegerTy()) return lhs;
+				if (ltype->isDoubleTy())
+				{
+					// convert lhs to int
+					return builder->CreateFPToSI(lhs, builder->getInt32Ty(), "int_cast_tmp");
+				}
+				if (ltype->isPointerTy())
+				{
+					// else string
+					return builder->CreateCall(module->getFunction("atoi"), { lhs }, "calltmp");
+				}
+			}
+			else if (TOKEN_VAR_F32 == new_type)
+			{
+				if (ltype->isDoubleTy()) return lhs;
+
+				if (ltype->isIntegerTy())
+				{
+					// convert lhs to double
+					lhs = builder->CreateSIToFP(lhs, builder->getDoubleTy(), "cast_to_dbl");
+					lt = LITERAL_TYPE_DOUBLE;
+				}
+				if (ltype->isPointerTy())
+				{
+					// else string
+					return builder->CreateCall(module->getFunction("atof"), { lhs }, "calltmp");
+				}
+			}
+			else if (TOKEN_VAR_STRING == new_type)
+			{
+				if (ltype->isIntegerTy() || ltype->isDoubleTy() || LITERAL_TYPE_BOOL == lt)
+				{
+					AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(33), "alloctmp");
+					Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
+					builder->CreateStore(builder->getInt8(0), b);
+
+					if (ltype->isIntegerTy())
+					{
+						builder->CreateCall(module->getFunction("itoa2"), { lhs, b }, "calltmp");
+					}
+					else if (ltype->isDoubleTy())
+					{
+						builder->CreateCall(module->getFunction("ftoa2"), { lhs, b }, "calltmp");
+					}
+					else if (LITERAL_TYPE_BOOL == lt)
+					{
+						builder->CreateCall(module->getFunction("btoa2"), { lhs, b }, "calltmp");
+					}
+					return b;
+				}
+			}
+		}
+
+
 		Value* rhs = m_right->codegen(context, builder, module, env, lt);
 		if (!lhs || !rhs) return nullptr;
+
+		if (lhs->getType()->isIntegerTy() && rhs->getType()->isDoubleTy())
+		{
+			// convert lhs to double
+			lhs = builder->CreateSIToFP(lhs, builder->getDoubleTy(), "cast_to_dbl");
+			lt = LITERAL_TYPE_DOUBLE;
+		}
+		else if (rhs->getType()->isIntegerTy() && lhs->getType()->isDoubleTy())
+		{
+			// convert rhs to double
+			rhs = builder->CreateSIToFP(rhs, builder->getDoubleTy(), "cast_to_int");
+			lt = LITERAL_TYPE_DOUBLE;
+		}
 
 		switch (m_token->GetType())
 		{
 		case TOKEN_MINUS:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFSub(lhs, rhs, "subtmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFSub(lhs, rhs, "subtmp");
 			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateSub(lhs, rhs, "subtmp");
 			break;
 
 		case TOKEN_PLUS:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFAdd(lhs, rhs, "addtmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateAdd(lhs, rhs, "addtmp");
-			if (LITERAL_TYPE_STRING == lt)
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFAdd(lhs, rhs, "addtmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateAdd(lhs, rhs, "addtmp");
+			if (lhs->getType()->isPointerTy())
 			{
 				AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(1024), "alloctmp");
 				Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
@@ -170,38 +295,38 @@ public:
 			break;
 
 		case TOKEN_STAR:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFMul(lhs, rhs, "multmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateMul(lhs, rhs, "multmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFMul(lhs, rhs, "multmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateMul(lhs, rhs, "multmp");
 			break;
 
 		case TOKEN_SLASH:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFDiv(lhs, rhs, "divtmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFDiv(lhs, rhs, "divtmp");
 			break;
 
 		case TOKEN_GREATER:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpUGT(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpSGT(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpUGT(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpSGT(lhs, rhs, "cmptmp");
 			break;
 
 		case TOKEN_GREATER_EQUAL:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpUGE(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpSGE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpUGE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpSGE(lhs, rhs, "cmptmp");
 			break;
 
 		case TOKEN_LESS:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpULT(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpSLT(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpULT(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpSLT(lhs, rhs, "cmptmp");
 			break;
 
 		case TOKEN_LESS_EQUAL:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpULE(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpSLE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpULE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpSLE(lhs, rhs, "cmptmp");
 			break;
 
 		case TOKEN_BANG_EQUAL:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpUNE(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpNE(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_STRING == lt)
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpUNE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpNE(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isPointerTy())
 			{
 				std::vector<Value*> args;
 				args.push_back(lhs);
@@ -212,9 +337,9 @@ public:
 			break;
 
 		case TOKEN_EQUAL_EQUAL:
-			if (LITERAL_TYPE_DOUBLE == lt) return builder->CreateFCmpUEQ(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_INTEGER == lt) return builder->CreateICmpEQ(lhs, rhs, "cmptmp");
-			if (LITERAL_TYPE_STRING == lt)
+			if (lhs->getType()->isDoubleTy()) return builder->CreateFCmpUEQ(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isIntegerTy()) return builder->CreateICmpEQ(lhs, rhs, "cmptmp");
+			if (lhs->getType()->isPointerTy())
 			{
 				std::vector<Value*> args;
 				args.push_back(lhs);
@@ -235,8 +360,80 @@ private:
 };
 
 
-// class CallExpr : public Expr
-// v moved to the bottom
+
+//-----------------------------------------------------------------------------
+class CallExpr : public Expr
+{
+public:
+	CallExpr() = delete;
+	CallExpr(Expr* callee, Token* paren, ArgList arguments)
+	{
+		m_callee = callee;
+		m_token = paren;
+		m_arguments = arguments;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_CALL; }
+
+	Expr* GetCallee() { return m_callee; }
+	Token* Operator() { return m_token; }
+	ArgList GetArguments() { return m_arguments; }
+
+	LiteralTypeEnum GetLiteralType(Environment* env)
+	{
+		if (!m_callee || EXPRESSION_VARIABLE != m_callee->GetType()) return LITERAL_TYPE_INVALID;
+		std::string name = (static_cast<VariableExpr*>(m_callee))->Operator()->Lexeme();
+		return env->GetFunctionReturnType(name);
+	}
+
+	Value* codegen(std::unique_ptr<LLVMContext>& context,
+		std::unique_ptr<IRBuilder<>>& builder,
+		std::unique_ptr<Module>& module,
+		Environment* env,
+		LiteralTypeEnum typeHint = LITERAL_TYPE_INVALID)
+	{
+		printf("CallExpr::codegen()\n");
+		if (!m_callee) return nullptr;
+		if (EXPRESSION_VARIABLE != m_callee->GetType()) return nullptr;
+
+		std::string name = (static_cast<VariableExpr*>(m_callee))->Operator()->Lexeme();
+		Function* callee = env->GetFunction(name);
+
+		if (0 == name.compare("input"))
+		{
+			AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(256), "alloctmp");
+			Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
+			builder->CreateStore(builder->getInt8(0), b);
+			builder->CreateCall(module->getFunction("input"), { b }, "calltmp");
+			return b;
+		}
+		else
+		{
+			return builder->CreateCall(callee, {}, "calltmp");
+		}
+
+		/*LiteralTypeEnum lt = this->GetLiteralType(env);
+		if (LITERAL_TYPE_INVALID != typeHint && typeHint != lt)
+		{
+			// return type conversion
+			if (LITERAL_TYPE_DOUBLE == typeHint)
+			{
+				return builder->CreateSIToFP(v, builder->getDoubleTy(), "dbl_cast_tmp");
+			}
+			else if (LITERAL_TYPE_INTEGER == typeHint)
+			{
+				return builder->CreateFPToSI(v, builder->getInt32Ty(), "int_cast_tmp");
+			}
+		}*/
+
+	}
+
+private:
+	Expr* m_callee;
+	Token* m_token;
+	ArgList m_arguments;
+};
+
 
 
 //-----------------------------------------------------------------------------
@@ -477,98 +674,6 @@ private:
 
 
 
-//-----------------------------------------------------------------------------
-class VariableExpr : public Expr
-{
-public:
-	VariableExpr() = delete;
-	VariableExpr(Token* name, Expr* right)
-	{
-		m_token = name;
-		m_right = right;
-	}
-
-	ExpressionTypeEnum GetType() { return EXPRESSION_VARIABLE; }
-
-	Token* Operator() { return m_token; }
-	Expr* VecIndex() { return m_right; }
-	
-	LiteralTypeEnum GetLiteralType(Environment* env) { return env->GetVariableType(m_token->Lexeme()); }
-
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
-		std::unique_ptr<IRBuilder<>>& builder,
-		std::unique_ptr<Module>& module,
-		Environment* env,
-		LiteralTypeEnum typeHint = LITERAL_TYPE_INVALID)
-	{
-		printf("VariableExpr::codegen()\n");
-		AllocaInst* a = env->GetVariable(m_token->Lexeme());
-		LiteralTypeEnum type = env->GetVariableType(m_token->Lexeme());
-
-		if (LITERAL_TYPE_INTEGER == type || LITERAL_TYPE_BOOL == type || LITERAL_TYPE_DOUBLE == type)
-		{
-			return builder->CreateLoad(a->getAllocatedType(), a, "loadtmp");
-		}
-		else if (LITERAL_TYPE_STRING == type)
-		{
-			return builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
-		}
-		
-		return nullptr;
-	}
-
-private:
-	Token* m_token;
-	Expr* m_right;
-};
-
-
-//-----------------------------------------------------------------------------
-class CallExpr : public Expr
-{
-public:
-	CallExpr() = delete;
-	CallExpr(Expr* callee, Token* paren, ArgList arguments)
-	{
-		m_callee = callee;
-		m_token = paren;
-		m_arguments = arguments;
-	}
-
-	ExpressionTypeEnum GetType() { return EXPRESSION_CALL; }
-
-	Expr* GetCallee() { return m_callee; }
-	Token* Operator() { return m_token; }
-	ArgList GetArguments() { return m_arguments; }
-
-	LiteralTypeEnum GetLiteralType(Environment* env)
-	{
-		if (!m_callee || EXPRESSION_VARIABLE != m_callee->GetType()) return LITERAL_TYPE_INVALID;
-		std::string name = (static_cast<VariableExpr*>(m_callee))->Operator()->Lexeme();
-		return env->GetFunctionReturnType(name);
-	}
-
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
-		std::unique_ptr<IRBuilder<>>& builder,
-		std::unique_ptr<Module>& module,
-		Environment* env,
-		LiteralTypeEnum typeHint = LITERAL_TYPE_INVALID)
-	{
-		printf("CallExpr::codegen()\n");
-		if (!m_callee) return nullptr;
-		if (EXPRESSION_VARIABLE != m_callee->GetType()) return nullptr;
-
-		std::string name = (static_cast<VariableExpr*>(m_callee))->Operator()->Lexeme();
-		Function* callee = env->GetFunction(name);
-
-		return builder->CreateCall(callee, {}, "calltmp");
-	}
-
-private:
-	Expr* m_callee;
-	Token* m_token;
-	ArgList m_arguments;
-};
 
 
 #endif // EXPRESSIONS_H

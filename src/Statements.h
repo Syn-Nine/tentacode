@@ -327,18 +327,19 @@ public:
 		std::vector<Value*> args;
 		
 		Value* v = m_expr->codegen(context, builder, module, env);
+		Type* vtype = v->getType();
 
-		if (LITERAL_TYPE_STRING != lt)
+		if (vtype->isIntegerTy() || vtype->isDoubleTy() || LITERAL_TYPE_BOOL == lt)
 		{
 			AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(33), "alloctmp");
 			Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
 			builder->CreateStore(builder->getInt8(0), b);
-			
-			if (LITERAL_TYPE_INTEGER == lt)
+
+			if (vtype->isIntegerTy())
 			{
 				builder->CreateCall(module->getFunction("itoa2"), { v, b }, "calltmp");
 			}
-			else if (LITERAL_TYPE_DOUBLE == lt)
+			else if (vtype->isDoubleTy())
 			{
 				builder->CreateCall(module->getFunction("ftoa2"), { v, b }, "calltmp");
 			}
@@ -346,7 +347,6 @@ public:
 			{
 				builder->CreateCall(module->getFunction("btoa2"), { v, b }, "calltmp");
 			}
-			
 			v = b;
 		}
 		args.push_back(v);
@@ -427,33 +427,32 @@ public:
 		if (a && m_expr)
 		{
 			LiteralTypeEnum lt = m_expr->GetLiteralType(env);
-			if ((LITERAL_TYPE_INTEGER == lt && TOKEN_VAR_I32 == varType) ||
-				(LITERAL_TYPE_BOOL == lt && TOKEN_VAR_BOOL == varType) ||
-				(LITERAL_TYPE_DOUBLE == lt && TOKEN_VAR_F32 == varType))
+
+			Value* rhs = m_expr->codegen(context, builder, module, env);
+			if (!rhs) return nullptr;
+
+			Type* rtype = rhs->getType();
+
+			if (rtype->isIntegerTy() || rtype->isDoubleTy() || LITERAL_TYPE_BOOL == lt)
 			{
-				Value* rhs = m_expr->codegen(context, builder, module, env);
-				if (rhs) builder->CreateStore(rhs, a);
+				if (TOKEN_VAR_I32 == varType && rhs->getType()->isDoubleTy())
+				{
+					rhs = builder->CreateFPToSI(rhs, builder->getInt32Ty(), "cast_to_int");
+				}
+				else if (LITERAL_TYPE_DOUBLE == varType && rhs->getType()->isIntegerTy())
+				{
+					rhs = builder->CreateSIToFP(rhs, builder->getDoubleTy(), "cast_to_dbl");
+				}
+				builder->CreateStore(rhs, a);
 			}
-			else if (LITERAL_TYPE_INTEGER == lt && TOKEN_VAR_F32 == varType)
-			{
-				Value* rhs = m_expr->codegen(context, builder, module, env, LITERAL_TYPE_DOUBLE);
-				if (rhs) builder->CreateStore(rhs, a);
-			}
-			else if (LITERAL_TYPE_DOUBLE == lt && TOKEN_VAR_I32 == varType)
-			{
-				Value* rhs = m_expr->codegen(context, builder, module, env, LITERAL_TYPE_INTEGER);
-				if (rhs) builder->CreateStore(rhs, a);
-			}
-			else if (LITERAL_TYPE_STRING == lt && TOKEN_VAR_STRING == varType)
+			else
 			{
 				Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
-				Value* rhs = m_expr->codegen(context, builder, module, env);
-				if (rhs)
-					builder->CreateCall(module->getFunction("strncpy"), { b, rhs, builder->getInt32(1023) }, "calltmp");
+				builder->CreateCall(module->getFunction("strncpy"), { b, rhs, builder->getInt32(1023) }, "calltmp");
 			}
 		}
 
-		return nullptr;
+		return Constant::getNullValue(builder->getInt32Ty());
 	}
 
 private:

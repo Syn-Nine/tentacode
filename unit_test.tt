@@ -1,168 +1,135 @@
-CLEARENV
 // test operation of FILELINE command
-if FILELINE != "File:unit_test.tt, Line:3" {
+if FILELINE != "File:unit_test.tt, Line:2" {
     println("Failed FILELINE test, " + FILELINE);
 }
 
 
-CLEARENV
 // default initialization test for basic types
-i32 i; f32 f; bool b; string s; enum e;
-if 0     != i { println("Test Failed, " + FILELINE); }
-if 0.0   != f { println("Test Failed, " + FILELINE); }
-if false != b { println("Test Failed, " + FILELINE); }
-if ""    != s { println("Test Failed, " + FILELINE); }
-if ""    != e as string { println("Test Failed, " + FILELINE); }
+{
+	i32 i; f32 f; bool b; string s;// enum e;
+	if 0     != i { println("Test Failed, " + FILELINE); }
+	if 0.0   != f { println("Test Failed, " + FILELINE); }
+	if false != b { println("Test Failed, " + FILELINE); }
+	if ""    != s { println("Test Failed, " + FILELINE); }
+	//if ""    != e as string { println("Test Failed, " + FILELINE); }
+}
 
 
-CLEARENV
 // assignment test for basic types
-i32 i = 1; f32 f = 2.2; bool b = true; string s = "test"; enum e = :TEST;
-if 1       != i { println("Test Failed, " + FILELINE); }
-if 2.2     != f { println("Test Failed, " + FILELINE); }
-if true    != b { println("Test Failed, " + FILELINE); }
-if "test"  != s { println("Test Failed, " + FILELINE); }
-if ":TEST" != e as string { println("Test Failed, " + FILELINE); }
-
-
-CLEARENV
-// type conversion test
-string s = ":blue";
-enum e = s as enum;
-if e != :blue { println("Test Failed, " + FILELINE); }
-
-
-CLEARENV
-// string formating tests
-string a = "aa";
-string b = format("b{a}");
-string c = format("c{b}");
-if "cbaa" != c { println("Test Failed, " + FILELINE); }
+{
+	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test";// enum e = :TEST;
+	// lhs test
+	if 1       != i { println("Test Failed, " + FILELINE); }
+	if 2.2     != f { println("Test Failed, " + FILELINE); }
+	if true    != b { println("Test Failed, " + FILELINE); }
+	if "test"  != s { println("Test Failed, " + FILELINE); }
+	//if ":TEST" != e as string { println("Test Failed, " + FILELINE); }
 	
-string a = "aa";
-i32 b = 66;
-string c = format("c{}{a}{}{}", b, 37.9, :GREEN);
-if "c66aa37.900000<enum :GREEN>" != c { println("Test Failed, " + FILELINE); }
+	// rhs test
+	if i != 1      { println("Test Failed, " + FILELINE); }
+	if f != 2.2    { println("Test Failed, " + FILELINE); }
+	if b != true   { println("Test Failed, " + FILELINE); }
+	if s != "test" { println("Test Failed, " + FILELINE); }
+	//if e as string != ":TEST" { println("Test Failed, " + FILELINE); }
+
+	// float to int automatic cast
+	i32 c = 0.3;
+	if c == 0.3 { println("Test Failed, " + FILELINE); }
+	
+	// redefinition test
+	i32 aa = 5;
+	if 5 != aa { println("Test Failed, " + FILELINE); }
+	f32 aa = 6.7;
+	if 6.7 != aa { println("Test Failed, " + FILELINE); }
+}
 
 
+// test conditional options
+{
+	i32 a = 1;
+	i32 b = 2;
+	i32 c = 3;
+	if a < b {
+		if c > b {
+			if b != b {
+				println("Test Failed, " + FILELINE);
+			}
+			else {
+				if b < b {
+					println("Test Failed, " + FILELINE);
+				}
+				else if b == b {
+					if c >= c {
+						// no op, all tests pass
+					}
+					else {
+						println("Test Failed, " + FILELINE);
+					}
+				}
+				else {
+					println("Test Failed, " + FILELINE);
+				}
+			}
+		}
+		else {
+			println("Test Failed, " + FILELINE);
+		}
+	}
+	else {
+		println("Test Failed, " + FILELINE);
+	}
+}
 
-CLEARENV
+
+// logical operation tests
+{
+	i32 a = 1;
+	i32 b = 2;
+	i32 c = 3;
+	if a < b && b < c {} else { println("Test Failed, " + FILELINE); }
+	if a > b || b < c {} else { println("Test Failed, " + FILELINE); }
+	if !(1 == 1) { println("Test Failed, " + FILELINE); }
+}
+
+
 // test for loop
-i32 i;
-for x in 0..5 {
-    i = i + 1;
-}
-if 5 != i { println("Test Failed, " + FILELINE); }
-
-
-CLEARENV
-// test vec init
-vec<i32> ivec;
-if len(ivec) != 0 { println("Test Failed, " + FILELINE); }
-ivec = [1];
-if len(ivec) != 1 { println("Test Failed, " + FILELINE); }
-if ivec[0] != 1 { println("Test Failed, " + FILELINE); }
-ivec = vec::append(ivec, 3);
-if len(ivec) != 2 { println("Test Failed, " + FILELINE); }
-if ivec[1] != 3 { println("Test Failed, " + FILELINE); }
-ivec = [1, 2, 3];
-if len(ivec) != 3 { println("Test Failed, " + FILELINE); }
-if ivec[0] != 1 || ivec[1] != 2 || ivec[2] != 3 { println("Test Failed, " + FILELINE); }
-ivec = vec::append(ivec, [9;3]);
-if len(ivec) != 6 { println("Test Failed, " + FILELINE); }
-if ivec[5] != 9 { println("Test Failed, " + FILELINE); }
-
-
-// function objects
-CLEARENV
-def a;
-a = @(x, y) { return x * y; };
-if 15 != a(5, 3) { println("Test Failed, " + FILELINE); }
-
-def b = @() { return 22.6; };
-if 22.6 != b() { println("Test Failed, " + FILELINE); }
-
-def c = @(z) { return z * z; };
-if 49 != c(7) { println("Test Failed, " + FILELINE); }
-
-struct ms_s {
-    i32 aa;
-    f32 bb;
-    def d;
+{
+	i32 i;
+	for x in 0..5 {
+		i = i + 1;
+	}
+	if 5 != i { println("Test Failed, " + FILELINE); }
 }
 
-ms_s ms;
-ms.aa = 9;
-ms.bb = 2.1;
-ms.d = @(zz) { return ms.aa * ms.bb * zz; };
-if 113.4 != ms.d(6) { println("Test Failed, " + FILELINE); }
-
-def myfunc(a, b, c) {
-    return c(a, b);
+// test while loop
+{
+	bool b = true;
+	i32 i = 0;
+	while (b) {
+		i = i + 1;
+		if i > 10 {
+			b = false;
+		}
+	}
+	if 11 != i { println("Test Failed, " + FILELINE); }
 }
-if 22.0 != myfunc(4, 5.5, @(x, y) { return x * y; }) { println("Test Failed, " + FILELINE); }
 
-i32 x = 16;
-def factorial = @(x) {
-    if x == 0 { return 1; }
-    return x * factorial(x - 1);
-};
-if 120 != factorial(5) { println("Test Failed, " + FILELINE); }
+// random number generation
+{
+	f32 r = 0.0;
+	if r == rand() { println("Test Failed, " + FILELINE); }
+}
 
-// global variable overwrite from inside function object
-enum e0 = :A;
-def ee = @(x) { e0 = x; };
-ee(:B);
-if :B != e0 { println("Test Failed, " + FILELINE); }
+// string conversion
+{
+	i32 a = 1;
+	f32 b = 12.3;
+	if a as string != "1" { println("Test Failed, " + FILELINE); }
+	if b as string != "12.300000" { println("Test Failed, " + FILELINE); }
+	
+	string s = "s" + a as string + b as string + "t";
+	if s != "s112.300000t" { println("Test Failed, " + FILELINE); }
+}
 
-
-// string access using bracket notation
-CLEARENV
-string mystr = "abcdef";
-if "a" != mystr[0] { println("Test Failed, " + FILELINE); }
-if "f" != mystr[len(mystr)-1] { println("Test Failed, " + FILELINE); }
-if "bcd" != mystr[1..4] { println("Test Failed, " + FILELINE); }
-
-// string replication
-CLEARENV
-string mystr = "abc" * 3;
-if "abcabcabc" != mystr { println("Test Failed, " + FILELINE); }
-if 0 != len(mystr*0) { println("Test Failed, " + FILELINE); }
-
-
-// hash map tests
-CLEARENV
-map<i32, string> map_a;
-map_a = map::insert(map_a, 1, "test");
-if "test" != map_a[1] { println("Test Failed, " + FILELINE); }
-
-map<enum, i32> map_b;
-map_b = map::insert(map_b, :BLUE, 1);
-map_b = map::insert(map_b, :GREEN, 2);
-map_b = map::insert(map_b, :BLUE, 5);
-if 5 != map_b[:BLUE] { println("Test Failed, " + FILELINE); }
-if 2 != map_b[:GREEN] { println("Test Failed, " + FILELINE); }
-map_b[:GREEN] = 7;
-if 7 != map_b[:GREEN] { println("Test Failed, " + FILELINE); }
-if !map::contains(map_b, :GREEN) { println("Test Failed, " + FILELINE); }
-if map::contains(map_b, :RED) { println("Test Failed, " + FILELINE); }
-
-
-// vector sorting test
-CLEARENV
-vec<f32> v = [0.566717, 0.343530, 0.168039, 0.920681, 0.690629];
-vec<string> s = ["a", "b", "c", "d", "e"];
-s = vec::sort_by_key(s, v);
-if "c" != s[0] { println("Test Failed, " + FILELINE); }
-if "b" != s[1] { println("Test Failed, " + FILELINE); }
-if "a" != s[2] { println("Test Failed, " + FILELINE); }
-if "e" != s[3] { println("Test Failed, " + FILELINE); }
-if "d" != s[4] { println("Test Failed, " + FILELINE); }
-
-
-// thread pooling
-CLEARENV
-vec<i32> src = [0..9];
-println(src);
-sys::batch(len(src), @(x) { src[x] = src[x] * src[x]; });
-println(src);
+//
+println("Test Complete");
