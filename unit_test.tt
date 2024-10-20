@@ -1,10 +1,10 @@
-// test operation of FILELINE command
+println("// test operation of FILELINE command");
 if FILELINE != "File:unit_test.tt, Line:2" {
     println("Failed FILELINE test, " + FILELINE);
 }
 
 
-// default initialization test for basic types
+println("// default initialization test for basic types");
 {
 	i32 i; f32 f; bool b; string s;// enum e;
 	if 0     != i { println("Test Failed, " + FILELINE); }
@@ -15,7 +15,7 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 }
 
 
-// assignment test for basic types
+println("// assignment test for basic types");
 {
 	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test";// enum e = :TEST;
 	// lhs test
@@ -44,7 +44,7 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 }
 
 
-// test conditional options
+println("// test conditional options");
 {
 	i32 a = 1;
 	i32 b = 2;
@@ -81,7 +81,7 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 }
 
 
-// logical operation tests
+println("// logical operation tests");
 {
 	i32 a = 1;
 	i32 b = 2;
@@ -92,7 +92,7 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 }
 
 
-// test for loop
+println("// test for loop");
 {
 	i32 i;
 	for x in 0..5 {
@@ -101,26 +101,25 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 	if 5 != i { println("Test Failed, " + FILELINE); }
 }
 
-// test while loop
+
+println("// test while loop");
 {
-	bool b = true;
-	i32 i = 0;
-	while (b) {
+	i32 i;
+	while (i < 10) {
 		i = i + 1;
-		if i > 10 {
-			b = false;
-		}
 	}
-	if 11 != i { println("Test Failed, " + FILELINE); }
+	if 10 != i { println("Test Failed, " + FILELINE); }
 }
 
-// random number generation
+
+println("// random number generation");
 {
-	f32 r = 0.0;
-	if r == rand() { println("Test Failed, " + FILELINE); }
+	f32 r = rand();
+	if r < 0.00000000000001 { println("Test Failed, " + FILELINE); }
 }
 
-// string conversion
+
+println("// string conversion");
 {
 	i32 a = 1;
 	f32 b = 12.3;
@@ -129,6 +128,21 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 	
 	string s = "s" + a as string + b as string + "t";
 	if s != "s112.300000t" { println("Test Failed, " + FILELINE); }
+
+	i32 c = 8 as i32;
+	if 8 != c { println("Test Failed, " + FILELINE); }
+	
+	f32 d = 22.8 as f32;
+	if 22.8 != d { println("Test Failed, " + FILELINE); }
+	
+	i32 c = "5" as i32;
+	if 5 != c { println("Test Failed, " + FILELINE); }
+	
+	f32 d = "33.2" as f32;
+	if 33.2 != d { println("Test Failed, " + FILELINE); }
+	
+	string e = "test" as string;
+	if "test" != e { println("Test Failed, " + FILELINE); }
 }
 
 //

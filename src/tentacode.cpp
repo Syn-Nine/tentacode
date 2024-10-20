@@ -18,6 +18,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include "TValue.h"
 #include "Token.h"
 #include "Parser.h"
 #include "Scanner.h"
@@ -70,13 +71,7 @@ bool Run(const char* buf, const char* filename)
 		{
 			if (STATEMENT_FUNCTION == statement->GetType())
 			{
-				Value* v = statement->codegen(context, builder, module, env);
-				if (v)
-				{
-					printf("LLVM IR: ");
-					v->print(errs());
-					printf("\n");
-				}
+				statement->codegen(context, builder, module, env);
 			}
 		}
 
@@ -90,13 +85,7 @@ bool Run(const char* buf, const char* filename)
 		{
 			if (STATEMENT_FUNCTION != statement->GetType())
 			{
-				Value* v = statement->codegen(context, builder, module, env);
-				if (v)
-				{
-					printf("LLVM IR: ");
-					v->print(errs());
-					printf("\n");
-				}
+				statement->codegen(context, builder, module, env);
 			}
 		}
 

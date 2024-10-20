@@ -3,6 +3,7 @@
 
 #include <assert.h>
 
+#include "TValue.h"
 #include "Enums.h"
 #include "Token.h"
 #include "Expressions.h"
@@ -24,7 +25,7 @@ class Stmt
 public:
 	virtual StatementTypeEnum GetType() = 0;
 	virtual Expr* Expression() { return nullptr; }
-	virtual Value* codegen(std::unique_ptr<LLVMContext>& context,
+	virtual TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env) = 0;
@@ -50,7 +51,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_BLOCK; }
 	
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
@@ -68,13 +69,9 @@ public:
 		
 		for (auto& statement : *m_block)
 		{
-			//StatementTypeEnum stype = statement->GetType();
-			Value* v = statement->codegen(context, builder, module, sub_env);
-			if (v)
+			if (STATEMENT_FUNCTION != statement->GetType())
 			{
-				printf("LLVM IR: ");
-				v->print(errs());
-				printf("\n");
+				statement->codegen(context, builder, module, sub_env);
 			}
 		}
 
@@ -85,7 +82,7 @@ public:
 		builder->CreateBr(after);
 		builder->SetInsertPoint(after);
 
-		return Constant::getNullValue(builder->getInt32Ty());
+		return TValue::NullInvalid();
 	}
 
 private:
@@ -109,7 +106,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_EXPRESSION; }
 
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
@@ -145,7 +142,7 @@ public:
 	TokenList GetParams() { return m_params; }
 	StmtList* GetBody() { return m_body; }
 
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
@@ -197,13 +194,9 @@ public:
 
 		for (auto& statement : *m_body)
 		{
-			//StatementTypeEnum stype = statement->GetType();
-			Value* v = statement->codegen(context, builder, module, sub_env);
-			if (v)
+			if (STATEMENT_FUNCTION != statement->GetType())
 			{
-				printf("LLVM IR: ");
-				v->print(errs());
-				printf("\n");
+				statement->codegen(context, builder, module, sub_env);
 			}
 		}
 
@@ -212,7 +205,7 @@ public:
 		builder->CreateRetVoid();
 		verifyFunction(*ftn);
 
-		return nullptr;
+		return TValue::NullInvalid();
 	}
 
 private:
@@ -243,14 +236,14 @@ public:
 	Stmt* GetThenBranch() { return m_thenBranch; }
 	Stmt* GetElseBranch() { return m_elseBranch; }
 	
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
 	{
 		printf("IfStmt::codegen()\n");
-		Value* CondV = m_condition->codegen(context, builder, module, env);
-		if (!CondV) return nullptr;
+		TValue CondV = m_condition->codegen(context, builder, module, env);
+		if (!CondV.value) return TValue::NullInvalid();
 
 		Function* ftn = builder->GetInsertBlock()->getParent();
 
@@ -258,37 +251,24 @@ public:
 		BasicBlock* ElseBB = BasicBlock::Create(*context, "else");
 		BasicBlock* MergeBB = BasicBlock::Create(*context, "ifcont");
 
-		builder->CreateCondBr(CondV, ThenBB, ElseBB);
+		builder->CreateCondBr(CondV.value, ThenBB, ElseBB);
 		builder->SetInsertPoint(ThenBB);
 
-		Value* ThenV = m_thenBranch->codegen(context, builder, module, env);
-		if (!ThenV)
-			return nullptr;
+		m_thenBranch->codegen(context, builder, module, env);
 
 		builder->CreateBr(MergeBB);
-		// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-		ThenBB = builder->GetInsertBlock();
 
 		ftn->insert(ftn->end(), ElseBB);
 		builder->SetInsertPoint(ElseBB);
 
-		if (m_elseBranch)
-		{
-			Value* ElseV = m_elseBranch->codegen(context, builder, module, env);
-			if (!ElseV)
-				return nullptr;
-		}
-
+		if (m_elseBranch) m_elseBranch->codegen(context, builder, module, env);
+		
 		builder->CreateBr(MergeBB);
-		// codegen of 'Else' can change the current block, update ElseBB for the PHI.
-		ElseBB = builder->GetInsertBlock();
 
-		//return m_expr->codegen(context, builder);
 		ftn->insert(ftn->end(), MergeBB);
 		builder->SetInsertPoint(MergeBB);
 
-
-		return Constant::getNullValue(builder->getInt32Ty());
+		return TValue::NullInvalid();
 	}
 
 private:
@@ -315,46 +295,43 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_PRINT; }
 
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
 	{
 		printf("PrintStmt::codegen()\n");
 
-		LiteralTypeEnum lt = m_expr->GetLiteralType(env);
+		TValue v = m_expr->codegen(context, builder, module, env);
 		
-		std::vector<Value*> args;
-		
-		Value* v = m_expr->codegen(context, builder, module, env);
-		Type* vtype = v->getType();
-
-		if (vtype->isIntegerTy() || vtype->isDoubleTy() || LITERAL_TYPE_BOOL == lt)
+		if (!v.IsString())
 		{
 			AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(33), "alloctmp");
-			Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
-			builder->CreateStore(builder->getInt8(0), b);
+			TValue b = TValue(LITERAL_TYPE_STRING, builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
+			builder->CreateStore(builder->getInt8(0), b.value);
 
-			if (vtype->isIntegerTy())
+			if (v.IsInteger())
 			{
-				builder->CreateCall(module->getFunction("itoa2"), { v, b }, "calltmp");
+				builder->CreateCall(module->getFunction("itoa2"), { v.value, b.value }, "calltmp");
 			}
-			else if (vtype->isDoubleTy())
+			else if (v.IsDouble())
 			{
-				builder->CreateCall(module->getFunction("ftoa2"), { v, b }, "calltmp");
+				builder->CreateCall(module->getFunction("ftoa2"), { v.value, b.value }, "calltmp");
 			}
-			else if (LITERAL_TYPE_BOOL == lt)
+			else if (v.IsBool())
 			{
-				builder->CreateCall(module->getFunction("btoa2"), { v, b }, "calltmp");
+				builder->CreateCall(module->getFunction("btoa2"), { v.value, b.value }, "calltmp");
 			}
+
 			v = b;
 		}
-		args.push_back(v);
 		
 		if (m_newline)
-			return builder->CreateCall(module->getFunction("println"), args, "calltmp");
+			builder->CreateCall(module->getFunction("println"), { v.value }, "calltmp");
 		else
-			return builder->CreateCall(module->getFunction("print"), args, "calltmp");
+			builder->CreateCall(module->getFunction("print"), { v.value }, "calltmp");
+
+		return TValue::NullInvalid();
 	}
 
 private:
@@ -383,7 +360,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_VAR; }
 
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
@@ -398,19 +375,19 @@ public:
 		{
 			a = builder->CreateAlloca(builder->getInt32Ty(), nullptr, "alloc_i32");
 			env->DefineVariable(LITERAL_TYPE_INTEGER, m_token->Lexeme(), a);
-			if (!m_expr) return builder->CreateStore(builder->getInt32(0), a);
+			if (!m_expr) builder->CreateStore(builder->getInt32(0), a);
 		}
 		else if (TOKEN_VAR_BOOL == varType)
 		{
 			a = builder->CreateAlloca(builder->getInt32Ty(), nullptr, "alloc_bool");
 			env->DefineVariable(LITERAL_TYPE_BOOL, m_token->Lexeme(), a);
-			if (!m_expr) return builder->CreateStore(builder->getInt32(0), a);
+			if (!m_expr) builder->CreateStore(builder->getInt32(0), a);
 		}
 		else if (TOKEN_VAR_F32 == varType)
 		{
 			a = builder->CreateAlloca(builder->getDoubleTy(), nullptr, "alloc_f64");
 			env->DefineVariable(LITERAL_TYPE_DOUBLE, m_token->Lexeme(), a);
-			if (!m_expr) return builder->CreateStore(Constant::getNullValue(builder->getDoubleTy()), a);
+			if (!m_expr) builder->CreateStore(Constant::getNullValue(builder->getDoubleTy()), a);
 		}
 		else if (TOKEN_VAR_STRING == varType)
 		{
@@ -419,40 +396,37 @@ public:
 
 			if (!m_expr)
 			{
-				Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
-				return builder->CreateStore(builder->getInt8(0), b);
+				TValue b = TValue(LITERAL_TYPE_STRING, builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
+				builder->CreateStore(builder->getInt8(0), b.value);
 			}
 		}
 
 		if (a && m_expr)
 		{
-			LiteralTypeEnum lt = m_expr->GetLiteralType(env);
+			TValue rhs = m_expr->codegen(context, builder, module, env);
+			if (!rhs.value) return TValue::NullInvalid();
 
-			Value* rhs = m_expr->codegen(context, builder, module, env);
-			if (!rhs) return nullptr;
-
-			Type* rtype = rhs->getType();
-
-			if (rtype->isIntegerTy() || rtype->isDoubleTy() || LITERAL_TYPE_BOOL == lt)
+			if (rhs.IsString())
 			{
-				if (TOKEN_VAR_I32 == varType && rhs->getType()->isDoubleTy())
-				{
-					rhs = builder->CreateFPToSI(rhs, builder->getInt32Ty(), "cast_to_int");
-				}
-				else if (LITERAL_TYPE_DOUBLE == varType && rhs->getType()->isIntegerTy())
-				{
-					rhs = builder->CreateSIToFP(rhs, builder->getDoubleTy(), "cast_to_dbl");
-				}
-				builder->CreateStore(rhs, a);
+				TValue b = TValue(LITERAL_TYPE_STRING, builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
+				builder->CreateCall(module->getFunction("strncpy"), { b.value, rhs.value, builder->getInt32(1023) }, "calltmp");
 			}
 			else
 			{
-				Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp");
-				builder->CreateCall(module->getFunction("strncpy"), { b, rhs, builder->getInt32(1023) }, "calltmp");
+				if (TOKEN_VAR_I32 == varType && rhs.IsDouble())
+				{
+					rhs = TValue(LITERAL_TYPE_INTEGER, builder->CreateFPToSI(rhs.value, builder->getInt32Ty(), "cast_to_int"));
+				}
+				else if (TOKEN_VAR_F32 == varType && rhs.IsInteger())
+				{
+					rhs = TValue(LITERAL_TYPE_DOUBLE, builder->CreateSIToFP(rhs.value, builder->getDoubleTy(), "cast_to_dbl"));
+				}
+
+				builder->CreateStore(rhs.value, a);
 			}
 		}
 
-		return Constant::getNullValue(builder->getInt32Ty());
+		return TValue::NullInvalid();
 	}
 
 private:
@@ -482,7 +456,7 @@ public:
 	Expr* GetPost() { return m_post; }
 	Stmt* GetBody() { return m_body; }
 
-	Value* codegen(std::unique_ptr<LLVMContext>& context,
+	TValue codegen(std::unique_ptr<LLVMContext>& context,
 		std::unique_ptr<IRBuilder<>>& builder,
 		std::unique_ptr<Module>& module,
 		Environment* env)
@@ -497,23 +471,23 @@ public:
 		builder->CreateBr(LoopBB);
 		builder->SetInsertPoint(LoopBB);
 
-		Value* CondV = m_condition->codegen(context, builder, module, env);
-		if (!CondV) return nullptr;
+		TValue CondV = m_condition->codegen(context, builder, module, env);
+		if (!CondV.value) return TValue::NullInvalid();
 
-		builder->CreateCondBr(CondV, BodyBB, MergeBB);
+		builder->CreateCondBr(CondV.value, BodyBB, MergeBB);
 		
 		ftn->insert(ftn->end(), BodyBB);
 		builder->SetInsertPoint(BodyBB);
 
-		if (m_body) Value* body = m_body->codegen(context, builder, module, env);
-		if (m_post) Value* post = m_post->codegen(context, builder, module, env);
+		if (m_body) m_body->codegen(context, builder, module, env);
+		if (m_post) m_post->codegen(context, builder, module, env);
 
 		builder->CreateBr(LoopBB); // go back to the top
 
 		ftn->insert(ftn->end(), MergeBB);
 		builder->SetInsertPoint(MergeBB);
 
-		return Constant::getNullValue(builder->getInt32Ty());
+		return TValue::NullInvalid();
 	}
 
 private:
