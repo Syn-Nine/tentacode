@@ -1,10 +1,11 @@
-println("// test operation of FILELINE command");
+println("-- FILELINE command test");
 if FILELINE != "File:unit_test.tt, Line:2" {
     println("Failed FILELINE test, " + FILELINE);
 }
 
 
-println("// default initialization test for basic types");
+//-----------------------------------------------------------------------------
+println("-- default initialization test for basic types");
 {
 	i32 i; f32 f; bool b; string s;// enum e;
 	if 0     != i { println("Test Failed, " + FILELINE); }
@@ -15,26 +16,52 @@ println("// default initialization test for basic types");
 }
 
 
-println("// assignment test for basic types");
+//-----------------------------------------------------------------------------
+println("-- approximation test");
 {
-	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test";// enum e = :TEST;
+	if 1 !~ 1 { println("Test Failed, " + FILELINE); }
+	if 1 ~~ 2 { println("Test Failed, " + FILELINE); }
+	
+	if "a" !~ "a" { println("Test Failed, " + FILELINE); }
+	if "b" ~~ "a" { println("Test Failed, " + FILELINE); }
+	
+	if true !~ true { println("Test Failed, " + FILELINE); }
+	if false ~~ true { println("Test Failed, " + FILELINE); }
+	
+	if :TEST !~ :TEST { println("Test Failed, " + FILELINE); }
+	if :FAIL ~~ :TEST { println("Test Failed, " + FILELINE); }
+
+	if 1.0 !~ 1.000000000000000000001 { println("Test Failed, " + FILELINE); }
+	if 1.0 ~~ 1.000000001 { println("Test Failed, " + FILELINE); }
+	if 1.0 !~ 1.0 { println("Test Failed, " + FILELINE); }
+	if 1.0 ~~ 2.0 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- assignment test for basic types");
+{
+	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test"; enum e = :TEST;
 	// lhs test
 	if 1       != i { println("Test Failed, " + FILELINE); }
 	if 2.2     != f { println("Test Failed, " + FILELINE); }
 	if true    != b { println("Test Failed, " + FILELINE); }
+	if !b           { println("Test Failed, " + FILELINE); }
 	if "test"  != s { println("Test Failed, " + FILELINE); }
-	//if ":TEST" != e as string { println("Test Failed, " + FILELINE); }
+	if :TEST   != e { println("Test Failed, " + FILELINE); }
 	
 	// rhs test
 	if i != 1      { println("Test Failed, " + FILELINE); }
 	if f != 2.2    { println("Test Failed, " + FILELINE); }
 	if b != true   { println("Test Failed, " + FILELINE); }
 	if s != "test" { println("Test Failed, " + FILELINE); }
-	//if e as string != ":TEST" { println("Test Failed, " + FILELINE); }
+	if e != :TEST  { println("Test Failed, " + FILELINE); }
 
 	// float to int automatic cast
 	i32 c = 0.3;
 	if c == 0.3 { println("Test Failed, " + FILELINE); }
+	f32 d = 1;
+	if 1.0 !~ d { println("Test Failed, " + FILELINE); }
 	
 	// redefinition test
 	i32 aa = 5;
@@ -44,7 +71,64 @@ println("// assignment test for basic types");
 }
 
 
-println("// test conditional options");
+//-----------------------------------------------------------------------------
+println("-- global assignment test");
+{
+	global i32 global_i = 1;
+	global f32 global_f = 2.2;
+	global bool global_b = true;
+	global enum global_e = :TEST;
+	global vec<i32> global_v = [1, 2, 3];
+
+	if 1       != global_i { println("Test Failed, " + FILELINE); }
+	if 2.2     != global_f { println("Test Failed, " + FILELINE); }
+	if true    != global_b { println("Test Failed, " + FILELINE); }
+	if !global_b           { println("Test Failed, " + FILELINE); }
+	if :TEST   != global_e { println("Test Failed, " + FILELINE); }
+	if 3 != len(global_v)  { println("Test Failed, " + FILELINE); }
+	if 2 != global_v[1]    { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- absolute value test");
+{
+	f32 x = 0.1;
+	f32 y = -0.006;
+	f32 z = abs(x - y);
+	if abs(0.106 - z) > 0.0000000000001 { println("Test Failed, " + FILELINE); }
+	if 0.106 !~ z { println("Test Failed, " + FILELINE); }
+
+	i32 a = 5;
+	i32 b = 33;
+	i32 c = abs(a - b);
+	if abs(28 - c) > 0 { println("Test Failed, " + FILELINE); }
+	if 28 !~ c { println("Test Failed, " + FILELINE); }
+	if 28 != c { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- trig ops test");
+{
+	f32 x = 90;
+	f32 y = deg2rad(x);
+	f32 z = rad2deg(y);
+	if abs(1.570796 - y) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if 90 !~ z { println("Test Failed, " + FILELINE); }
+	
+	if abs(cos(30) - 0.154251) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(sin(30) - -0.988032) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(tan(30) - -6.405331) > 0.000001 { println("Test Failed, " + FILELINE); }
+	
+	if pi !~ 3.1415926535897932384626433832795028841971693993751058 { println("Test Failed, " + FILELINE); }
+	if rad2deg(pi) !~ 180 { println("Test Failed, " + FILELINE); }
+	if deg2rad(180) !~ pi { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- conditional ops test");
 {
 	i32 a = 1;
 	i32 b = 2;
@@ -81,7 +165,8 @@ println("// test conditional options");
 }
 
 
-println("// logical operation tests");
+//-----------------------------------------------------------------------------
+println("-- logical ops tests");
 {
 	i32 a = 1;
 	i32 b = 2;
@@ -92,7 +177,8 @@ println("// logical operation tests");
 }
 
 
-println("// test for loop");
+//-----------------------------------------------------------------------------
+println("-- for loop test");
 {
 	i32 i;
 	for x in 0..5 {
@@ -102,24 +188,64 @@ println("// test for loop");
 }
 
 
-println("// test while loop");
+//-----------------------------------------------------------------------------
+println("-- while loop test");
 {
 	i32 i;
-	while (i < 10) {
+	while i < 10 {
 		i = i + 1;
 	}
 	if 10 != i { println("Test Failed, " + FILELINE); }
 }
 
 
-println("// random number generation");
+//-----------------------------------------------------------------------------
+println("-- break and continue test");
 {
-	f32 r = rand();
-	if r < 0.00000000000001 { println("Test Failed, " + FILELINE); }
+	i32 a;
+	loop {
+		a = a + 1;
+		if a > 5 { break; }
+		continue;
+		a = a - 1;
+	}
+	if 6 != a { println("Test Failed, " + FILELINE); }
 }
 
 
-println("// string conversion");
+//-----------------------------------------------------------------------------
+println("-- double break and continue test");
+{
+	i32 j = 0;
+	for i in 0..6 {
+		if i > 4 { break; }
+		if i > 2 { continue; }
+		i32 a;
+		loop {
+			a = a + 1;
+			if a > 5 { break; }
+			continue;
+			a = a - 1;
+		}
+		j = j + a;
+		if 6 != a { println("Test Failed, " + FILELINE); }
+	}
+	if 18 != j { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- random number generation test");
+{
+	f32 r = rand();
+	if r < 0.00000000000001 { println("Test Failed, " + FILELINE); }
+	i32 r = rand(1..5);
+	if r < 1 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- string conversion test");
 {
 	i32 a = 1;
 	f32 b = 12.3;
@@ -129,12 +255,6 @@ println("// string conversion");
 	string s = "s" + a as string + b as string + "t";
 	if s != "s112.300000t" { println("Test Failed, " + FILELINE); }
 
-	i32 c = 8 as i32;
-	if 8 != c { println("Test Failed, " + FILELINE); }
-	
-	f32 d = 22.8 as f32;
-	if 22.8 != d { println("Test Failed, " + FILELINE); }
-	
 	i32 c = "5" as i32;
 	if 5 != c { println("Test Failed, " + FILELINE); }
 	
@@ -143,6 +263,217 @@ println("// string conversion");
 	
 	string e = "test" as string;
 	if "test" != e { println("Test Failed, " + FILELINE); }
+	
+	// compound string assignment test
+	string s = 5 as string + ", " + 1.1 as string + ", " + true as string;
+	if s != "5, 1.100000, true" { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- vec i32 test");
+{
+	vec<i32> ivec;
+	if len(ivec) != 0 { println("Test Failed, " + FILELINE); }
+
+	ivec = [1];
+	if len(ivec) != 1 { println("Test Failed, " + FILELINE); }
+	if ivec[0] != 1 { println("Test Failed, " + FILELINE); }
+
+	vec::append(ivec, 3);
+	if len(ivec) != 2 { println("Test Failed, " + FILELINE); }
+	if ivec[1] != 3 { println("Test Failed, " + FILELINE); }
+
+	vec<i32> ivec = [1, 2, 3];
+	if ivec[0] + ivec[1] + ivec[2] != 6 { println("Test Failed, " + FILELINE); }
+
+	vec<i32> tvec = ivec;
+	tvec[1] = 5;
+	if tvec[0] + tvec[1] + tvec[2] != 9 { println("Test Failed, " + FILELINE); }
+
+	ivec = [55; 6];
+	if len(ivec) != 6 { println("Test Failed, " + FILELINE); }
+	if ivec[0] != ivec[1] || ivec[1] != ivec[2] || ivec[2] != ivec[3] { println("Test Failed, " + FILELINE); }
+	if ivec[3] != ivec[4] || ivec[4] != ivec[5] { println("Test Failed, " + FILELINE); }
+	if ivec[3] != 55 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- vec f32 test");
+{
+	vec<f32> fvec;
+	if len(fvec) != 0 { println("Test Failed, " + FILELINE); }
+
+	fvec = [1.1];
+	if len(fvec) != 1 { println("Test Failed, " + FILELINE); }
+	if 1.1 !~ fvec[0] { println("Test Failed, " + FILELINE); }
+
+	vec::append(fvec, 3.1);
+	if len(fvec) != 2 { println("Test Failed, " + FILELINE); }
+	if 3.1 !~ fvec[1] { println("Test Failed, " + FILELINE); }
+
+	vec<f32> fvec = [1, 2.3, 3]; // detect float in fixed vec
+	if fvec[0] + fvec[1] + fvec[2] !~ 6.3 { println("Test Failed, " + FILELINE); }
+
+	vec<f32> fvec = [1, 2, 3]; // implicit convert ints to float
+	if fvec[0] + fvec[1] + fvec[2] !~ 6 { println("Test Failed, " + FILELINE); }
+
+	vec<f32> tvec = fvec;
+	tvec[1] = 5.7;
+	tvec[2] = 7;
+	if tvec[0] + tvec[1] + tvec[2] !~ 13.7 { println("Test Failed, " + FILELINE); }
+
+	fvec = [55; 6];
+	if len(fvec) != 6 { println("Test Failed, " + FILELINE); }
+	f32 s = 0;
+	for i in 0..len(fvec) {
+		s = s + fvec[i];
+	}
+	if s !~ 330 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- vec enum test");
+{
+	vec<enum> evec;
+	if len(evec) != 0 { println("Test Failed, " + FILELINE); }
+
+	evec = [:TEST];
+	if len(evec) != 1 { println("Test Failed, " + FILELINE); }
+	if evec[0] != :TEST { println("Test Failed, " + FILELINE); }
+
+	vec::append(evec, :APPEND_TEST);
+	if len(evec) != 2 { println("Test Failed, " + FILELINE); }
+	if evec[1] != :APPEND_TEST { println("Test Failed, " + FILELINE); }
+
+	vec<enum> evec = [:A, :B, :C];
+	if evec[0] != :A || evec[1] != :B || evec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	vec<enum> tvec = evec;
+	tvec[1] = :INSERT;
+	if tvec[0] != :A || tvec[1] != :INSERT || tvec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	evec = [:REP; 6];
+	if len(evec) != 6 { println("Test Failed, " + FILELINE); }
+	if evec[0] != evec[1] || evec[1] != evec[2] || evec[2] != evec[3] { println("Test Failed, " + FILELINE); }
+	if evec[3] != evec[4] || evec[4] != evec[5] { println("Test Failed, " + FILELINE); }
+	if evec[3] != :REP { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- vec bool test");
+{
+	vec<bool> bvec;
+	if len(bvec) != 0 { println("Test Failed, " + FILELINE); }
+
+	bvec = [true];
+	if len(bvec) != 1 { println("Test Failed, " + FILELINE); }
+	if !bvec[0] { println("Test Failed, " + FILELINE); }
+
+	vec::append(bvec, false);
+	if len(bvec) != 2 { println("Test Failed, " + FILELINE); }
+	if bvec[1] { println("Test Failed, " + FILELINE); }
+
+	vec<bool> bvec = [true, true, false];
+	if !bvec[0] || !bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
+
+
+	vec<bool> tvec = bvec;
+	tvec[1] = false;
+	if !tvec[0] || tvec[1] || tvec[2] { println("Test Failed, " + FILELINE); }
+
+	bvec = [true; 7];
+	if len(bvec) != 7 { println("Test Failed, " + FILELINE); }
+	for i in 0..len(bvec) {
+		if !bvec[i] { println("Test Failed, " + FILELINE); }
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- basic struct test");
+{
+	struct basic_struct_test_s {
+		i32 x;
+		i32 y;
+		f32 z;
+		enum e;
+		bool b;
+		string s;
+	}
+
+	basic_struct_test_s a;
+	
+	// default initialization tests
+	if 0 != a.x { println("Test Failed, " + FILELINE); }
+	if 0 != a.y { println("Test Failed, " + FILELINE); }
+	if 0 !~ a.z { println("Test Failed, " + FILELINE); }
+	if a.b { println("Test Failed, " + FILELINE); }
+	
+	// assignment tests
+	a.x = 5;
+	if 5 != a.x { println("Test Failed, " + FILELINE); }
+	if a.x != 5 { println("Test Failed, " + FILELINE); }
+
+	a.y = 77.3; // implicit conversion from float to int
+	if 77 != a.y { println("Test Failed, " + FILELINE); }
+	if a.y != 77 { println("Test Failed, " + FILELINE); }
+
+	a.z = 1.5;
+	if 1.5 !~ a.z { println("Test Failed, " + FILELINE); }
+
+	a.e = :TEST;
+	if :TEST != a.e { println("Test Failed, " + FILELINE); }
+	if a.e != :TEST { println("Test Failed, " + FILELINE); }
+
+	a.b = true;
+	if !a.b { println("Test Failed, " + FILELINE); }
+	if true != a.b { println("Test Failed, " + FILELINE); }
+	if a.b != true { println("Test Failed, " + FILELINE); }
+	
+	a.s = "test";
+	a.s = a.s + "cat";
+	if "testcat" != a.s { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- nested struct test");
+{
+	struct nested_struct_test_arf {
+		string s;
+	}
+
+	struct nested_struct_test_foo {
+		i32 x;
+		nested_struct_test_arf a;
+		f32 f;
+	}
+
+	struct nested_struct_test_bar {
+		i32 b;
+		nested_struct_test_foo y;
+	}
+
+	nested_struct_test_bar z;
+
+	if 0 != z.b { println("Test Failed, " + FILELINE); }
+	if 0 != z.y.x { println("Test Failed, " + FILELINE); }
+	if 0 !~ z.y.f { println("Test Failed, " + FILELINE); }
+	if "" != z.y.a.s { println("Test Failed, " + FILELINE); }
+
+	z.b = 11;
+	z.y.x = 22;
+	z.y.f = 33.3;
+	z.y.a.s = "nested";
+
+	if 11 != z.b { println("Test Failed, " + FILELINE); }
+	if 22 != z.y.x { println("Test Failed, " + FILELINE); }
+	if 33.3 !~ z.y.f { println("Test Failed, " + FILELINE); }
+	if "nested" != z.y.a.s { println("Test Failed, " + FILELINE); }
 }
 
 //

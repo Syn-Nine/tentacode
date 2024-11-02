@@ -1,0 +1,80 @@
+// Rock-Paper-Scissors Game
+
+i32 p_score;   i32 c_score; // default initialized to zero
+i32 tries = 3; i32 max = tries;
+
+i32 ROCK         = 0;
+i32 PAPER        = 1;
+i32 SCISSORS     = 2;
+i32 INVALID      = 3;
+
+i32 TIE          = 0;
+i32 PLAYER_WIN   = 1;
+i32 COMPUTER_WIN = 2;
+
+println("Let's play Rock-Paper-Scissors!");
+
+while tries > 0 {
+    print("Best out of " + max as string + ", " + tries as string + " tries remaining. ");
+    println("What is your guess? [r]ock, [p]aper, or [s]cissors?");
+	
+	i32 guess = INVALID;
+    loop {
+	    string s = input();
+        if "r" == s      { guess = ROCK;     }
+        else if "p" == s { guess = PAPER;    }
+        else if "s" == s { guess = SCISSORS; }
+		else { println("input invalid."); }
+        if INVALID != guess { break; }
+    }
+	
+    string choice;
+    if ROCK == guess          { choice = "Rock";     }
+    else if PAPER == guess    { choice = "Paper";    }
+    else if SCISSORS == guess { choice = "Scissors"; }
+    println("Player: " + choice);
+    
+    i32 comp = rand(0..3);
+	string choice;
+    if ROCK == comp          { choice = "Rock";     }
+    else if PAPER == comp    { choice = "Paper";    }
+    else if SCISSORS == comp { choice = "Scissors"; }
+    println("Computer: " + choice);
+    
+    i32 result = TIE;
+    if (ROCK     == comp && SCISSORS == guess) || 
+       (SCISSORS == comp && PAPER    == guess) ||
+       (PAPER    == comp && ROCK     == guess) {
+           result = COMPUTER_WIN;
+       }
+    else if (ROCK == guess && SCISSORS == comp) ||
+       (SCISSORS  == guess && PAPER    == comp) ||
+       (PAPER     == guess && ROCK     == comp) {
+           result = PLAYER_WIN;
+       }
+       
+    tries = tries - 1;
+    
+    if TIE == result {
+        println("Tie!");
+        tries = tries + 1;
+        
+    } else if COMPUTER_WIN == result {
+        println("Computer Score!");
+        c_score = c_score + 1;
+        
+    } else if PLAYER_WIN == result {
+        println("Player Score!");
+        p_score = p_score + 1;
+    }
+    
+    println("Score: Player: " + p_score as string + ", Computer: " + c_score as string);
+}
+
+if p_score == c_score {
+    println("GAME TIED!");
+} else if p_score > c_score {
+    println("PLAYER WINS GAME!");
+} else {
+    println("COMPUTER WINS GAME!");
+}

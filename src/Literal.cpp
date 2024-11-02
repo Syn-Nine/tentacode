@@ -9,6 +9,9 @@ std::string Literal::ToString() const
 	case LITERAL_TYPE_INVALID:
 		return "<Literal Invalid>";
 
+	case LITERAL_TYPE_ENUM:
+		return "<enum " + m_enumValue.enumValue + ">";
+
 	case LITERAL_TYPE_BOOL:
 		return m_boolValue ? "true" : "false";
 

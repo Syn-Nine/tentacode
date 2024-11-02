@@ -176,12 +176,27 @@ void Scanner::ScanToken()
 	case '@': AddToken(TOKEN_AT); break;
 
 	// one or two character tokens
-	case '!': AddToken(Match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG); break;
+	case '!': 
+		if (Match('='))
+		{
+			AddToken(TOKEN_BANG_EQUAL);
+		}
+		else if (Match('~'))
+		{
+			AddToken(TOKEN_BANG_TILDE);
+		}
+		else
+		{
+			AddToken(TOKEN_BANG);
+		}
+		break;
+	
 	case '=': AddToken(Match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL); break;
 	case '>': AddToken(Match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER); break;
 	case '<': AddToken(Match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS); break;
 	
 	// two character tokens
+	case '~': Match('~') ? AddToken(TOKEN_TILDE_TILDE) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
 	case '&': Match('&') ? AddToken(TOKEN_AND) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
 	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
 	case ':':
@@ -198,6 +213,7 @@ void Scanner::ScanToken()
 			AddToken(TOKEN_COLON);
 		}
 		break;
+
 	
 	// struct member and range token
 	case '.': 

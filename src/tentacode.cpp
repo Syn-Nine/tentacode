@@ -13,6 +13,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -24,6 +25,7 @@
 #include "Scanner.h"
 #include "ErrorHandler.h"
 #include "Extensions.h"
+#include "Extensions_Raylib.h"
 #include "Environment.h"
 
 #include <algorithm>
@@ -38,14 +40,11 @@
 
 ErrorHandler* errorHandler;
 
-using namespace llvm;
-using namespace llvm::orc;
-
-static std::unique_ptr<LLVMContext> context;
-static std::unique_ptr<Module> module;
-static std::unique_ptr<IRBuilder<>> builder;
+static std::unique_ptr<llvm::LLVMContext> context;
+static std::unique_ptr<llvm::Module> module;
+static std::unique_ptr<llvm::IRBuilder<>> builder;
 static std::unique_ptr<llvm::orc::KaleidoscopeJIT> TheJIT;
-static ExitOnError ExitOnErr;
+static llvm::ExitOnError ExitOnErr;
 
 bool Run(const char* buf, const char* filename)
 {
@@ -63,10 +62,45 @@ bool Run(const char* buf, const char* filename)
 		Environment* env = new Environment(nullptr);
 
 		LoadExtensions(builder, module, env);
+		LoadExtensions_Raylib(builder, module, env);
 
-		printf("\nWalking AST...\n");
+		if (2 <= Environment::GetDebugLevel()) printf("\nWalking AST...\n");
 
-		// walk function definitions
+		
+		// walk function and struct definitions
+		for (auto& statement : stmts)
+		{
+			if (STATEMENT_STRUCT == statement->GetType())
+			{
+				statement->codegen(context, builder, module, env);
+			}
+
+			if (STATEMENT_FUNCTION == statement->GetType())
+			{
+				static_cast<FunctionStmt*>(statement)->codegen_prototype(context, builder, module, env);
+			}
+		}
+
+		llvm::FunctionType* funcType = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
+		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", *module);
+		llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context, "entry", mainFunc);
+		builder->SetInsertPoint(entry);
+
+		// walk main code
+		for (auto& statement : stmts)
+		{
+			if (STATEMENT_FUNCTION != statement->GetType() && STATEMENT_STRUCT != statement->GetType())
+			{
+				statement->codegen(context, builder, module, env);
+			}
+		}
+
+		env->EmitCleanup(builder, module);
+
+		builder->CreateRetVoid();
+		verifyFunction(*mainFunc);
+
+		// fill in functions
 		for (auto& statement : stmts)
 		{
 			if (STATEMENT_FUNCTION == statement->GetType())
@@ -75,24 +109,15 @@ bool Run(const char* buf, const char* filename)
 			}
 		}
 
-		FunctionType* funcType = FunctionType::get(builder->getVoidTy(), {}, false);
-		Function* mainFunc = Function::Create(funcType, Function::ExternalLinkage, "main", *module);
-		BasicBlock* entry = BasicBlock::Create(*context, "entry", mainFunc);
-		builder->SetInsertPoint(entry);
+		delete env;
 
-		// walk main code
-		for (auto& statement : stmts)
+
+		if (1 <= Environment::GetDebugLevel())
 		{
-			if (STATEMENT_FUNCTION != statement->GetType())
-			{
-				statement->codegen(context, builder, module, env);
-			}
+			printf("\nLLVM IR Dump:\n");
+			module->print(llvm::errs(), nullptr);
 		}
 
-		builder->CreateRetVoid();
-		verifyFunction(*mainFunc);
-
-		delete env;
 
 		if (errorHandler->HasErrors())
 		{
@@ -140,22 +165,23 @@ void RunFile(const char* filename)
 
 int main(int nargs, char* argsv[])
 {
-	InitializeNativeTarget();
-	InitializeNativeTargetAsmPrinter();
-	InitializeNativeTargetAsmParser();
+	llvm::InitializeNativeTarget();
+	llvm::InitializeNativeTargetAsmPrinter();
+	llvm::InitializeNativeTargetAsmParser();
 
-
-	const char* version = "0.2.0";
+	const char* version = "0.2.1";
 	printf("Launching Tentacode JIT Compiler v%s\n", version);
+
+	Environment::SetDebugLevel(2);
 
 	errorHandler = new ErrorHandler();
 
-	TheJIT = ExitOnErr(KaleidoscopeJIT::Create());
+	TheJIT = ExitOnErr(llvm::orc::KaleidoscopeJIT::Create());
 
-	context = std::make_unique<LLVMContext>();
-	module = std::make_unique<Module>("tentajit", *context);
+	context = std::make_unique<llvm::LLVMContext>();
+	module = std::make_unique<llvm::Module>("tentajit", *context);
 	module->setDataLayout(TheJIT->getDataLayout());
-	builder = std::make_unique<IRBuilder<>>(*context);
+	builder = std::make_unique<llvm::IRBuilder<>>(*context);
 
 	if (1 == nargs)
 	{
@@ -181,10 +207,7 @@ int main(int nargs, char* argsv[])
 	}
 
 
-	printf("\nLLVM IR Dump:\n");
-	module->print(errs(), nullptr);
-
-	auto TSM = ThreadSafeModule(std::move(module), std::move(context));
+	auto TSM = llvm::orc::ThreadSafeModule(std::move(module), std::move(context));
 	TheJIT->addModule(std::move(TSM));
 
 	auto ExprSymbol = ExitOnErr(TheJIT->lookup("main"));
@@ -193,6 +216,5 @@ int main(int nargs, char* argsv[])
 	printf("\nOutput:\n");
 	FP();
 
-
-	_getch();
+	//_getch();
 }

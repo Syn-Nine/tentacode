@@ -29,6 +29,18 @@ enum LiteralTypeEnum
 	LITERAL_TYPE_INTEGER,
 	LITERAL_TYPE_STRING,
 	LITERAL_TYPE_BOOL,
+	LITERAL_TYPE_ENUM,
+	LITERAL_TYPE_VEC,
+	LITERAL_TYPE_VEC_FIXED,
+	LITERAL_TYPE_POINTER,
+	LITERAL_TYPE_UDT,
+};
+
+struct EnumLiteral
+{
+	std::string enumValue;
+	EnumLiteral() {}
+	EnumLiteral(std::string v) : enumValue(v) {}
 };
 
 class Literal
@@ -62,6 +74,12 @@ public:
 		m_type = LITERAL_TYPE_STRING;
 	}
 
+	Literal(EnumLiteral val)
+	{
+		m_enumValue = val;
+		m_type = LITERAL_TYPE_ENUM;
+	}
+
 	Literal(bool val)
 	{
 		m_boolValue = val;
@@ -72,16 +90,25 @@ public:
 	bool IsInt() const { return m_type == LITERAL_TYPE_INTEGER; }
 	bool IsNumeric() const { return (m_type == LITERAL_TYPE_DOUBLE || m_type == LITERAL_TYPE_INTEGER); }
 	bool IsString() const { return m_type == LITERAL_TYPE_STRING; }
+	bool IsEnum() const { return m_type == LITERAL_TYPE_ENUM; }
 	bool IsBool() const { return m_type == LITERAL_TYPE_BOOL; }
 	bool IsInvalid() const { return m_type == LITERAL_TYPE_INVALID; }
+	bool IsVector() const { return m_type == LITERAL_TYPE_VEC; }
 
 	LiteralTypeEnum GetType() const { return m_type; }
 	
 	bool BoolValue() const { return m_boolValue; }
 	std::string StringValue() const { return m_stringValue; }
+	EnumLiteral EnumValue() const { return m_enumValue; }
 	double DoubleValue() const{ return m_doubleValue; }
 	int32_t IntValue() const{ return m_intValue; }
 
+	LiteralTypeEnum GetVecType() const { return m_vecType; }
+	bool IsVecBool() const { return LITERAL_TYPE_BOOL == m_vecType; }
+	bool IsVecInteger() const { return LITERAL_TYPE_INTEGER == m_vecType; }
+	bool IsVecDouble() const { return LITERAL_TYPE_DOUBLE == m_vecType; }
+	bool IsVecString() const { return LITERAL_TYPE_STRING == m_vecType; }
+	bool IsVecEnum() const { return LITERAL_TYPE_ENUM == m_vecType; }
 	std::string ToString() const;
 
 
@@ -90,9 +117,10 @@ private:
 	double m_doubleValue;
 	int32_t m_intValue;
 	std::string m_stringValue;
-	
+	EnumLiteral m_enumValue;
 	bool m_boolValue;
 	LiteralTypeEnum m_type;
+	LiteralTypeEnum m_vecType;
 	
 };
 

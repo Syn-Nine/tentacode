@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "Enums.h"
-//#include "Literal.h"
+#include "Literal.h"
 
 class Token
 {
@@ -18,7 +18,7 @@ public:
 		m_lexeme = lexeme;
 		m_line = line;
 		m_filename = filename;
-		//if (TOKEN_ENUM == m_type) m_enumValue = EnumLiteral(lexeme);
+		if (TOKEN_ENUM == m_type) m_enumValue = EnumLiteral(lexeme);
 	}
 
 	Token(TokenTypeEnum type, std::string lexeme, std::string value, int line, std::string filename)
@@ -73,6 +73,9 @@ public:
 		case TOKEN_GREATER_EQUAL: type = "TOKEN_GREATER_EQUAL"; break;
 		case TOKEN_LESS: type = "TOKEN_LESS"; break;
 		case TOKEN_LESS_EQUAL: type = "TOKEN_LESS_EQUAL"; break;
+		case TOKEN_TILDE_TILDE: type = "TOKEN_TILDE_TILDE"; break;
+		case TOKEN_BANG_TILDE: type = "TOKEN_BANG_TILDE"; break;
+
 
 		// literals
 		case TOKEN_IDENTIFIER: type = "TOKEN_IDENTIFIER"; break;
@@ -111,8 +114,9 @@ public:
 		case TOKEN_STRUCT: type = "TOKEN_STRUCT"; break;
 		case TOKEN_INCLUDE: type = "TOKEN_INCLUDE"; break;
 		case TOKEN_INTERNAL: type = "TOKEN_INTERNAL"; break;
+		case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
 		case TOKEN_FILELINE: type = "TOKEN_FILELINE"; break;
-		case TOKEN_CLEARENV: type = "TOKEN_CLEARENV"; break;
+		case TOKEN_PI: type = "TOKEN_PI"; break;
 
 		// raylib custom
 		case TOKEN_VAR_FONT: type = "TOKEN_VAR_FONT"; break;
@@ -139,7 +143,7 @@ public:
 	double DoubleValue() { return m_doubleValue; }
 	int32_t IntValue() { return m_intValue; }
 	std::string StringValue() { return m_stringValue; }
-	//EnumLiteral EnumValue() { return m_enumValue; }
+	EnumLiteral EnumValue() { return m_enumValue; }
 	int Line() { return m_line; }
 	std::string Filename() { return m_filename; }
 
@@ -150,7 +154,7 @@ private:
 	double m_doubleValue;
 	int32_t m_intValue;
 	std::string m_stringValue;
-	//EnumLiteral m_enumValue;
+	EnumLiteral m_enumValue;
 	std::string m_filename;
 };
 

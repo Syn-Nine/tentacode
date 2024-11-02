@@ -1,0 +1,39 @@
+i32 XRES = 640;
+i32 YRES = 400;
+
+// create window
+ray::InitWindow(XRES, YRES, "Window Example");
+ray::SetTargetFPS(60);
+
+ray_texture tex = ray::LoadTexture("assets/town.png");
+
+i32 x = XRES / 2;
+i32 y = YRES / 2;
+
+f32 an = 0;
+
+// main loop
+loop {
+	
+	// handle input
+	if ray::IsKeyDown(:KEY_UP)    { y = y - 10; }
+	if ray::IsKeyDown(:KEY_DOWN)  { y = y + 10; }
+	if ray::IsKeyDown(:KEY_LEFT)  { x = x - 10; }
+	if ray::IsKeyDown(:KEY_RIGHT) { x = x + 10; }
+
+	// rendering
+	ray::BeginDrawing();
+		ray::ClearBackground(:SHARKGRAY);
+		ray::DrawLine(0, 0, XRES, YRES, :RED);
+		ray::DrawRectangle(100, 50, 300, 75, :GRAY);
+		ray::DrawText("Test", 100, 50, 30, :WHITE);
+		ray::DrawCircle(x, y, 20, :BLUE);
+		ray::DrawTexturePro(tex, 0, 0, 48, 48, 100, 100, 48*4, 48*4, 24*4, 24*4, an, :WHITE);
+		an = an + 1;
+	ray::EndDrawing();
+
+	// check for window close event
+	if ray::WindowShouldClose() { break; }
+}
+
+ray::CloseWindow();

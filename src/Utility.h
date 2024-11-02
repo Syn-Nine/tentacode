@@ -45,7 +45,7 @@ static std::string StrReplace(std::string str, const std::string& from, const st
 }
 
 
-std::string GenerateUUID()
+static std::string GenerateUUID()
 {
     unsigned char bytes[16];
 
