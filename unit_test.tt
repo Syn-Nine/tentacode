@@ -42,6 +42,7 @@ println("-- approximation test");
 println("-- assignment test for basic types");
 {
 	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test"; enum e = :TEST;
+	
 	// lhs test
 	if 1       != i { println("Test Failed, " + FILELINE); }
 	if 2.2     != f { println("Test Failed, " + FILELINE); }
@@ -394,6 +395,48 @@ println("-- vec bool test");
 
 
 //-----------------------------------------------------------------------------
+println("-- vec string test");
+{
+	vec<string> t;
+	if 0 != len(t) { println("Test Failed, " + FILELINE); }
+
+	t = ["sss"];
+	if 1 != len(t) { println("Test Failed, " + FILELINE); }
+	if "sss" != t[0] { println("Test Failed, " + FILELINE); }
+
+	vec<string> v = ["a"; 3];
+
+	if len(v) != 3 { println("Test Failed, " + FILELINE); }
+	if v[0] != "a" || v[1] != "a" || v[2] != "a" { println("Test Failed, " + FILELINE); }
+
+	v[1] = "b";
+	if v[1] != "b" { println("Test Failed, " + FILELINE); }
+
+	vec::append(v, "c");
+	if len(v) != 4 { println("Test Failed, " + FILELINE); }
+	if "c" != v[3] { println("Test Failed, " + FILELINE); }
+
+	vec<string> u;
+	vec::append(u, "d");
+
+	v = u;
+	if 1 != len(v) { println("Test Failed, " + FILELINE); }
+	if "d" != v[0] { println("Test Failed, " + FILELINE); }
+
+	string s = v[0];
+	if "d" != s { println("Test Failed, " + FILELINE); }
+
+	u[0] = "e";
+	if "e" != u[0] { println("Test Failed, " + FILELINE); }
+	u[0] = v[0];
+	if "d" != u[0] { println("Test Failed, " + FILELINE); }
+	
+	vec<string> r = v;
+	if 1 != len(v) { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
 println("-- basic struct test");
 {
 	struct basic_struct_test_s {
@@ -474,6 +517,135 @@ println("-- nested struct test");
 	if 22 != z.y.x { println("Test Failed, " + FILELINE); }
 	if 33.3 !~ z.y.f { println("Test Failed, " + FILELINE); }
 	if "nested" != z.y.a.s { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- nested struct sub-assignment test");
+{
+	struct nested_sub_assign_ssc {
+		string s;
+	}
+
+	struct nested_sub_assign_ssb {
+		f32 f;
+		nested_sub_assign_ssc c;
+	}
+
+	struct nested_sub_assign_ss {
+		i32 t;
+		nested_sub_assign_ssb u;
+	}
+
+	nested_sub_assign_ss a;
+	nested_sub_assign_ss b;
+	a.u.f = 1.2;
+	b.u.f = 0.8;
+	a.u.f = b.u.f;
+	if 0.8 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss a;
+	nested_sub_assign_ssb b;
+	b.f = 1.2;
+	b.c.s = "bcs";
+	if "bcs" != b.c.s { println("Test Failed, " + FILELINE); }
+
+	a.u = b;
+	if 1.2 !~ a.u.f { println("Test Failed, " + FILELINE); }
+	if "bcs" != a.u.c.s { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss a;
+	a.t = 1;
+	a.u.f = 3.3;
+	if 1 != a.t { println("Test Failed, " + FILELINE); }
+	if 3.3 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss b;
+	b.u.f = 4.4;
+	a = b;
+	if 0 != a.t { println("Test Failed, " + FILELINE); }
+	if 4.4 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ssb c;
+	c.f = 5.5;
+	b.u = c;
+	if 5.5 !~ b.u.f { println("Test Failed, " + FILELINE); }
+
+
+	nested_sub_assign_ss b0;
+	nested_sub_assign_ss b1;
+	b0.t = 1;
+	b0.u.f = 333.3;
+	b1.t = 2;
+	if 1 != b0.t { println("Test Failed, " + FILELINE); }
+
+	b0.t = b1.t;
+	if 2 != b0.t { println("Test Failed, " + FILELINE); }
+
+	if 333.3 !~ b0.u.f { println("Test Failed, " + FILELINE); }
+	b1 = b0;
+	if 333.3 !~ b1.u.f { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- file read/write test");
+{
+	vec<string> a = ["a", "b", "c"];
+	file::writelines("test.out", a);
+
+	vec<string> b = file::readlines("test.out");
+	if 3 != len(b) { println("Test Failed, " + FILELINE); }
+	if "a" != b[0] { println("Test Failed, " + FILELINE); }
+	if b[1] != "b" { println("Test Failed, " + FILELINE); }
+	if "c" != b[2] { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- string operation test");
+{
+	string s = "a,b,c";
+	if !str::contains(s, "a") { println("Test Failed, " + FILELINE); }
+	if str::contains(s, "d") { println("Test Failed, " + FILELINE); }
+
+	s = str::replace(s, "c", "d");
+	if !str::contains(s, "d") { println("Test Failed, " + FILELINE); }
+
+	vec<string> vs = str::split(s, ",");
+	if 3 != len(vs) { println("Test Failed, " + FILELINE); }
+
+	vec<string> vs2 = str::split(s, ",b,");
+	if len(vs2) != 2 { println("Test Failed, " + FILELINE); }
+
+	vec<string> vs3 = ["lhs", "rhs"];
+	string c = str::join(vs3, ",");
+	if c != "lhs,rhs" { println("Test Failed, " + FILELINE); }
+
+	string d = str::join(vs3, "--");
+	if d != "lhs--rhs" { println("Test Failed, " + FILELINE); }
+
+	string e = str::substr(d, 3);
+	if "--rhs" != e { println("Test Failed, " + FILELINE); }
+
+	string f = str::substr(d, 2, 3);
+	if "s--" != f { println("Test Failed, " + FILELINE); }
+
+	string g = str::substr(d, 0, 4);
+	if g != "lhs-" { println("Test Failed, " + FILELINE); }
+
+	string h = "Ba_Rf";
+	if "BA_RF" != str::toupper(h) { println("Test Failed, " + FILELINE); }
+	if "ba_rf" != str::tolower(h) { println("Test Failed, " + FILELINE); }
+
+	if "Ba_Rf" != str::ltrim(h) { println("Test Failed, " + FILELINE); }
+	if "Ba_Rf" != str::rtrim(h) { println("Test Failed, " + FILELINE); }
+	if "Ba_Rf" != str::trim(h) { println("Test Failed, " + FILELINE); }
+
+	string i = " aa   ";
+	if "aa   " != str::ltrim(i) { println("Test Failed, " + FILELINE); }
+	if " aa" != str::rtrim(i) { println("Test Failed, " + FILELINE); }
+	if "aa" != str::trim(i) { println("Test Failed, " + FILELINE); }
 }
 
 //

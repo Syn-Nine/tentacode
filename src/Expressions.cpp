@@ -6,6 +6,51 @@
 #define DEG2RAD (1 / RAD2DEG)
 
 //-----------------------------------------------------------------------------
+void copy_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
+	std::unique_ptr<llvm::Module>& module,
+	Environment* env,
+	std::string udtname,
+	llvm::Value* defval, llvm::Value* rdefval, llvm::Type* defty, llvm::Type* rdefty, std::vector<llvm::Value*> lhs_args, std::vector<llvm::Value*> rhs_args)
+{
+	if (!env->GetUdt(udtname)) return;
+
+	std::vector<llvm::Type*> arg_ty = env->GetUdtTy(udtname);
+	std::vector<Token*> arg_var_tokens = env->GetUdtMemberTokens(udtname);
+	std::vector<std::string> arg_var_names = env->GetUdtMemberNames(udtname);
+
+	for (size_t i = 0; i < arg_ty.size(); ++i)
+	{
+		std::vector<llvm::Value*> lhs_argtmp = lhs_args;
+		std::vector<llvm::Value*> rhs_argtmp = rhs_args;
+		lhs_argtmp.push_back(builder->getInt32(i));
+		rhs_argtmp.push_back(builder->getInt32(i));
+
+		if (TOKEN_IDENTIFIER == arg_var_tokens[i]->GetType())
+		{
+			copy_udt(builder, module, env, "struct." + arg_var_tokens[i]->Lexeme(), defval, rdefval, defty, rdefty, lhs_argtmp, rhs_argtmp);
+		}
+		else
+		{
+			llvm::Value* lhs_gep = builder->CreateGEP(defty, defval, lhs_argtmp, "lhs_gep_" + arg_var_tokens[i]->Lexeme());
+			llvm::Value* rhs_gep = builder->CreateGEP(rdefty, rdefval, rhs_argtmp, "rhs_gep_" + arg_var_tokens[i]->Lexeme());
+			if (TOKEN_VAR_I32 == arg_var_tokens[i]->GetType() ||
+				TOKEN_VAR_ENUM == arg_var_tokens[i]->GetType()) builder->CreateStore(builder->CreateLoad(builder->getInt32Ty(), rhs_gep, "loadtmp"), lhs_gep);
+			else if (TOKEN_VAR_BOOL == arg_var_tokens[i]->GetType()) builder->CreateStore(builder->CreateLoad(builder->getInt1Ty(), rhs_gep, "loadtmp"), lhs_gep);
+			else if (TOKEN_VAR_F32 == arg_var_tokens[i]->GetType()) builder->CreateStore(builder->CreateLoad(builder->getDoubleTy(), rhs_gep, "loadtmp"), lhs_gep);
+			else if (TOKEN_VAR_STRING == arg_var_tokens[i]->GetType())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs_gep, "lhs_load");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs_gep, "rhs_load");
+				builder->CreateCall(module->getFunction("__str_assign"), { lhs_load, rhs_load }, "calltmp");
+			}
+			else
+			{
+				printf("Initializer not present for VarStmt\n");
+			}
+		}
+	}
+}
+
 TValue AssignExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	std::unique_ptr<llvm::IRBuilder<>>& builder,
 	std::unique_ptr<llvm::Module>& module,
@@ -21,10 +66,20 @@ TValue AssignExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	if (LITERAL_TYPE_STRING == varType)
 	{
-		builder->CreateCall(module->getFunction("__str_assign"), { defval, rhs.value }, "calltmp");
+		llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), defval, "loadtmp");
+		llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+		builder->CreateCall(module->getFunction("__str_assign"), { lhs_load, rhs_load }, "calltmp");
 	}
 	else if (LITERAL_TYPE_INTEGER == varType || LITERAL_TYPE_BOOL == varType || LITERAL_TYPE_DOUBLE == varType || LITERAL_TYPE_ENUM == varType || LITERAL_TYPE_POINTER == varType)
 	{
+		if (LITERAL_TYPE_INTEGER == varType && rhs.IsDouble())
+		{
+			rhs = TValue(LITERAL_TYPE_INTEGER, builder->CreateFPToSI(rhs.value, builder->getInt32Ty(), "cast_to_int"));
+		}
+		else if (LITERAL_TYPE_DOUBLE == varType && rhs.IsInteger())
+		{
+			rhs = TValue(LITERAL_TYPE_DOUBLE, builder->CreateSIToFP(rhs.value, builder->getDoubleTy(), "cast_to_dbl"));
+		}
 		builder->CreateStore(rhs.value, defval);
 	}
 	else if (LITERAL_TYPE_VEC == varType)
@@ -64,6 +119,11 @@ TValue AssignExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				rhs = TValue::Integer(builder->CreateIntCast(rhs.value, builder->getInt8Ty(), true));
 				builder->CreateCall(module->getFunction("__vec_set_bool"), { src, idx.value, rhs.value }, "calltmp");
 			}
+			else if (LITERAL_TYPE_STRING == vecType)
+			{
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				builder->CreateCall(module->getFunction("__vec_set_str"), { src, idx.value, tmp }, "calltmp");
+			}
 
 		}
 		else
@@ -71,24 +131,43 @@ TValue AssignExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			// overwrite entire vector
 			if (rhs.IsFixedVec())
 			{
-				TValue b = TValue(LITERAL_TYPE_INTEGER, builder->CreateLoad(defty, defval, "geptmp"));
-				llvm::Value* dstType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
-				llvm::Value* srcType = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_type, true));
-				llvm::Value* srcQty = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_sz, true));
+				llvm::Value* dstType = builder->getInt32(vecType);
+				llvm::Value* srcType = builder->getInt32(rhs.fixed_vec_type);
+				llvm::Value* srcQty = builder->getInt32(rhs.fixed_vec_sz);
 				llvm::Value* dstPtr = builder->CreateLoad(defty, defval, "vecdst");
-				llvm::Value* srcPtr = rhs.value;
+				llvm::Value* srcPtr = rhs.value; // no load required, address already loaded in local variable
 				builder->CreateCall(module->getFunction("__vec_assign_fixed"), { dstType, dstPtr, srcType, srcPtr, srcQty }, "calltmp");
 			}
 			else if (rhs.IsVec())
 			{
-				TValue b = TValue(LITERAL_TYPE_INTEGER, builder->CreateLoad(defty, defval, "geptmp"));
-				llvm::Value* dstType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
-				llvm::Value* srcType = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_type, true));
-				llvm::Value* dstPtr = b.value;
-				llvm::Value* srcPtr = rhs.value;
+				llvm::Value* dstType = builder->getInt32(vecType);
+				llvm::Value* srcType = builder->getInt32(rhs.fixed_vec_type);
+				llvm::Value* dstPtr = builder->CreateLoad(defty, defval, "vecdst");
+				llvm::Value* srcPtr = builder->CreateLoad(defty, rhs.value, "vecdst");
 				builder->CreateCall(module->getFunction("__vec_assign"), { dstType, dstPtr, srcType, srcPtr }, "calltmp");
 			}
 
+		}
+	}
+	else if (LITERAL_TYPE_UDT == varType)
+	{
+		if (EXPRESSION_VARIABLE == m_right->GetType())
+		{
+			VariableExpr* ve = static_cast<VariableExpr*>(m_right);
+			std::string rvar = ve->Operator()->Lexeme();
+			
+			LiteralTypeEnum rvarType = env->GetVariableType(rvar);
+			if (LITERAL_TYPE_UDT == rvarType)
+			{
+				llvm::Value* rdefval = env->GetVariable(rvar);
+				llvm::Type* rdefty = env->GetVariableTy(rvar);
+
+				if (defty == rdefty) // same type of data
+				{
+					std::string udtname = "struct." + env->GetVariableToken(rvar)->Lexeme();
+					copy_udt(builder, module, env, udtname, defval, rdefval, defty, rdefty, { builder->getInt32(0) }, { builder->getInt32(0) } );
+				}
+			}
 		}
 	}
 
@@ -114,7 +193,6 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (lhs.IsInteger() || lhs.IsEnum()) ty = builder->getInt32Ty();
 		else if (lhs.IsDouble()) ty = builder->getDoubleTy();
 		else if (lhs.IsBool()) ty = builder->getInt1Ty();
-		else if (lhs.IsString()) ty = builder->getPtrTy();
 		
 		if (ty) lhs = TValue(lhs.type, builder->CreateLoad(ty, lhs.value, "gep_load"));
 	}
@@ -132,7 +210,8 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			}
 			if (lhs.IsString())
 			{
-				return TValue::Integer(builder->CreateCall(module->getFunction("__str_to_int"), { lhs.value }, "calltmp"));
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), lhs.value);
+				return TValue::Integer(builder->CreateCall(module->getFunction("__str_to_int"), { tmp }, "calltmp"));
 			}
 		}
 		else if (TOKEN_VAR_F32 == new_type)
@@ -144,7 +223,8 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			}
 			if (lhs.IsString())
 			{
-				return TValue::Double(builder->CreateCall(module->getFunction("__str_to_double"), { lhs.value }, "calltmp"));
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), lhs.value);
+				return TValue::Double(builder->CreateCall(module->getFunction("__str_to_double"), { tmp }, "calltmp"));
 			}
 		}
 		else if (TOKEN_VAR_STRING == new_type)
@@ -153,7 +233,10 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 			if (lhs.IsInteger())
 			{
-				TValue ret = TValue::String(builder->CreateCall(module->getFunction("__int_to_string"), { lhs.value }, "calltmp"));
+				llvm::Value* s = builder->CreateCall(module->getFunction("__int_to_string"), { lhs.value }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
@@ -164,13 +247,19 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			}
 			else if (lhs.IsDouble())
 			{
-				TValue ret = TValue::String(builder->CreateCall(module->getFunction("__double_to_string"), { lhs.value }, "calltmp"));
+				llvm::Value* s = builder->CreateCall(module->getFunction("__double_to_string"), { lhs.value }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
 			else if (lhs.IsBool())
 			{
-				TValue ret = TValue::String(builder->CreateCall(module->getFunction("__bool_to_string"), { lhs.value }, "calltmp"));
+				llvm::Value* s = builder->CreateCall(module->getFunction("__bool_to_string"), { lhs.value }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
@@ -187,8 +276,7 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (rhs.IsInteger() || rhs.IsEnum()) ty = builder->getInt32Ty();
 		else if (rhs.IsDouble()) ty = builder->getDoubleTy();
 		else if (rhs.IsBool()) ty = builder->getInt1Ty();
-		else if (rhs.IsString()) ty = builder->getPtrTy();
-
+		
 		if (ty) rhs = TValue(rhs.type, builder->CreateLoad(ty, rhs.value, "gep_load"));
 	}
 	
@@ -222,7 +310,12 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (lhs.IsInteger()) return TValue::Integer(builder->CreateAdd(lhs.value, rhs.value, "addtmp"));
 		if (lhs.IsString() && rhs.IsString())
 		{
-			TValue ret = TValue::String(builder->CreateCall(module->getFunction("__std_string_cat"), { lhs.value, rhs.value }, "calltmp"));
+			llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value);
+			llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value);
+			llvm::Value* s = builder->CreateCall(module->getFunction("__std_string_cat"), { lhs_load, rhs_load }, "calltmp");
+			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			TValue ret = TValue::String(a);
 			env->AddToCleanup(ret);
 			return ret;
 		}
@@ -272,7 +365,9 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (lhs.IsInteger() || lhs.IsEnum() || lhs.IsBool()) return TValue::Bool(builder->CreateICmpNE(lhs.value, rhs.value, "cmptmp"));
 		if (lhs.IsString() && rhs.IsString())
 		{
-			llvm::Value* tmp = builder->CreateCall(module->getFunction("__str_cmp"), { lhs.value, rhs.value }, "calltmp");
+			llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+			llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+			llvm::Value* tmp = builder->CreateCall(module->getFunction("__str_cmp"), { lhs_load, rhs_load }, "calltmp");
 			return TValue::Bool(builder->CreateICmpNE(tmp, builder->getTrue(), "boolcmp"));
 		}
 		break;
@@ -291,7 +386,9 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (lhs.IsInteger() || lhs.IsEnum() || lhs.IsBool()) return TValue::Bool(builder->CreateICmpEQ(lhs.value, rhs.value, "cmptmp"));
 		if (lhs.IsString() && rhs.IsString())
 		{
-			return TValue::Bool(builder->CreateCall(module->getFunction("__str_cmp"), { lhs.value, rhs.value }, "calltmp"));
+			llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+			llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+			return TValue::Bool(builder->CreateCall(module->getFunction("__str_cmp"), { lhs_load, rhs_load }, "calltmp"));
 		}
 		break;	
 	}
@@ -328,6 +425,8 @@ TValue BracketExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				if (LITERAL_TYPE_INTEGER == le->GetLiteral().GetType())
 				{
 					TValue val = lhs->codegen(context, builder, module, env);
+					if (val.IsString()) val = TValue::String(builder->CreateLoad(builder->getPtrTy(), val.value, "loadtmp"));
+
 					int qty = le->GetLiteral().IntValue();
 					for (size_t i = 0; i < qty; ++i)
 					{
@@ -342,6 +441,8 @@ TValue BracketExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		else
 		{
 			TValue v = arg->codegen(context, builder, module, env);
+			if (v.IsString()) v = TValue::String(builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp"));
+
 			vals.push_back(v);
 			if (v.IsInteger()) has_int = true;
 			if (v.IsDouble()) has_double = true;
@@ -366,6 +467,7 @@ TValue BracketExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (vals[0].IsInteger() || vals[0].IsEnum()) a = builder->CreateAlloca(builder->getInt32Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
 	if (vals[0].IsBool()) a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
 	if (vals[0].IsDouble()) a = builder->CreateAlloca(builder->getDoubleTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
+	if (vals[0].IsString()) a = builder->CreateAlloca(builder->getPtrTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
 
 	if (a)
 	{
@@ -488,7 +590,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			if (LITERAL_TYPE_VEC == varType)
 			{
 				llvm::Value* src = builder->CreateLoad(defty, defval);
-				llvm::Value* srcType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
+				llvm::Value* srcType = builder->getInt32(vecType);
 				return TValue::Integer(builder->CreateCall(module->getFunction("__vec_len"), { srcType, src }, "calltmp"));
 			}
 		}
@@ -512,6 +614,216 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			return TValue::Double(rval);
 		}
 	}
+	else if (0 == name.compare("file::readlines"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(builder->CreateCall(module->getFunction("__file_readlines"), { tmp }, "calltmp"), a);
+				TValue ret = TValue::Vec(a, LITERAL_TYPE_STRING);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("file::writelines"))
+	{
+		if (2 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsString() && rhs.IsVec())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				builder->CreateCall(module->getFunction("__file_writelines"), { lhs_load, rhs_load }, "calltmp");
+			}
+		}
+	}
+	else if (0 == name.compare("str::contains"))
+	{
+		if (2 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsString() && rhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				return TValue::Bool(builder->CreateCall(module->getFunction("__str_contains"), { lhs_load, rhs_load }, "calltmp"));
+			}
+		}
+	}
+	else if (0 == name.compare("str::replace"))
+	{
+		if (3 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue mhs = m_arguments[1]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[2]->codegen(context, builder, module, env);
+			if (lhs.IsString() && mhs.IsString() && rhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* mhs_load = builder->CreateLoad(builder->getPtrTy(), mhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_replace"), { lhs_load, mhs_load, rhs_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("str::split"))
+	{
+		if (2 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsString() && rhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_split"), { lhs_load, rhs_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::Vec(a, LITERAL_TYPE_STRING);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("str::join"))
+	{
+		if (2 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsVec() && LITERAL_TYPE_STRING == lhs.fixed_vec_type && rhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_join"), { lhs_load, rhs_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("str::substr"))
+	{
+		if (2 <= m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsString() && rhs.IsInteger())
+			{
+				TValue len = 2 < m_arguments.size() ? m_arguments[2]->codegen(context, builder, module, env) : TValue::Integer(builder->getInt32(-1));
+				if (len.IsInteger())
+				{
+					llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+					llvm::Value* s = builder->CreateCall(module->getFunction("__str_substr"), { lhs_load, rhs.value, len.value }, "calltmp");
+					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					builder->CreateStore(s, a);
+					TValue ret = TValue::String(a);
+					env->AddToCleanup(ret);
+					return ret;
+				}
+			}
+		}
+	}
+	else if (0 == name.compare("str::toupper"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_toupper"), { arg_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("str::tolower"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_tolower"), { arg_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+	}
+	else if (0 == name.compare("str::ltrim"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_ltrim"), { arg_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+		}
+	else if (0 == name.compare("str::rtrim"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_rtrim"), { arg_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+		}
+	else if (0 == name.compare("str::trim"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* s = builder->CreateCall(module->getFunction("__str_trim"), { arg_load }, "calltmp");
+				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(s, a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+		}
+		}
 	else if (0 == name.compare("vec::append"))
 	{
 		if (2 == m_arguments.size() && EXPRESSION_VARIABLE == m_arguments[0]->GetType())
@@ -530,7 +842,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
 
 				llvm::Value* dst = builder->CreateLoad(defty, defval);
-				llvm::Value* dstType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
+				llvm::Value* dstType = builder->getInt32(vecType);
 
 				if (LITERAL_TYPE_INTEGER == vecType)
 				{
@@ -557,6 +869,11 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				else if (LITERAL_TYPE_BOOL == vecType)
 				{
 					builder->CreateCall(module->getFunction("__vec_append_bool"), { dstType, dst, rhs.value }, "calltmp");
+				}
+				else if (LITERAL_TYPE_STRING == vecType)
+				{
+					llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+					builder->CreateCall(module->getFunction("__vec_append_str"), { dstType, dst, tmp }, "calltmp");
 				}
 
 			}
@@ -670,6 +987,7 @@ TValue GetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (TOKEN_IDENTIFIER == ttype)
 		{
 			udt_name = "struct." + token->Lexeme();
+			ret = TValue::UDT(udt_name, defty, defval, args);
 		}
 		else
 		{
@@ -698,11 +1016,11 @@ TValue LiteralExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	if (LITERAL_TYPE_INTEGER == lt)
 	{
-		return TValue(lt, llvm::ConstantInt::get(*context, llvm::APInt(32, m_literal.IntValue(), true)));
+		return TValue(lt, builder->getInt32(m_literal.IntValue()));
 	}
 	else if (LITERAL_TYPE_ENUM == lt)
 	{
-		return TValue(lt, llvm::ConstantInt::get(*context, llvm::APInt(32, env->GetEnumAsInt(m_literal.EnumValue().enumValue), true)));
+		return TValue(lt, builder->getInt32(env->GetEnumAsInt(m_literal.EnumValue().enumValue)));
 	}
 	else if (LITERAL_TYPE_BOOL == lt)
 	{
@@ -719,7 +1037,9 @@ TValue LiteralExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	{
 		llvm::Value* global_string = builder->CreateGlobalStringPtr(m_literal.ToString(), "strtmp");
 		llvm::Value* p = builder->CreateCall(module->getFunction("__new_std_string_ptr"), { global_string }, "strptr");
-		TValue ret(lt, p);
+		llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+		builder->CreateStore(p, a);
+		TValue ret(lt, a);
 		env->AddToCleanup(ret);
 		return ret;
 	}
@@ -785,7 +1105,18 @@ TValue SetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (2 <= Environment::GetDebugLevel()) printf("SetExpr::codegen()\n");
 
 	TValue lhs = m_object->codegen(context, builder, module, env);
+	
 	TValue rhs = m_value->codegen(context, builder, module, env);
+	if (EXPRESSION_GET == m_value->GetType())
+	{
+		llvm::Type* ty = nullptr;
+		if (rhs.IsInteger() || rhs.IsEnum()) ty = builder->getInt32Ty();
+		else if (rhs.IsDouble()) ty = builder->getDoubleTy();
+		else if (rhs.IsBool()) ty = builder->getInt1Ty();
+		
+		if (ty) rhs = TValue(rhs.type, builder->CreateLoad(ty, rhs.value, "gep_load"));
+	}
+
 
 	if (lhs.IsInteger() && rhs.IsDouble())
 	{
@@ -798,9 +1129,49 @@ TValue SetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		rhs = TValue::Double(builder->CreateSIToFP(rhs.value, builder->getDoubleTy(), "cast_to_dbl"));
 	}
 	
+	
 	if (lhs.type == rhs.type)
 	{
-		builder->CreateStore(rhs.value, lhs.value);
+		if (LITERAL_TYPE_UDT != lhs.type)
+		{
+			if (lhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "lhs_load");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "rhs_load");
+				builder->CreateCall(module->getFunction("__str_assign"), { lhs_load, rhs_load }, "calltmp");
+			}
+			else
+			{
+				builder->CreateStore(rhs.value, lhs.value);
+			}
+		}
+		else
+		{
+			llvm::Value* defval = lhs.value;
+			llvm::Type* defty = lhs.udt_ty;
+			std::vector<llvm::Value*> lhs_args = lhs.udt_args;
+
+			if (EXPRESSION_VARIABLE == m_value->GetType())
+			{
+				VariableExpr* ve = static_cast<VariableExpr*>(m_value);
+				std::string rvar = ve->Operator()->Lexeme();
+
+				LiteralTypeEnum rvarType = env->GetVariableType(rvar);
+				if (LITERAL_TYPE_UDT == rvarType)
+				{
+					llvm::Value* rdefval = env->GetVariable(rvar);
+					llvm::Type* rdefty = env->GetVariableTy(rvar);
+
+					std::string udtname = "struct." + env->GetVariableToken(rvar)->Lexeme();
+					if (0 == lhs.udt_name.compare(udtname))
+					{
+						// same type of data
+						copy_udt(builder, module, env, udtname, defval, rdefval, defty, rdefty, lhs_args, { builder->getInt32(0) });
+					}
+				}
+			}
+
+		}
 	}
 	else
 	{
@@ -897,11 +1268,21 @@ TValue VariableExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		{
 			return TValue(vecType, builder->CreateCall(module->getFunction("__vec_get_bool"), { src, idx.value }, "calltmp"));
 		}
+		else if (LITERAL_TYPE_STRING == vecType)
+		{
+			llvm::Value* s = builder->CreateCall(module->getFunction("__vec_get_str"), { src, idx.value }, "calltmp");
+			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			TValue ret = TValue::String(a);
+			env->AddToCleanup(ret);
+			return ret;
+		}
 
 	}
 	else if (LITERAL_TYPE_VEC == varType && !m_vecIndex)
 	{
-		return TValue::Vec(builder->CreateLoad(defty, defval, "loadtmp"), env->GetVecType(var));
+		//return TValue::Vec(builder->CreateLoad(defty, defval, "loadtmp"), env->GetVecType(var));
+		return TValue::Vec(defval, env->GetVecType(var));
 	}
 	else if (LITERAL_TYPE_POINTER == varType)
 	{

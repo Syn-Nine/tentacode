@@ -4,7 +4,7 @@
 #include "Literal.h"
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Type.h>
-
+#include <vector>
 
 struct TValue
 {
@@ -12,6 +12,9 @@ struct TValue
 	llvm::Value* value;
 	size_t fixed_vec_sz;
 	LiteralTypeEnum fixed_vec_type;
+	std::string udt_name;
+	llvm::Type* udt_ty;
+	std::vector<llvm::Value*> udt_args;
 	//void* addr;
 
 	TValue(LiteralTypeEnum t, llvm::Value* v) : type(t), value(v)
@@ -25,6 +28,7 @@ struct TValue
 	bool IsVec()        { return type == LITERAL_TYPE_VEC; }
 	bool IsFixedVec()   { return type == LITERAL_TYPE_VEC_FIXED; }
 	bool IsPointer()    { return type == LITERAL_TYPE_POINTER; }
+	bool IsUDT()		{ return type == LITERAL_TYPE_UDT; }
 
 	bool IsIntegerTy()  { return value->getType()->isIntegerTy(); }
 	bool IsDoubleTy()	{ return value->getType()->isDoubleTy();  }
@@ -79,6 +83,15 @@ struct TValue
 	{
 		TValue ret = TValue(LITERAL_TYPE_VEC, v);
 		ret.fixed_vec_type = type;
+		return ret;
+	}
+
+	static TValue UDT(std::string udt_name, llvm::Type* ty, llvm::Value* v, std::vector<llvm::Value*> args)
+	{
+		TValue ret = TValue(LITERAL_TYPE_UDT, v);
+		ret.udt_ty = ty;
+		ret.udt_name = udt_name;
+		ret.udt_args = args;
 		return ret;
 	}
 };

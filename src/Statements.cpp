@@ -329,8 +329,7 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (v.IsInteger() || v.IsEnum()) ty = builder->getInt32Ty();
 		else if (v.IsDouble()) ty = builder->getDoubleTy();
 		else if (v.IsBool()) ty = builder->getInt1Ty();
-		else if (v.IsString()) ty = builder->getPtrTy();
-
+		
 		if (ty) v = TValue(v.type, builder->CreateLoad(ty, v.value, "gep_load"));
 	}
 
@@ -338,25 +337,35 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	{
 		if (v.IsInteger())
 		{
-			v = TValue::String(builder->CreateCall(module->getFunction("__int_to_string"), { v.value }, "calltmp"));
+			llvm::Value* s = builder->CreateCall(module->getFunction("__int_to_string"), { v.value }, "calltmp");
+			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			v = TValue::String(a);
 			env->AddToCleanup(v);
 		}
 		else if (v.IsDouble())
 		{
-			v = TValue::String(builder->CreateCall(module->getFunction("__double_to_string"), { v.value }, "calltmp"));
+			llvm::Value* s = builder->CreateCall(module->getFunction("__double_to_string"), { v.value }, "calltmp");
+			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			v = TValue::String(a);
 			env->AddToCleanup(v);
 		}
 		else if (v.IsBool())
 		{
-			v = TValue::String(builder->CreateCall(module->getFunction("__bool_to_string"), { v.value }, "calltmp"));
+			llvm::Value* s = builder->CreateCall(module->getFunction("__bool_to_string"), { v.value }, "calltmp");
+			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			v = TValue::String(a);
 			env->AddToCleanup(v);
 		}
 	}
 
+	llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp");
 	if (m_newline)
-		builder->CreateCall(module->getFunction("println"), { v.value }, "calltmp");
+		builder->CreateCall(module->getFunction("println"), { tmp }, "calltmp");
 	else
-		builder->CreateCall(module->getFunction("print"), { v.value }, "calltmp");
+		builder->CreateCall(module->getFunction("print"), { tmp }, "calltmp");
 
 	return TValue::NullInvalid();
 }
@@ -441,6 +450,10 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					printf("Invalid structure member UDT.\n");
 				break;
 			}
+			/*case TOKEN_VAR_VEC:
+				arg_ty.push_back(builder->getPtrTy());
+				break;*/
+
 			default:
 				printf("Invalid structure member type.\n");
 				break;
@@ -493,8 +506,13 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 			else if (TOKEN_VAR_F32 == arg_var_tokens[i]->GetType()) builder->CreateStore(llvm::Constant::getNullValue(builder->getDoubleTy()), gep);
 			else if (TOKEN_VAR_STRING == arg_var_tokens[i]->GetType())
 			{
-				TValue tmp = TValue::String(builder->CreateCall(module->getFunction("__new_std_string_void"), {}, "calltmp"));
-				builder->CreateStore(tmp.value, gep);
+				llvm::Value* s = builder->CreateCall(module->getFunction("__new_std_string_void"), {}, "calltmp");
+				/*llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr);
+				builder->CreateStore(s, a);
+				TValue tmp = TValue::String(a);
+				builder->CreateStore(tmp.value, gep);*/
+				builder->CreateStore(s, gep);
+				TValue tmp = TValue::String(gep);
 				env->AddToCleanup(tmp);
 			}
 			else
@@ -504,8 +522,6 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 		}
 	}
 }
-
-
 
 TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	std::unique_ptr<llvm::IRBuilder<>>& builder,
@@ -522,87 +538,97 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	if (TOKEN_VAR_I32 == varType)
 	{
+		defty = builder->getInt32Ty();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, builder->getInt32Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
 		}
 		else
 		{
-			defval = builder->CreateAlloca(builder->getInt32Ty(), nullptr, "alloc_i32");
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_i32");
 			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
 		}
-		defty = builder->getInt32Ty();
 		env->DefineVariable(LITERAL_TYPE_INTEGER, m_token->Lexeme(), defval, defty, m_type);
 	}
 	else if (TOKEN_VAR_ENUM == varType)
 	{
+		defty = builder->getInt32Ty();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, builder->getInt32Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
 		}
 		else
 		{
-			defval = builder->CreateAlloca(builder->getInt32Ty(), nullptr, "alloc_enum_i32");
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_enum_i32");
 			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
 		}
-		defty = builder->getInt32Ty();
 		env->DefineVariable(LITERAL_TYPE_ENUM, m_token->Lexeme(), defval, defty, m_type);
 	}
 	else if (TOKEN_VAR_BOOL == varType)
 	{
+		defty = builder->getInt1Ty();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, builder->getInt1Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getFalse(), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getFalse(), m_token->Lexeme());
 		}
 		else
 		{
-			defval = builder->CreateAlloca(builder->getInt1Ty(), nullptr, "alloc_bool");
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_bool");
 			if (!m_expr) builder->CreateStore(builder->getFalse(), defval);
 		}
-		defty = builder->getInt1Ty();
 		env->DefineVariable(LITERAL_TYPE_BOOL, m_token->Lexeme(), defval, defty, m_type);
 	}
 	else if (TOKEN_VAR_F32 == varType)
 	{
+		defty = builder->getDoubleTy();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, builder->getDoubleTy(), false, llvm::GlobalValue::InternalLinkage, llvm::ConstantFP::get(*context, llvm::APFloat(0.0)), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantFP::get(*context, llvm::APFloat(0.0)), m_token->Lexeme());
 		}
 		else
 		{
-			defval = builder->CreateAlloca(builder->getDoubleTy(), nullptr, "alloc_f64");
-			if (!m_expr) builder->CreateStore(llvm::Constant::getNullValue(builder->getDoubleTy()), defval);
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_f64");
+			if (!m_expr) builder->CreateStore(llvm::Constant::getNullValue(defty), defval);
 		}
-		defty = builder->getDoubleTy();
 		env->DefineVariable(LITERAL_TYPE_DOUBLE, m_token->Lexeme(), defval, defty, m_type);
 	}
 	else if (TOKEN_VAR_STRING == varType)
 	{
-		defval = builder->CreateCall(module->getFunction("__new_std_string_void"), { }, "calltmp");
 		defty = builder->getPtrTy();
+		if (m_global)
+		{
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
+		}
+		else
+		{
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_ptr");
+
+		}
 		env->DefineVariable(LITERAL_TYPE_STRING, m_token->Lexeme(), defval, defty, m_type);
+		llvm::Value* addr = builder->CreateCall(module->getFunction("__new_std_string_void"), { }, "calltmp");
+		builder->CreateStore(addr, defval);
 		env->AddToCleanup(TValue::String(defval));
 	}
 	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType)
 	{
+		defty = builder->getPtrTy();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, builder->getInt64Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt64(0), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
 		}
 		else
 		{
-			defval = builder->CreateAlloca(builder->getInt64Ty(), nullptr, "alloc_ptr");
+			defval = builder->CreateAlloca(defty, nullptr, "alloc_ptr");
 
 		}
-		defty = builder->getInt64Ty();
 		env->DefineVariable(LITERAL_TYPE_POINTER, m_token->Lexeme(), defval, defty, m_type);
 	}
 	else if (TOKEN_VAR_VEC == varType)
 	{
-		defty = builder->getInt64Ty();
+		defty = builder->getPtrTy();
 		if (m_global)
 		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt64(0), m_token->Lexeme());
+			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
 		}
 		else
 		{
@@ -610,9 +636,9 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 		}
 		env->DefineVariable(LITERAL_TYPE_VEC, m_token->Lexeme(), defval, defty, m_type, vecType);
-		llvm::Value* v = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
-		llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { v }, "calltmp");
+		llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
 		builder->CreateStore(addr, defval);
+		env->AddToCleanup(TValue::Vec(defval, vecType));
 	}
 	else if (TOKEN_IDENTIFIER == varType)
 	{
@@ -637,56 +663,10 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 	}
 
-	if (defval && m_expr)
+	if (defval && m_expr && EXPRESSION_ASSIGN == m_expr->GetType())
 	{
-		TValue rhs = m_expr->codegen(context, builder, module, env);
-		if (!rhs.value) return TValue::NullInvalid();
-
-		//printf("%d\n", &rhs);
-
-		if (rhs.IsString())
-		{
-			builder->CreateCall(module->getFunction("__str_assign"), { defval, rhs.value }, "calltmp");
-		}
-		else
-		{
-			if (TOKEN_VAR_I32 == varType && rhs.IsDouble())
-			{
-				rhs = TValue(LITERAL_TYPE_INTEGER, builder->CreateFPToSI(rhs.value, builder->getInt32Ty(), "cast_to_int"));
-			}
-			else if (TOKEN_VAR_F32 == varType && rhs.IsInteger())
-			{
-				rhs = TValue(LITERAL_TYPE_DOUBLE, builder->CreateSIToFP(rhs.value, builder->getDoubleTy(), "cast_to_dbl"));
-			}
-			else if (TOKEN_VAR_VEC == varType && rhs.IsFixedVec())
-			{
-				TValue b = TValue(LITERAL_TYPE_INTEGER, builder->CreateLoad(defty, defval, "geptmp"));
-				llvm::Value* dstType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
-				llvm::Value* srcType = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_type, true));
-				llvm::Value* srcQty = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_sz, true));
-				llvm::Value* dstPtr = b.value;
-				llvm::Value* srcPtr = rhs.value;
-				builder->CreateCall(module->getFunction("__vec_assign_fixed"), { dstType, dstPtr, srcType, srcPtr, srcQty }, "calltmp");
-				return TValue::NullInvalid();
-			}
-			else if (TOKEN_VAR_VEC == varType && rhs.IsVec())
-			{
-				TValue b = TValue(LITERAL_TYPE_INTEGER, builder->CreateLoad(defty, defval, "geptmp"));
-				llvm::Value* dstType = llvm::ConstantInt::get(*context, llvm::APInt(32, vecType, true));
-				llvm::Value* srcType = llvm::ConstantInt::get(*context, llvm::APInt(32, rhs.fixed_vec_type, true));
-				llvm::Value* dstPtr = b.value;
-				llvm::Value* srcPtr = rhs.value;
-				builder->CreateCall(module->getFunction("__vec_assign"), { dstType, dstPtr, srcType, srcPtr }, "calltmp");
-				return TValue::NullInvalid();
-			}
-			else if ((TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType) && rhs.IsPointer())
-			{
-				builder->CreateStore(rhs.value, defval);
-				return TValue::NullInvalid();
-			}
-
-			builder->CreateStore(rhs.value, defval);
-		}
+		// run assignment expression
+		m_expr->codegen(context, builder, module, env);
 	}
 
 	return TValue::NullInvalid();

@@ -3,10 +3,10 @@
 
 #include <sstream>
 #include <iomanip>
-#include <vector>
+#include <llvm/ADT/SmallVector.h>
 #include <string>
 
-static std::string StrJoin(std::vector<std::string> s, std::string delimiter) {
+static std::string StrJoin(llvm::SmallVector<std::string> s, std::string delimiter) {
     std::string ret;
     for (size_t i = 0; i < s.size(); ++i)
     {
@@ -17,10 +17,10 @@ static std::string StrJoin(std::vector<std::string> s, std::string delimiter) {
 }
 
 // source: https://stackoverflow.com/questions/14265581/parse-split-a-string-in-c-using-string-delimiter-standard-c
-static std::vector<std::string> StrSplit(std::string s, std::string delimiter) {
+static llvm::SmallVector<std::string> StrSplit(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
     std::string token;
-    std::vector<std::string> res;
+    llvm::SmallVector<std::string> res;
 
     while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
         token = s.substr(pos_start, pos_end - pos_start);

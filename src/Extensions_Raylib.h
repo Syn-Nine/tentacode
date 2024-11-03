@@ -185,13 +185,13 @@ static void LoadExtensions_Raylib(
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadTexture", *module);
         env->DefineFunction("ray::LoadTexture", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         args.push_back(builder->getInt32Ty());
         args.push_back(builder->getInt32Ty());
         args.push_back(builder->getInt32Ty());
@@ -201,7 +201,7 @@ static void LoadExtensions_Raylib(
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
@@ -210,7 +210,7 @@ static void LoadExtensions_Raylib(
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
         args.push_back(builder->getDoubleTy());
         args.push_back(builder->getDoubleTy());
@@ -221,7 +221,7 @@ static void LoadExtensions_Raylib(
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
@@ -257,20 +257,20 @@ static void LoadExtensions_Raylib(
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadSound", *module);
         env->DefineFunction("ray::LoadSound", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadSound", *module);
         env->DefineFunction("ray::UnloadSound", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_PlaySound", *module);
         env->DefineFunction("ray::PlaySound", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
@@ -284,13 +284,13 @@ static void LoadExtensions_Raylib(
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadFont", *module);
         env->DefineFunction("ray::LoadFont", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
     }
     {
         std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt64Ty());
+        args.push_back(builder->getPtrTy());
         args.push_back(builder->getPtrTy());
         args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
         args.push_back(builder->getDoubleTy());

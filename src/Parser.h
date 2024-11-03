@@ -217,7 +217,11 @@ private:
 		id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), type->Line(), type->Filename());
 
 		Expr* expr = nullptr;
-		if (Match(1, TOKEN_EQUAL)) expr = Expression();
+		if (Match(1, TOKEN_EQUAL))
+		{
+			Expr* value = Assignment();
+			expr = new AssignExpr(id, value, nullptr);
+		}
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
@@ -237,7 +241,11 @@ private:
 		id = new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename());
 
 		Expr* expr = nullptr;
-		if (Match(1, TOKEN_EQUAL)) expr = Expression();
+		if (Match(1, TOKEN_EQUAL))
+		{
+			Expr* value = Assignment();
+			expr = new AssignExpr(id, value, nullptr);
+		}
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
@@ -313,7 +321,8 @@ private:
 				body = new WhileStmt(condition, body, increment, label);
 
 				// build new initializer
-				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, rangeLeft, LITERAL_TYPE_INVALID);
+				Expr* assign_expr = new AssignExpr(var, rangeLeft, nullptr);
+				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, LITERAL_TYPE_INVALID);
 
 				// build outer block
 				StmtList* list = new StmtList();

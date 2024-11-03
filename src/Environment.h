@@ -277,7 +277,13 @@ public:
 		{
 			if (v.IsString())
 			{
-				builder->CreateCall(module->getFunction("__del_std_string_ptr"), { v.value }, "delstr");
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "tmpload");
+				builder->CreateCall(module->getFunction("__del_std_string_ptr"), { tmp }, "delstr");
+			}
+			else if (v.IsVec())
+			{
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "tmpload");
+				builder->CreateCall(module->getFunction("__vec_del"), { builder->getInt32(v.fixed_vec_type), tmp }, "delvec");
 			}
 		}
 	}
