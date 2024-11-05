@@ -416,6 +416,8 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	std::vector<llvm::Type*> arg_ty;
 	std::vector<Token*> arg_types;
+	std::vector<LiteralTypeEnum> arg_vec_types;
+	std::vector<std::string> arg_vec_types_id;
 	std::vector<std::string> arg_names;
 
 	for (auto& statement : *m_vars)
@@ -450,14 +452,16 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					printf("Invalid structure member UDT.\n");
 				break;
 			}
-			/*case TOKEN_VAR_VEC:
+			case TOKEN_VAR_VEC:
 				arg_ty.push_back(builder->getPtrTy());
-				break;*/
+				break;
 
 			default:
 				printf("Invalid structure member type.\n");
 				break;
 			}
+			arg_vec_types.push_back(vs->VarVecType());
+			arg_vec_types_id.push_back(vs->VarVecTypeId());
 			arg_types.push_back(vs->VarType());
 			arg_names.push_back(id);
 		}
@@ -467,7 +471,7 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	{
 		std::string id = "struct." + m_name->Lexeme();
 		llvm::StructType* stype = llvm::StructType::create(*context, arg_ty, id);
-		env->DefineUdt(id, stype, arg_types, arg_names, arg_ty);
+		env->DefineUdt(id, stype, arg_types, arg_names, arg_ty, arg_vec_types, arg_vec_types_id);
 	}
 
 	return TValue::NullInvalid();
@@ -487,32 +491,40 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 	std::vector<llvm::Type*> arg_ty = env->GetUdtTy(udtname);
 	std::vector<Token*> arg_var_tokens = env->GetUdtMemberTokens(udtname);
 	std::vector<std::string> arg_var_names = env->GetUdtMemberNames(udtname);
+	std::vector<LiteralTypeEnum> arg_var_vec_types = env->GetUdtMemberVecTypes(udtname);
+	std::vector<std::string> arg_var_vec_type_ids = env->GetUdtMemberVecTypeIds(udtname);
 	
 	for (size_t i = 0; i < arg_ty.size(); ++i)
 	{
 		std::vector<llvm::Value*> argtmp = args;
 		argtmp.push_back(builder->getInt32(i));
+		TokenTypeEnum argVarType = arg_var_tokens[i]->GetType();
 
-		if (TOKEN_IDENTIFIER == arg_var_tokens[i]->GetType())
+		if (TOKEN_IDENTIFIER == argVarType)
 		{
 			init_udt(builder, module, env, "struct." + arg_var_tokens[i]->Lexeme(), defval, defty, argtmp);
 		}
 		else
 		{
 			llvm::Value* gep = builder->CreateGEP(defty, defval, argtmp, "gep_" + arg_var_tokens[i]->Lexeme());
-			if (TOKEN_VAR_I32 == arg_var_tokens[i]->GetType() ||
-				TOKEN_VAR_ENUM == arg_var_tokens[i]->GetType()) builder->CreateStore(builder->getInt32(0), gep);
-			else if (TOKEN_VAR_BOOL == arg_var_tokens[i]->GetType()) builder->CreateStore(builder->getFalse(), gep);
-			else if (TOKEN_VAR_F32 == arg_var_tokens[i]->GetType()) builder->CreateStore(llvm::Constant::getNullValue(builder->getDoubleTy()), gep);
-			else if (TOKEN_VAR_STRING == arg_var_tokens[i]->GetType())
+			if (TOKEN_VAR_I32 == argVarType ||
+				TOKEN_VAR_ENUM == argVarType) builder->CreateStore(builder->getInt32(0), gep);
+			else if (TOKEN_VAR_BOOL == argVarType) builder->CreateStore(builder->getFalse(), gep);
+			else if (TOKEN_VAR_F32 == argVarType) builder->CreateStore(llvm::Constant::getNullValue(builder->getDoubleTy()), gep);
+			else if (TOKEN_VAR_STRING == argVarType)
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__new_std_string_void"), {}, "calltmp");
-				/*llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr);
-				builder->CreateStore(s, a);
-				TValue tmp = TValue::String(a);
-				builder->CreateStore(tmp.value, gep);*/
 				builder->CreateStore(s, gep);
 				TValue tmp = TValue::String(gep);
+				env->AddToCleanup(tmp);
+			}
+			else if (TOKEN_VAR_VEC == argVarType)
+			{
+				LiteralTypeEnum vecType = arg_var_vec_types[i];
+				std::string vecTypeId = arg_var_vec_type_ids[i];
+				llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
+				builder->CreateStore(addr, gep);
+				TValue tmp = TValue::Vec(gep, vecType, vecTypeId);
 				env->AddToCleanup(tmp);
 			}
 			else
@@ -609,7 +621,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		builder->CreateStore(addr, defval);
 		env->AddToCleanup(TValue::String(defval));
 	}
-	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType)
+	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType)
 	{
 		defty = builder->getPtrTy();
 		if (m_global)

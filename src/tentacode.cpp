@@ -172,7 +172,7 @@ int main(int nargs, char* argsv[])
 	const char* version = "0.2.1";
 	printf("Launching Tentacode JIT Compiler v%s\n", version);
 
-	Environment::SetDebugLevel(2);
+	Environment::SetDebugLevel(1);
 
 	errorHandler = new ErrorHandler();
 

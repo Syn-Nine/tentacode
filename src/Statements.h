@@ -307,19 +307,21 @@ class VarStmt : public Stmt
 public:
 	VarStmt() = delete;
 
-	VarStmt(Token* type, Token* name, Expr* expr, LiteralTypeEnum vtype, bool global = false)
+	VarStmt(Token* type, Token* name, Expr* expr, LiteralTypeEnum vtype, std::string vtypeid, bool global = false)
 	{
 		m_type = type;
 		m_token = name;
 		m_expr = expr;
 		m_vecType = vtype;
 		m_global = global;
+		m_vecTypeId = vtypeid;
 	}
 
 	Expr* Expression() { return m_expr; }
 	Token* Operator() { return m_token; }
 	Token* VarType() { return m_type; }
 	LiteralTypeEnum VarVecType() { return m_vecType; }
+	std::string VarVecTypeId() { return m_vecTypeId; }
 
 	StatementTypeEnum GetType() { return STATEMENT_VAR; }
 
@@ -331,6 +333,7 @@ public:
 private:
 	Token* m_type;
 	LiteralTypeEnum m_vecType;
+	std::string m_vecTypeId;
 	Token* m_token;
 	Expr* m_expr;
 	bool m_global;

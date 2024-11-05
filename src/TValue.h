@@ -12,6 +12,7 @@ struct TValue
 	llvm::Value* value;
 	size_t fixed_vec_sz;
 	LiteralTypeEnum fixed_vec_type;
+	std::string vec_udt_name;
 	std::string udt_name;
 	llvm::Type* udt_ty;
 	std::vector<llvm::Value*> udt_args;
@@ -79,10 +80,11 @@ struct TValue
 		return ret;
 	}
 
-	static TValue Vec(llvm::Value* v, LiteralTypeEnum type)
+	static TValue Vec(llvm::Value* v, LiteralTypeEnum type, std::string vec_udt_name = "")
 	{
 		TValue ret = TValue(LITERAL_TYPE_VEC, v);
 		ret.fixed_vec_type = type;
+		ret.vec_udt_name = vec_udt_name;
 		return ret;
 	}
 

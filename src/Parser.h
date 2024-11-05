@@ -184,13 +184,14 @@ private:
 	{
 		Token* type = new Token(Previous());
 
+		std::string vtypeid;
 		LiteralTypeEnum vtype = LITERAL_TYPE_INVALID; 
 		if (TOKEN_VAR_VEC == type->GetType())
 		{
 			if (Consume(TOKEN_LESS, "Expected <type> after vec."))
 			{
-				if (Match(5, TOKEN_VAR_BOOL, TOKEN_VAR_I32, TOKEN_VAR_F32,
-					TOKEN_VAR_STRING, TOKEN_VAR_ENUM))
+				if (Match(6, TOKEN_VAR_BOOL, TOKEN_VAR_I32, TOKEN_VAR_F32,
+					TOKEN_VAR_STRING, TOKEN_VAR_ENUM, TOKEN_IDENTIFIER))
 				{
 					TokenTypeEnum prevType = Previous().GetType();
 					if (TOKEN_VAR_BOOL == prevType)
@@ -203,6 +204,11 @@ private:
 						vtype = LITERAL_TYPE_STRING;
 					else if (TOKEN_VAR_ENUM == prevType)
 						vtype = LITERAL_TYPE_ENUM;
+					else if (TOKEN_IDENTIFIER == prevType)
+					{
+						vtype = LITERAL_TYPE_UDT;
+						vtypeid = Previous().Lexeme();
+					}
 				}
 				else
 				{
@@ -225,7 +231,7 @@ private:
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, vtype, m_global);
+		return new VarStmt(type, id, expr, vtype, vtypeid, m_global);
 	}
 
 
@@ -249,7 +255,7 @@ private:
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, LITERAL_TYPE_INVALID, m_global);
+		return new VarStmt(type, id, expr, LITERAL_TYPE_INVALID, "", m_global);
 	}
 	
 
@@ -280,7 +286,7 @@ private:
 				{
 					expr = new RangeExpr(new LiteralExpr(int32_t(0)), new Token(TOKEN_DOT_DOT, "..", id->Line(), id->Filename()), expr);
 				}
-				return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, LITERAL_TYPE_INVALID);
+				return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, LITERAL_TYPE_INVALID, "");
 			}
 		}
 		
@@ -322,7 +328,7 @@ private:
 
 				// build new initializer
 				Expr* assign_expr = new AssignExpr(var, rangeLeft, nullptr);
-				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, LITERAL_TYPE_INVALID);
+				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, LITERAL_TYPE_INVALID, "");
 
 				// build outer block
 				StmtList* list = new StmtList();

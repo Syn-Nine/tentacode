@@ -33,6 +33,60 @@ static int StringToKey(const std::string& s);
 static int StringToGamepadAxis(const std::string& s);
 static int StringToGamepadButton(const std::string& s);
 
+//-----------------------------------------------------------------------------
+// manual functions
+
+extern "C" DLLEXPORT int32_t ray_ImagePeek(Image* in0, int32_t in1, int32_t in2, int32_t in3)
+{
+    Image img = *in0;
+    uint8_t* raw = (uint8_t*)img.data;
+    size_t x = in1;
+    size_t y = in2;
+    size_t ofs = in3;
+    if (x >= 0 && y >= 0 && x < img.width && y < img.height && ofs < 4)
+    {
+        return raw[(y * img.width + x) * 4 + ofs];
+    }
+    else
+    {
+        printf("ray_ImagePeek out of bounds\n");
+    }
+    return 0;
+}
+
+extern "C" DLLEXPORT void ray_DrawTextureTileMap(Texture2D* in0, int32_t xx, int32_t yy, int32_t width, int32_t w, int32_t h, double scale, void* srcPtr, int32_t color)
+{
+    Texture2D tex = *in0;
+    llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
+    llvm::SmallVector<int32_t>& tiles = *src;
+    double rot = 0;
+    int32_t height = tiles.size() / width;
+    int32_t tw = (tex.width / w);
+
+    Color c = StringToColor(rayenv->GetEnumAsString(color));
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            size_t idx = y * width + x;
+            int32_t sprite = tiles[idx];
+            if (0 > sprite) continue;
+
+            int32_t u = sprite % tw;
+            int32_t v = (sprite - u) / tw;
+            int32_t x0 = u * w;
+            int32_t y0 = v * h;
+
+            Rectangle src = { float(x0), float(y0), float(w), float(h) };
+            Rectangle dst = { float(xx + int(x * w * scale)), float(yy + int(y * h * scale)), float(w * scale), float(h * scale) };
+            Vector2 org = { 0, 0 };
+
+            DrawTexturePro(tex, src, dst, org, rot, c);
+        }
+    }
+}
+
+
+//-----------------------------------------------------------------------------
 //
 
 extern "C" DLLEXPORT void ray_BeginDrawing() { BeginDrawing(); }
@@ -63,6 +117,8 @@ extern "C" DLLEXPORT void ray_PlaySound(Sound* in0) { PlaySound(*in0); }
 extern "C" DLLEXPORT void ray_InitAudioDevice() { InitAudioDevice(); }
 extern "C" DLLEXPORT Font* ray_LoadFont(std::string* in0) { return new Font(LoadFont(in0->c_str())); }
 extern "C" DLLEXPORT void ray_DrawTextEx(Font* in0, std::string* in1, double in2a, double in2b, double in3, double in4, int32_t in5) { DrawTextEx(*in0, in1->c_str(), { float(in2a), float(in2b) }, in3, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
+extern "C" DLLEXPORT Image* ray_LoadImage(std::string* in0) { return new Image(LoadImage(in0->c_str())); }
+extern "C" DLLEXPORT Texture2D* ray_LoadTextureFromImage(Image* in0) { return new Texture2D(LoadTextureFromImage(*in0)); }
 
 //
 
@@ -300,7 +356,53 @@ static void LoadExtensions_Raylib(
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextEx", *module);
         env->DefineFunction("ray::DrawTextEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_STRING, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadImage", *module);
+        env->DefineFunction("ray::LoadImage", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadTextureFromImage", *module);
+        env->DefineFunction("ray::LoadTextureFromImage", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_POINTER);
+    }
 
+    //-------------------------------------------------------------------------
+    // manual functions
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImagePeek", *module);
+        env->DefineFunction("ray::ImagePeek", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INTEGER);
+    }
+
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getDoubleTy());
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureTileMap", *module);
+        env->DefineFunction("ray::DrawTextureTileMap", ftn, {
+            LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER,
+            LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_POINTER,
+            LITERAL_TYPE_ENUM
+            }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
 }
 
 static Color StringToColor(const std::string& s)
