@@ -260,38 +260,6 @@ extern "C" DLLEXPORT std::string* __str_trim(std::string* src)
 	input.erase(input.find_last_not_of(" \t\n\r\f\v") + 1); // rtrim
 	return new std::string(input);
 }
-/*
-
-		
-		// str::rtrim()
-		Literal strRtrim = Literal();
-		strRtrim.SetCallable(1, [](LiteralList args, Interpreter* interpreter)->Literal
-		{
-			if (args[0].IsString())
-			{
-				std::string input = args[0].StringValue();
-				
-				return input;
-			}
-			return 0;
-		}, nspace);
-		globals->Define("rtrim", strRtrim, "global::str::");
-
-		// str::trim()
-		Literal strTrim = Literal();
-		strTrim.SetCallable(1, [](LiteralList args, Interpreter* interpreter)->Literal
-		{
-			if (args[0].IsString())
-			{
-				std::string input = args[0].StringValue();
-				
-				return input;
-			}
-			return 0;
-		}, nspace);
-		globals->Define("trim", strTrim, "global::str::");
-		*/
-
 
 
 //-----------------------------------------------------------------------------

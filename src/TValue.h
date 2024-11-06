@@ -18,6 +18,7 @@ struct TValue
 	std::vector<llvm::Value*> udt_args;
 	//void* addr;
 
+	TValue() = delete;
 	TValue(LiteralTypeEnum t, llvm::Value* v) : type(t), value(v)
 	{}
 
@@ -30,6 +31,7 @@ struct TValue
 	bool IsFixedVec()   { return type == LITERAL_TYPE_VEC_FIXED; }
 	bool IsPointer()    { return type == LITERAL_TYPE_POINTER; }
 	bool IsUDT()		{ return type == LITERAL_TYPE_UDT; }
+	bool IsInvalid()    { return type == LITERAL_TYPE_INVALID; }
 
 	bool IsIntegerTy()  { return value->getType()->isIntegerTy(); }
 	bool IsDoubleTy()	{ return value->getType()->isDoubleTy();  }

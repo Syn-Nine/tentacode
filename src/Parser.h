@@ -1,13 +1,6 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-/*#include <cstdarg>
-#include <sstream>
-#include <iomanip>
-#include <time.h>
-#include <fstream>
-#include <set>*/
-
 #include "Token.h"
 #include "Expressions.h"
 #include "ErrorHandler.h"

@@ -16,6 +16,7 @@ TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	for (auto& statement : *m_block)
 	{
+		if (env->HasErrors()) break;
 		if (STATEMENT_FUNCTION != statement->GetType())
 		{
 			statement->codegen(context, builder, module, sub_env);
@@ -50,6 +51,10 @@ TValue BreakStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		llvm::Function* ftn = builder->GetInsertBlock()->getParent();
 		llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "breaktail", ftn);
 		builder->SetInsertPoint(tail);
+	}
+	else
+	{
+		env->Error(m_keyword, "No parent block for `break`.");
 	}
 
 	return TValue::NullInvalid();
@@ -225,6 +230,7 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	for (auto& statement : *m_body)
 	{
+		if (env->HasErrors()) break;
 		if (STATEMENT_FUNCTION != statement->GetType())
 		{
 			statement->codegen(context, builder, module, sub_env);
@@ -422,6 +428,7 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	for (auto& statement : *m_vars)
 	{
+		if (env->HasErrors()) break;
 		if (STATEMENT_VAR == statement->GetType())
 		{
 			VarStmt* vs = static_cast<VarStmt*>(statement);
@@ -548,10 +555,12 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	llvm::Value* defval = nullptr;
 	llvm::Type* defty = nullptr;
 
+	bool global = !env->HasParent();
+
 	if (TOKEN_VAR_I32 == varType)
 	{
 		defty = builder->getInt32Ty();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
 		}
@@ -565,7 +574,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_ENUM == varType)
 	{
 		defty = builder->getInt32Ty();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
 		}
@@ -579,7 +588,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_BOOL == varType)
 	{
 		defty = builder->getInt1Ty();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getFalse(), m_token->Lexeme());
 		}
@@ -593,7 +602,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_F32 == varType)
 	{
 		defty = builder->getDoubleTy();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantFP::get(*context, llvm::APFloat(0.0)), m_token->Lexeme());
 		}
@@ -607,7 +616,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_STRING == varType)
 	{
 		defty = builder->getPtrTy();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
 		}
@@ -624,7 +633,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType)
 	{
 		defty = builder->getPtrTy();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
 		}
@@ -638,7 +647,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	else if (TOKEN_VAR_VEC == varType)
 	{
 		defty = builder->getPtrTy();
-		if (m_global)
+		if (global)
 		{
 			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
 		}
@@ -658,7 +667,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (env->IsUdt(udtname))
 		{
 			defty = env->GetUdt(udtname);
-			if (m_global)
+			if (global)
 			{
 				//defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt64(0), m_token->Lexeme());
 			}
@@ -672,6 +681,10 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 			}
 			env->DefineVariable(LITERAL_TYPE_UDT, m_token->Lexeme(), defval, defty, m_type);
+		}
+		else
+		{
+			env->Error(m_type, "Invalid identifier type.");
 		}
 	}
 

@@ -64,6 +64,11 @@ TValue AssignExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 {
 	if (2 <= Environment::GetDebugLevel()) printf("AssignExpr::codegen()\n");
 	TValue rhs = m_right->codegen(context, builder, module, env);
+	if (rhs.IsInvalid())
+	{
+		env->Error(m_token, "Invalid assignment.");
+		return TValue::NullInvalid();
+	}
 
 	std::string var = m_token->Lexeme();
 	llvm::Value* defval = env->GetVariable(var);
@@ -509,7 +514,8 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (!m_callee) return TValue::NullInvalid();
 	if (EXPRESSION_VARIABLE != m_callee->GetType()) return TValue::NullInvalid();
 
-	std::string name = (static_cast<VariableExpr*>(m_callee))->Operator()->Lexeme();
+	Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
+	std::string name = callee->Lexeme();
 	//printf("  lexeme=%s\n", name.c_str());
 
 	if (0 == name.compare("abs") && 1 == m_arguments.size())
@@ -1028,24 +1034,27 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					// convert rhs to double
 					v = TValue::Double(builder->CreateSIToFP(v.value, builder->getDoubleTy(), "cast_to_dbl"));
 				}
+				else if (v.IsFixedVec())
+				{
+					// convert to regular vec
+					LiteralTypeEnum vecType = v.fixed_vec_type;
+					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
+					builder->CreateCall(module->getFunction("__vec_assign_fixed"), { builder->getInt32(vecType), addr, builder->getInt32(vecType), v.value, builder->getInt32(v.fixed_vec_sz) }, "calltmp");
+					builder->CreateStore(addr, a);
+					v = TValue::Vec(a, vecType);
+					env->AddToCleanup(v);
+				}
 				if (v.IsString() || v.IsVec()) v.value = builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp");
 				args.push_back(v.value);
 			}
 			llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
 			LiteralTypeEnum retType = env->GetFunctionReturnType(name);
-			switch (retType)
-			{
-			case LITERAL_TYPE_INTEGER:
-				return TValue::Integer(rval);
-			case LITERAL_TYPE_DOUBLE:
-				return TValue::Double(rval);
-			case LITERAL_TYPE_BOOL:
-				return TValue::Bool(rval);
-			case LITERAL_TYPE_ENUM:
-				return TValue::Enum(rval);
-			}
-
-			return TValue(LITERAL_TYPE_INVALID, rval);
+			return TValue(retType, rval);
+		}
+		else
+		{
+			env->Error(callee, "Function not found.");
 		}
 	}
 
@@ -1383,6 +1392,12 @@ TValue VariableExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (2 <= Environment::GetDebugLevel()) printf("VariableExpr::codegen()\n");
 	std::string var = m_token->Lexeme();
 	llvm::Value* defval = env->GetVariable(var);
+	if (!defval)
+	{
+		env->Error(m_token, "Variable not found in environment.");
+		return TValue::NullInvalid();
+	}
+
 	llvm::Type* defty = env->GetVariableTy(var);
 	LiteralTypeEnum varType = env->GetVariableType(var);
 

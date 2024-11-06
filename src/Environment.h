@@ -12,6 +12,7 @@
 #include "Literal.h"
 #include "Token.h"
 #include "TValue.h"
+#include "ErrorHandler.h"
 
 class Environment
 {
@@ -22,6 +23,26 @@ public:
 		m_parent = parent;
 		m_loopBreak = nullptr;
 		m_loopContinue = nullptr;
+	}
+
+	bool HasParent() const { return m_parent; }
+	static bool HasErrors()
+	{
+		if (m_errorHandler) return m_errorHandler->HasErrors();
+		return false;
+	}
+
+	static void RegisterErrorHandler(ErrorHandler* eh) { m_errorHandler = eh; }
+	static void Error(Token* token, const std::string& err)
+	{
+		if (token)
+		{
+			m_errorHandler->Error(token->Filename(), token->Line(), "at '" + token->Lexeme() + "'", err);
+		}
+		else
+		{
+			m_errorHandler->Error("<File>", -1, "at '<at>'", err);
+		}
 	}
 
 	void DefineVariable(LiteralTypeEnum type, std::string id, llvm::Value* value, llvm::Type* ty, Token* token, LiteralTypeEnum vecType = LITERAL_TYPE_INVALID)
@@ -69,7 +90,7 @@ public:
 	{
 		if (0 != m_vars.count(id)) return m_vars.at(id);		
 		if (m_parent) return m_parent->GetVariable(id);
-		printf("Error - unable to find variable `%s` in environment!\n", id.c_str());
+		//printf("Error - unable to find variable `%s` in environment!\n", id.c_str());
 		return nullptr;
 	}
 
@@ -106,7 +127,7 @@ public:
 	{
 		if (0 != m_ftns.count(id)) return m_ftns.at(id);
 		if (m_parent) return m_parent->GetFunction(id);
-		printf("Error - unable to find function `%s` in environment!\n", id.c_str());
+		//printf("Error - unable to find function `%s` in environment!\n", id.c_str());
 		return nullptr;
 	}
 
@@ -359,6 +380,7 @@ private:
 	llvm::BasicBlock* m_loopBreak;
 	llvm::BasicBlock* m_loopContinue;
 
+	static ErrorHandler* m_errorHandler;
 };
 
 #endif // ENVIRONMENT_H

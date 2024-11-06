@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
-#include <conio.h>
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
@@ -60,6 +59,7 @@ bool Run(const char* buf, const char* filename)
 		Parser parser(tokens, errorHandler);
 		StmtList stmts = parser.Parse();
 		Environment* env = new Environment(nullptr);
+		env->RegisterErrorHandler(errorHandler);
 
 		LoadExtensions(builder, module, env);
 		LoadExtensions_Raylib(builder, module, env);
@@ -70,6 +70,7 @@ bool Run(const char* buf, const char* filename)
 		// walk function and struct definitions
 		for (auto& statement : stmts)
 		{
+			if (env->HasErrors()) break;
 			if (STATEMENT_STRUCT == statement->GetType())
 			{
 				statement->codegen(context, builder, module, env);
@@ -89,6 +90,7 @@ bool Run(const char* buf, const char* filename)
 		// walk main code
 		for (auto& statement : stmts)
 		{
+			if (env->HasErrors()) break;
 			if (STATEMENT_FUNCTION != statement->GetType() && STATEMENT_STRUCT != statement->GetType())
 			{
 				statement->codegen(context, builder, module, env);
@@ -103,6 +105,7 @@ bool Run(const char* buf, const char* filename)
 		// fill in functions
 		for (auto& statement : stmts)
 		{
+			if (env->HasErrors()) break;
 			if (STATEMENT_FUNCTION == statement->GetType())
 			{
 				statement->codegen(context, builder, module, env);
@@ -116,13 +119,6 @@ bool Run(const char* buf, const char* filename)
 		{
 			printf("\nLLVM IR Dump:\n");
 			module->print(llvm::errs(), nullptr);
-		}
-
-
-		if (errorHandler->HasErrors())
-		{
-			errorHandler->Print();
-			errorHandler->Clear();
 		}
 	}
 
@@ -206,15 +202,20 @@ int main(int nargs, char* argsv[])
 		printf("Usage: interp [script]\nOmit [script] to run prompt\n");
 	}
 
+	if (errorHandler->HasErrors())
+	{
+		errorHandler->Print();
+	}
+	else
+	{
+		auto TSM = llvm::orc::ThreadSafeModule(std::move(module), std::move(context));
+		TheJIT->addModule(std::move(TSM));
 
-	auto TSM = llvm::orc::ThreadSafeModule(std::move(module), std::move(context));
-	TheJIT->addModule(std::move(TSM));
+		auto ExprSymbol = ExitOnErr(TheJIT->lookup("main"));
+		void (*FP)() = ExprSymbol.getAddress().toPtr<void (*)()>();
 
-	auto ExprSymbol = ExitOnErr(TheJIT->lookup("main"));
-	void (*FP)() = ExprSymbol.getAddress().toPtr<void (*)()>();
-	
-	printf("\nOutput:\n");
-	FP();
+		printf("\nOutput:\n");
+		FP();
+	}
 
-	//_getch();
 }
