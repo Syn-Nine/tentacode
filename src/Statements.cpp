@@ -1,6 +1,15 @@
 #include "Statements.h"
 
 
+static llvm::Value* CreateEntryAlloca(std::unique_ptr<llvm::IRBuilder<>>& builder, llvm::Type* Ty, llvm::Value* ArraySize = nullptr,
+	const llvm::Twine& Name = "")
+{
+	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+	llvm::IRBuilder<> entry_builder(&ftn->getEntryBlock(), ftn->getEntryBlock().begin());
+	return entry_builder.CreateAlloca(Ty, ArraySize, Name);
+}
+
+
 //-----------------------------------------------------------------------------
 TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	std::unique_ptr<llvm::IRBuilder<>>& builder,
@@ -9,8 +18,7 @@ TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 {
 	if (2 <= Environment::GetDebugLevel()) printf("BlockStmt::codegen()\n");
 
-	//llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-	//llvm::BasicBlock* after = llvm::BasicBlock::Create(*context, "after_block", ftn);
+	llvm::Value* stack = builder->CreateStackSave("stksave");
 
 	Environment* sub_env = new Environment(env);
 
@@ -26,8 +34,7 @@ TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	sub_env->EmitCleanup(builder, module);
 	delete sub_env;
 
-	//builder->CreateBr(after);
-	//builder->SetInsertPoint(after);
+	builder->CreateStackRestore(stack, "stkrest");
 
 	return TValue::NullInvalid();
 }
@@ -112,7 +119,7 @@ TValue FunctionStmt::codegen_prototype(std::unique_ptr<llvm::LLVMContext>& conte
 	// check for existing function definition
 	if (env->IsFunction(name))
 	{
-		printf("Function `%s` already defined!\n", name.c_str());
+		env->Error(m_name, "Function already defined in environment.");
 		return TValue::NullInvalid();
 	}
 
@@ -204,7 +211,7 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	llvm::Function* ftn = env->GetFunction(name);
 	if (!ftn)
 	{
-		printf("Function `%s` not defined!\n", name.c_str());
+		env->Error(m_name, "Function not defined in environment.");
 		return TValue::NullInvalid();
 	}
 
@@ -218,10 +225,11 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	std::vector<llvm::Type*> args = env->GetFunctionArgTy(name);
 	std::vector<Token*> tokens = env->GetFunctionParamTokens(name);
 
+	
 	int i = 0;
 	for (auto& arg : ftn->args())
 	{
-		llvm::Value* defval = builder->CreateAlloca(args[i]);
+		llvm::Value* defval =CreateEntryAlloca(builder, args[i]);
 		llvm::Type* defty = arg.getType();
 		builder->CreateStore(&arg, defval);
 		env->DefineVariable(types[i], names[i], defval, defty, tokens[i]);
@@ -339,12 +347,13 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (ty) v = TValue(v.type, builder->CreateLoad(ty, v.value, "gep_load"));
 	}
 
+
 	if (!v.IsString())
 	{
 		if (v.IsInteger())
 		{
 			llvm::Value* s = builder->CreateCall(module->getFunction("__int_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 			builder->CreateStore(s, a);
 			v = TValue::String(a);
 			env->AddToCleanup(v);
@@ -352,7 +361,7 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		else if (v.IsDouble())
 		{
 			llvm::Value* s = builder->CreateCall(module->getFunction("__double_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 			builder->CreateStore(s, a);
 			v = TValue::String(a);
 			env->AddToCleanup(v);
@@ -360,7 +369,7 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		else if (v.IsBool())
 		{
 			llvm::Value* s = builder->CreateCall(module->getFunction("__bool_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 			builder->CreateStore(s, a);
 			v = TValue::String(a);
 			env->AddToCleanup(v);
@@ -456,7 +465,7 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				if (udt_ty)
 					arg_ty.push_back(udt_ty);
 				else
-					printf("Invalid structure member UDT.\n");
+					env->Error(vs->VarType(), "Invalid structure member type");
 				break;
 			}
 			case TOKEN_VAR_VEC:
@@ -464,7 +473,7 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				break;
 
 			default:
-				printf("Invalid structure member type.\n");
+				env->Error(vs->VarType(), "Invalid structure member type");
 				break;
 			}
 			arg_vec_types.push_back(vs->VarVecType());
@@ -509,7 +518,15 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 
 		if (TOKEN_IDENTIFIER == argVarType)
 		{
-			init_udt(builder, module, env, "struct." + arg_var_tokens[i]->Lexeme(), defval, defty, argtmp);
+			std::string subname = "struct." + arg_var_tokens[i]->Lexeme();
+			if (env->IsUdt(subname))
+			{
+				init_udt(builder, module, env, subname, defval, defty, argtmp);
+			}
+			else
+			{
+				env->Error(arg_var_tokens[i], "Invalid identifier type.");
+			}
 		}
 		else
 		{
@@ -536,7 +553,7 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 			}
 			else
 			{
-				printf("Initializer not present for VarStmt\n");
+				env->Error(arg_var_tokens[i], "Initializer not present.");
 			}
 		}
 	}
@@ -566,7 +583,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_i32");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_i32");
 			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
 		}
 		env->DefineVariable(LITERAL_TYPE_INTEGER, m_token->Lexeme(), defval, defty, m_type);
@@ -580,7 +597,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_enum_i32");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_enum_i32");
 			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
 		}
 		env->DefineVariable(LITERAL_TYPE_ENUM, m_token->Lexeme(), defval, defty, m_type);
@@ -594,7 +611,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_bool");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_bool");
 			if (!m_expr) builder->CreateStore(builder->getFalse(), defval);
 		}
 		env->DefineVariable(LITERAL_TYPE_BOOL, m_token->Lexeme(), defval, defty, m_type);
@@ -608,7 +625,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_f64");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_f64");
 			if (!m_expr) builder->CreateStore(llvm::Constant::getNullValue(defty), defval);
 		}
 		env->DefineVariable(LITERAL_TYPE_DOUBLE, m_token->Lexeme(), defval, defty, m_type);
@@ -622,7 +639,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_ptr");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_ptr");
 
 		}
 		env->DefineVariable(LITERAL_TYPE_STRING, m_token->Lexeme(), defval, defty, m_type);
@@ -639,7 +656,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_ptr");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_ptr");
 
 		}
 		env->DefineVariable(LITERAL_TYPE_POINTER, m_token->Lexeme(), defval, defty, m_type);
@@ -653,7 +670,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		}
 		else
 		{
-			defval = builder->CreateAlloca(defty, nullptr, "alloc_vec_ptr");
+			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_vec_ptr");
 
 		}
 		env->DefineVariable(LITERAL_TYPE_VEC, m_token->Lexeme(), defval, defty, m_type, vecType);
@@ -673,7 +690,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			}
 			else
 			{
-				defval = builder->CreateAlloca(defty, nullptr, "alloc_udt");
+				defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_udt");
 				if (!m_expr)
 				{
 					init_udt(builder, module, env, udtname, defval, defty, { builder->getInt32(0) });

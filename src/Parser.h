@@ -145,7 +145,7 @@ private:
 		if (!Consume(TOKEN_LEFT_BRACE, "Expected { for struct definition.")) return nullptr;
 
 		StmtList* vars = new StmtList();
-		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd())
+		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd() && !m_errorHandler->HasErrors())
 		{
 			if (Match(14, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
 				TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
@@ -403,7 +403,7 @@ private:
 	{
 		StmtList* statements = new StmtList();
 
-		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd())
+		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd() && !m_errorHandler->HasErrors())
 		{
 			statements->push_back(Declaration());
 		}
@@ -740,7 +740,7 @@ private:
 			Expr* expr = new VariableExpr(new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename()), vecIndex);
 
 			// check for function call parenthesis
-			while (true)
+			while (true && !m_errorHandler->HasErrors())
 			{
 				if (Match(1, TOKEN_LEFT_PAREN))
 				{

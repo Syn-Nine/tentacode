@@ -158,6 +158,11 @@ TokenList Scanner::ScanTokens()
 void Scanner::ScanToken()
 {
 	char c = Advance();
+
+	char tmp[2];
+	sprintf(tmp, "%c", c);
+	std::string unexpected_character = "Unexpected character `" + std::string(tmp) + "`.";
+
 	switch (c)
 	{
 	// single character tokens
@@ -196,9 +201,9 @@ void Scanner::ScanToken()
 	case '<': AddToken(Match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS); break;
 	
 	// two character tokens
-	case '~': Match('~') ? AddToken(TOKEN_TILDE_TILDE) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
-	case '&': Match('&') ? AddToken(TOKEN_AND) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
-	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, "Unexpected character"); break;
+	case '~': Match('~') ? AddToken(TOKEN_TILDE_TILDE) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
+	case '&': Match('&') ? AddToken(TOKEN_AND) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
+	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
 	case ':':
 		/*if (Match(':'))
 		{
@@ -237,6 +242,7 @@ void Scanner::ScanToken()
 		{
 			while (true)
 			{
+				if (Peek() == '\n') m_line++;
 				if (Peek() == '*' && PeekNext() == '/')
 				{
 					Advance(); Advance(); break;
@@ -279,7 +285,7 @@ void Scanner::ScanToken()
 			Identifier();
 			break;
 		}
-		m_errorHandler->Error(m_filename, m_line, "Unexpected character");
+		m_errorHandler->Error(m_filename, m_line, unexpected_character);
 	}
 }
 

@@ -189,7 +189,6 @@ public:
 	{
 		if (0 != m_udts.count(id)) return m_udts.at(id);
 		if (m_parent) return m_parent->GetUdt(id);
-		printf("Error - unable to find UDT `%s` in environment!\n", id.c_str());
 		return nullptr;
 	}
 

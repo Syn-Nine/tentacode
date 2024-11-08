@@ -332,7 +332,7 @@ public:
 		TValue val = m_left->codegen(context, builder, module, env);
 		TValue qty = m_left->codegen(context, builder, module, env);
 
-		/*AllocaInst* a = builder->CreateAlloca(builder->getInt64Ty(), nullptr, "alloc_vec_ptr");
+		/*AllocaInst* a = entry_builder.CreateAlloca(builder->getInt64Ty(), nullptr, "alloc_vec_ptr");
 		if (LITERAL_TYPE_INTEGER == val.type && LITERAL_TYPE_INTEGER == qty.type)
 		{
 			Value* addr = builder->CreateCall(module->getFunction("__vec_new_rep_i32"), { val.value, qty.value }, "calltmp");
@@ -353,7 +353,7 @@ public:
 
 				if (val.IsInteger())
 				{
-					AllocaInst* a = builder->CreateAlloca(builder->getInt32Ty(), vqty, "alloc_vec_tmp");
+					AllocaInst* a = entry_builder.CreateAlloca(builder->getInt32Ty(), vqty, "alloc_vec_tmp");
 
 					// build a for loop
 					Value* startval = builder->CreateLoad(builder->getInt32Ty(), builder->getInt32(0), "startval");

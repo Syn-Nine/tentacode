@@ -5,6 +5,14 @@
 #define RAD2DEG (180.0 / PI)
 #define DEG2RAD (1 / RAD2DEG)
 
+static llvm::Value* CreateEntryAlloca(std::unique_ptr<llvm::IRBuilder<>>& builder, llvm::Type* Ty, llvm::Value* ArraySize = nullptr,
+	const llvm::Twine& Name = "")
+{
+	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+	llvm::IRBuilder<> entry_builder(&ftn->getEntryBlock(), ftn->getEntryBlock().begin());
+	return entry_builder.CreateAlloca(Ty, ArraySize, Name);
+}
+
 //-----------------------------------------------------------------------------
 void copy_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 	std::unique_ptr<llvm::Module>& module,
@@ -51,7 +59,7 @@ void copy_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 			}*/
 			else
 			{
-				printf("Initializer not present for copy_udt\n");
+				env->Error(arg_var_tokens[i], "Initializer not present for copy_udt.");
 			}
 		}
 	}
@@ -196,6 +204,8 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (2 <= Environment::GetDebugLevel()) printf("BinaryExpr::codegen()\n");
 
 	if (!m_left || !m_right) return TValue::NullInvalid();
+
+	
 	TValue lhs = m_left->codegen(context, builder, module, env);
 	if (!lhs.value) return TValue::NullInvalid();
 	if (EXPRESSION_GET == m_left->GetType())
@@ -245,7 +255,7 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			if (lhs.IsInteger())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__int_to_string"), { lhs.value }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
@@ -259,7 +269,7 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			else if (lhs.IsDouble())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__double_to_string"), { lhs.value }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
@@ -268,13 +278,13 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			else if (lhs.IsBool())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__bool_to_string"), { lhs.value }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
-			printf("Unable to cast to string\n");
+			env->Error(m_token, "Unable to cast to string");
 		}
 	}
 
@@ -324,7 +334,7 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value);
 			llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value);
 			llvm::Value* s = builder->CreateCall(module->getFunction("__std_string_cat"), { lhs_load, rhs_load }, "calltmp");
-			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 			builder->CreateStore(s, a);
 			TValue ret = TValue::String(a);
 			env->AddToCleanup(ret);
@@ -417,6 +427,7 @@ TValue BracketExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 {
 	if (2 <= Environment::GetDebugLevel()) printf("BracketExpr::codegen()\n");
 
+	
 	std::vector<TValue> vals;
 
 	bool has_int = false;
@@ -474,18 +485,18 @@ TValue BracketExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	if (vals.empty()) return TValue::NullInvalid();
 
-	llvm::AllocaInst* a = nullptr;
-	if (vals[0].IsInteger() || vals[0].IsEnum()) a = builder->CreateAlloca(builder->getInt32Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
-	if (vals[0].IsBool()) a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
-	if (vals[0].IsDouble()) a = builder->CreateAlloca(builder->getDoubleTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
-	if (vals[0].IsString()) a = builder->CreateAlloca(builder->getPtrTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
+	llvm::Value* a = nullptr;
+	if (vals[0].IsInteger() || vals[0].IsEnum()) a = CreateEntryAlloca(builder, builder->getInt32Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
+	if (vals[0].IsBool()) a = CreateEntryAlloca(builder, builder->getInt8Ty(), builder->getInt32(vals.size()), "alloc_vec_tmp");
+	if (vals[0].IsDouble()) a = CreateEntryAlloca(builder, builder->getDoubleTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
+	if (vals[0].IsString()) a = CreateEntryAlloca(builder, builder->getPtrTy(), builder->getInt32(vals.size()), "alloc_vec_tmp");
 
 	if (a)
 	{
 		TValue ret = TValue::NullInvalid();
 		for (size_t i = 0; i < vals.size(); ++i)
 		{
-			llvm::Value* b = builder->CreateGEP(a->getAllocatedType(), a, builder->getInt32(i), "geptmp");
+			llvm::Value* b = builder->CreateGEP(static_cast<llvm::AllocaInst*>(a)->getAllocatedType(), a, builder->getInt32(i), "geptmp");
 			if (0 == i) ret = TValue::FixedVec(b, vals[0].type, vals.size());
 
 			// convert bool to int8
@@ -514,9 +525,9 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (!m_callee) return TValue::NullInvalid();
 	if (EXPRESSION_VARIABLE != m_callee->GetType()) return TValue::NullInvalid();
 
+	
 	Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
 	std::string name = callee->Lexeme();
-	//printf("  lexeme=%s\n", name.c_str());
 
 	if (0 == name.compare("abs") && 1 == m_arguments.size())
 	{
@@ -573,8 +584,8 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	}
 	else if (0 == name.compare("input"))
 	{
-		llvm::AllocaInst* a = builder->CreateAlloca(builder->getInt8Ty(), builder->getInt32(256), "alloctmp");
-		TValue b = TValue::String(builder->CreateGEP(a->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
+		llvm::Value* a = CreateEntryAlloca(builder, builder->getInt8Ty(), builder->getInt32(256), "alloctmp");
+		TValue b = TValue::String(builder->CreateGEP(static_cast<llvm::AllocaInst*>(a)->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
 		builder->CreateStore(builder->getInt8(0), b.value);
 		builder->CreateCall(module->getFunction("input"), { b.value }, "calltmp");
 		return b;
@@ -584,6 +595,11 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (m_arguments.empty())
 		{
 			return TValue::Double(builder->CreateCall(module->getFunction("clock_impl"), {}, "calltmp"));
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("rand"))
@@ -637,7 +653,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					llvm::Value* srcType = builder->getInt32(v.fixed_vec_type);
 					return TValue::Integer(builder->CreateCall(module->getFunction("__vec_len"), { srcType, src }, "calltmp"));
 				}
+				else
+				{
+					env->Error(callee, "Argument type mismatch.");
+					return TValue::NullInvalid();
+				}
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("pow"))
@@ -658,6 +689,11 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			llvm::Value* rval = builder->CreateCall(module->getFunction("pow_impl"), args, std::string("call_" + name).c_str());
 			return TValue::Double(rval);
 		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
+		}
 	}
 	else if (0 == name.compare("file::readlines"))
 	{
@@ -667,12 +703,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			if (arg.IsString())
 			{
 				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(builder->CreateCall(module->getFunction("__file_readlines"), { tmp }, "calltmp"), a);
 				TValue ret = TValue::Vec(a, LITERAL_TYPE_STRING);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("file::writelines"))
@@ -687,6 +733,16 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				builder->CreateCall(module->getFunction("__file_writelines"), { lhs_load, rhs_load }, "calltmp");
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::contains"))
@@ -701,6 +757,16 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				return TValue::Bool(builder->CreateCall(module->getFunction("__str_contains"), { lhs_load, rhs_load }, "calltmp"));
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::replace"))
@@ -716,12 +782,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* mhs_load = builder->CreateLoad(builder->getPtrTy(), mhs.value, "loadtmp");
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_replace"), { lhs_load, mhs_load, rhs_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::split"))
@@ -735,12 +811,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_split"), { lhs_load, rhs_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::Vec(a, LITERAL_TYPE_STRING);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::join"))
@@ -754,12 +840,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_join"), { lhs_load, rhs_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::substr"))
@@ -775,13 +871,28 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				{
 					llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
 					llvm::Value* s = builder->CreateCall(module->getFunction("__str_substr"), { lhs_load, rhs.value, len.value }, "calltmp");
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					builder->CreateStore(s, a);
 					TValue ret = TValue::String(a);
 					env->AddToCleanup(ret);
 					return ret;
 				}
+				else
+				{
+					env->Error(callee, "Argument type mismatch.");
+					return TValue::NullInvalid();
+				}
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::toupper"))
@@ -793,12 +904,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			{
 				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_toupper"), { arg_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::tolower"))
@@ -810,12 +931,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			{
 				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_tolower"), { arg_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("str::ltrim"))
@@ -827,12 +958,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			{
 				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_ltrim"), { arg_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 		}
 	else if (0 == name.compare("str::rtrim"))
@@ -844,12 +985,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			{
 				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_rtrim"), { arg_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 		}
 	else if (0 == name.compare("str::trim"))
@@ -861,12 +1012,22 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			{
 				llvm::Value* arg_load = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_trim"), { arg_load }, "calltmp");
-				llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				builder->CreateStore(s, a);
 				TValue ret = TValue::String(a);
 				env->AddToCleanup(ret);
 				return ret;
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 		}
 	else if (0 == name.compare("vec::append"))
@@ -879,8 +1040,6 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			llvm::Type* defty = env->GetVariableTy(var);
 			LiteralTypeEnum varType = env->GetVariableType(var);
 			LiteralTypeEnum vecType = env->GetVecType(var);
-
-			//printf("%lu, %d, %d\n", defval, varType, vecType);
 
 			if (LITERAL_TYPE_VEC == varType)
 			{
@@ -925,8 +1084,18 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 					builder->CreateCall(module->getFunction("__vec_append_udt"), { dstType, dst, tmp }, "calltmp");
 				}
-
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+
+		if (m_arguments.size() != m_arguments.size())
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("vec::contains"))
@@ -939,8 +1108,6 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			llvm::Type* defty = env->GetVariableTy(var);
 			LiteralTypeEnum varType = env->GetVariableType(var);
 			LiteralTypeEnum vecType = env->GetVecType(var);
-
-			//printf("%lu, %d, %d\n", defval, varType, vecType);
 
 			if (LITERAL_TYPE_VEC == varType)
 			{
@@ -958,6 +1125,17 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 					return TValue::Bool(builder->CreateCall(module->getFunction("__vec_contains_i32"), { dst, rhs.value }, "calltmp"));
 				}
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+
+		if (m_arguments.size() != m_arguments.size())
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else if (0 == name.compare("vec::fill"))
@@ -972,7 +1150,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				if (lhs.IsInteger())
 				{
 					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_i32"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					builder->CreateStore(v, a);
 					TValue ret = TValue::Vec(a, LITERAL_TYPE_INTEGER, "");
 					env->AddToCleanup(ret);
@@ -981,7 +1159,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				else if (lhs.IsBool())
 				{
 					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_bool"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					builder->CreateStore(v, a);
 					TValue ret = TValue::Vec(a, LITERAL_TYPE_BOOL, "");
 					env->AddToCleanup(ret);
@@ -990,7 +1168,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				if (lhs.IsEnum())
 				{
 					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_enum"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					builder->CreateStore(v, a);
 					TValue ret = TValue::Vec(a, LITERAL_TYPE_ENUM, "");
 					env->AddToCleanup(ret);
@@ -999,13 +1177,28 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				else if (lhs.IsDouble())
 				{
 					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_double"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					builder->CreateStore(v, a);
 					TValue ret = TValue::Vec(a, LITERAL_TYPE_DOUBLE, "");
 					env->AddToCleanup(ret);
 					return ret;
 				}
+				else
+				{
+					env->Error(callee, "Argument type mismatch.");
+					return TValue::NullInvalid();
+				}
 			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
 		}
 	}
 	else
@@ -1016,7 +1209,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			std::vector<LiteralTypeEnum> types = env->GetFunctionParamTypes(name);
 			if (m_arguments.size() != types.size())
 			{
-				printf("Argument count mismatch for call: %s\n", name.c_str());
+				env->Error(callee, "Argument count mismatch.");
 				return TValue::NullInvalid();
 			}
 
@@ -1038,7 +1231,7 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				{
 					// convert to regular vec
 					LiteralTypeEnum vecType = v.fixed_vec_type;
-					llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 					llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
 					builder->CreateCall(module->getFunction("__vec_assign_fixed"), { builder->getInt32(vecType), addr, builder->getInt32(vecType), v.value, builder->getInt32(v.fixed_vec_sz) }, "calltmp");
 					builder->CreateStore(addr, a);
@@ -1103,7 +1296,7 @@ TValue GetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		int idx = env->GetUdtMemberIndex(udt_name, names[i]);
 		if (-1 == idx)
 		{
-			printf("Error parsing UDT members\n");
+			env->Error(env->GetVariableToken(var_name), "Error parsing UDT members");
 			return TValue::NullInvalid();
 		}
 
@@ -1112,7 +1305,7 @@ TValue GetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		Token* token = env->GetUdtMemberTokenAt(udt_name, idx);
 		if (!token)
 		{
-			printf("Invalid UDT member token\n");
+			env->Error(env->GetVariableToken(var_name), "Invalid UDT member token");
 			return TValue::NullInvalid();
 		}
 
@@ -1149,6 +1342,7 @@ TValue LiteralExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 {
 	if (2 <= Environment::GetDebugLevel()) printf("LiteralExpr::codegen()\n");
 
+	
 	LiteralTypeEnum lt = m_literal.GetType();
 
 	if (LITERAL_TYPE_INTEGER == lt)
@@ -1174,7 +1368,7 @@ TValue LiteralExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	{
 		llvm::Value* global_string = builder->CreateGlobalStringPtr(m_literal.ToString(), "strtmp");
 		llvm::Value* p = builder->CreateCall(module->getFunction("__new_std_string_ptr"), { global_string }, "strptr");
-		llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+		llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 		builder->CreateStore(p, a);
 		TValue ret(lt, a);
 		env->AddToCleanup(ret);
@@ -1330,7 +1524,7 @@ TValue SetExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	}
 	else
 	{
-		printf("Type mismatch in SetExpr\n");
+		env->Error(static_cast<GetExpr*>(m_object)->Operator(), "Type mismatch in SetExpr\n");
 	}
 	
 
@@ -1398,6 +1592,7 @@ TValue VariableExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		return TValue::NullInvalid();
 	}
 
+	
 	llvm::Type* defty = env->GetVariableTy(var);
 	LiteralTypeEnum varType = env->GetVariableType(var);
 
@@ -1432,7 +1627,7 @@ TValue VariableExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		else if (LITERAL_TYPE_STRING == vecType)
 		{
 			llvm::Value* s = builder->CreateCall(module->getFunction("__vec_get_str"), { src, idx.value }, "calltmp");
-			llvm::Value* a = builder->CreateAlloca(builder->getPtrTy(), nullptr, "alloctmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 			builder->CreateStore(s, a);
 			TValue ret = TValue::String(a);
 			env->AddToCleanup(ret);
