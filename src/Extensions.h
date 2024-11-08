@@ -620,6 +620,107 @@ extern "C" DLLEXPORT void __vec_append_udt(int dstType, void* dstPtr, void* val)
 	}
 }
 
+extern "C" DLLEXPORT void* __vec_to_string(int vecType, void* srcPtr)
+{
+	LiteralTypeEnum vt = LiteralTypeEnum(vecType);
+
+	int sz = 0;
+	std::string array;
+	std::string vtype = "invalid";
+
+	if (LITERAL_TYPE_INTEGER == vt)
+	{
+		llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
+		sz = src->size();
+		vtype = "i32";
+		for (size_t i = 0; i < sz; ++i)
+		{
+			if (0 == i)
+			{
+				array.append(std::to_string((*src)[i]));
+			}
+			else
+			{
+				array.append(", " + std::to_string((*src)[i]));
+			}
+		}
+	}
+	else if (LITERAL_TYPE_ENUM == vt)
+	{
+		llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
+		sz = src->size();
+		vtype = "enum";
+		for (size_t i = 0; i < sz; ++i)
+		{
+			if (0 == i)
+			{
+				array.append(std::to_string((*src)[i]));
+			}
+			else
+			{
+				array.append(", " + std::to_string((*src)[i]));
+			}
+		}
+	}
+	else if (LITERAL_TYPE_BOOL == vt)
+	{
+		llvm::SmallVector<bool>* src = static_cast<llvm::SmallVector<bool>*>(srcPtr);
+		sz = src->size();
+		vtype = "bool";
+		for (size_t i = 0; i < sz; ++i)
+		{
+			if (0 == i)
+			{
+				array.append((*src)[i] ? "true" : "false");
+			}
+			else
+			{
+				std::string s = (*src)[i] ? "true" : "false";
+				array.append(", " + s);
+			}
+		}
+	}
+	else if (LITERAL_TYPE_DOUBLE == vt)
+	{
+		llvm::SmallVector<double>* src = static_cast<llvm::SmallVector<double>*>(srcPtr);
+		sz = src->size();
+		vtype = "f32";
+		for (size_t i = 0; i < sz; ++i)
+		{
+			if (0 == i)
+			{
+				array.append(std::to_string((*src)[i]));
+			}
+			else
+			{
+				array.append(", " + std::to_string((*src)[i]));
+			}
+		}
+	}
+	else if (LITERAL_TYPE_STRING == vt)
+	{
+		llvm::SmallVector<std::string*>* src = static_cast<llvm::SmallVector<std::string*>*>(srcPtr);
+		sz = src->size();
+		vtype = "string";
+		for (size_t i = 0; i < sz; ++i)
+		{
+			if (0 == i)
+			{
+				array.append(*(*src)[i]);
+			}
+			else
+			{
+				array.append(", " + *(*src)[i]);
+			}
+		}
+	}
+
+	std::string ret = "<Vec," + vtype + ",Size:" + std::to_string(sz) + ">[" + array + "]";
+
+	return new std::string(ret);
+}
+
+
 static void LoadExtensions(
 	std::unique_ptr<llvm::IRBuilder<>>& builder,
 	std::unique_ptr<llvm::Module>& module,
@@ -933,6 +1034,15 @@ static void LoadExtensions(
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_contains_i32", *module);
 	}
+
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_to_string", *module);
+	}
+
 }
 
 

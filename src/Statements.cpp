@@ -374,6 +374,16 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			v = TValue::String(a);
 			env->AddToCleanup(v);
 		}
+		else if (v.IsVec())
+		{
+			llvm::Value* srcType = builder->getInt32(v.fixed_vec_type);
+			llvm::Value* srcPtr = builder->CreateLoad(builder->getPtrTy(), v.value);
+			llvm::Value* s = builder->CreateCall(module->getFunction("__vec_to_string"), { srcType, srcPtr }, "calltmp");
+			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
+			builder->CreateStore(s, a);
+			v = TValue::String(a);
+			env->AddToCleanup(v);
+		}
 	}
 
 	llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp");
