@@ -224,15 +224,22 @@ TValue BinaryExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 		if (TOKEN_VAR_I32 == new_type)
 		{
-			if (lhs.IsInteger()) return lhs;
-			if (lhs.IsDouble())
+			if (lhs.IsInteger())
+			{
+				return lhs;
+			}
+			else if (lhs.IsDouble())
 			{
 				return TValue::Integer(builder->CreateFPToSI(lhs.value, builder->getInt32Ty(), "int_cast_tmp"));
 			}
-			if (lhs.IsString())
+			else if (lhs.IsString())
 			{
 				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), lhs.value);
 				return TValue::Integer(builder->CreateCall(module->getFunction("__str_to_int"), { tmp }, "calltmp"));
+			}
+			else if (lhs.IsBool())
+			{
+				return TValue::Integer(builder->CreateIntCast(lhs.value, builder->getInt32Ty(), false, "int_cast_tmp"));
 			}
 		}
 		else if (TOKEN_VAR_F32 == new_type)

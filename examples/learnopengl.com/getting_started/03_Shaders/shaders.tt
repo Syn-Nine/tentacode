@@ -1,0 +1,88 @@
+// Equivalent output to https://learnopengl.com/Getting-started/Shaders
+
+// create window
+ray::InitWindow(800, 600, "Getting Started - Shaders");
+ray::SetTargetFPS(60);
+
+ray::rlClearColor(51, 77, 77, 255);
+
+// load the shader for tutorial 2
+i32 program = shader::load("shaders.vs", "shaders.fs");
+
+// create a vertex array object
+i32 vao = ray::rlLoadVertexArray();
+ray::rlEnableVertexArray(vao);
+
+// create vertices and load them to a vertex buffer object
+vec<f32> verts = [
+	// positions      // colors
+	-0.5, -0.5, 0.0,  1.0, 0.0, 0.0,
+	 0.5, -0.5, 0.0,  0.0, 1.0, 0.0,
+	 0.0,  0.5, 0.0,  0.0, 0.0, 1.0
+	 ];
+
+i32 vbo = ray::rlLoadVertexBuffer(verts, false);
+
+ray::rlSetVertexAttribute(0, 3, RL_FLOAT, false, 6 * 4, 0);
+ray::rlEnableVertexAttribute(0);
+
+ray::rlSetVertexAttribute(1, 3, RL_FLOAT, false, 6 * 4, 3 * 4);
+ray::rlEnableVertexAttribute(1);
+
+ray::rlDisableVertexBuffer();
+ray::rlDisableVertexArray();
+
+// main loop
+loop {
+	
+	// rendering
+	ray::BeginDrawing();
+		ray::rlClearScreenBuffers();
+		
+		shader::enable(program);
+			ray::rlEnableVertexArray(vao);
+			ray::rlDrawVertexArray(0, 3);
+			ray::rlDisableVertexArray();
+		shader::disable();
+
+	ray::EndDrawing();
+
+	// check for window close event
+	if ray::WindowShouldClose() { break; }
+	
+}
+
+ray::rlUnloadVertexArray(vao);
+ray::rlUnloadVertexBuffer(vbo);
+ray::rlUnloadShaderProgram(program);
+
+ray::CloseWindow();
+
+
+//-----------------------------------------------------------------------------
+// shader utilities
+//-----------------------------------------------------------------------------
+
+def i32 shader::load(string vs, string fs) {
+	return ray::rlLoadShaderCode(file::readstring(vs), file::readstring(fs));
+}
+
+def shader::enable(i32 program) {
+	ray::rlEnableShader(program);
+}
+
+def shader::disable() {
+	ray::rlDisableShader();
+}
+
+def shader::set_bool(i32 program, string name, bool val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val as i32 ], RL_SHADER_UNIFORM_INT);
+}
+
+def shader::set_i32(i32 program, string name, i32 val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val ], RL_SHADER_UNIFORM_INT);
+}
+
+def shader::set_f32(i32 program, string name, f32 val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val ], RL_SHADER_UNIFORM_FLOAT);
+}

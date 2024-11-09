@@ -1,7 +1,7 @@
 // Equivalent output to https://learnopengl.com/Getting-started/Hello-Window
 
 // create window
-ray::InitWindow(800, 600, "Tutorial 01");
+ray::InitWindow(800, 600, "Getting Started - Hello Window");
 ray::SetTargetFPS(60);
 
 ray::rlClearColor(51, 77, 77, 255);

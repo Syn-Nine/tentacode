@@ -94,10 +94,77 @@ extern "C" DLLEXPORT int32_t ray_rlLoadVertexBuffer(void* vecPtr, bool dynamic)
     return rlLoadVertexBuffer(tmp.data(), tmp.size() * sizeof(float), dynamic);
 }
 
+extern "C" DLLEXPORT int32_t ray_rlLoadVertexBufferElement(void* vecPtr, bool dynamic)
+{
+    llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(vecPtr);
+    llvm::SmallVector<unsigned short> tmp;
+    tmp.reserve(src->size());
+    for (size_t i = 0; i < src->size(); ++i)
+    {
+        tmp.push_back((*src)[i]);
+    }
+    return rlLoadVertexBufferElement(tmp.data(), tmp.size() * sizeof(unsigned short), dynamic);
+}
+
 extern "C" DLLEXPORT void ray_rlSetVertexAttribute(int32_t in0, int32_t in1, int32_t in2, bool in3, int32_t in4, int32_t in5)
 {
     size_t offsetNative = in5;
     rlSetVertexAttribute(in0, in1, in2, in3, in4, (void*)offsetNative);
+}
+
+extern "C" DLLEXPORT void ray_rlDrawVertexArrayElements(int32_t in0, int32_t in1, int32_t in2)
+{
+    rlDrawVertexArrayElements(in0, in1, (void*)in2);
+}
+
+extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, void* in1, int32_t in2)
+{
+    void* ptr = nullptr;
+    int sz = 0;
+
+    switch (in2)
+    {
+    case RL_SHADER_UNIFORM_FLOAT: // intentional fall-through
+    case RL_SHADER_UNIFORM_VEC2:
+    case RL_SHADER_UNIFORM_VEC3:
+    case RL_SHADER_UNIFORM_VEC4:
+    {
+        llvm::SmallVector<double>* src = static_cast<llvm::SmallVector<double>*>(in1);
+        llvm::SmallVector<float> tmp;
+        tmp.reserve(src->size());
+        for (size_t i = 0; i < src->size(); ++i)
+        {
+            tmp.push_back((*src)[i]);
+        }
+        ptr = static_cast<void*>(tmp.data());
+        sz = tmp.size();
+        break;
+    }
+    case RL_SHADER_UNIFORM_INT: // intentional fall-through
+    case RL_SHADER_UNIFORM_IVEC2:
+    case RL_SHADER_UNIFORM_IVEC3:
+    case RL_SHADER_UNIFORM_IVEC4:
+    case RL_SHADER_UNIFORM_SAMPLER2D:
+    {
+        llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(in1);
+        ptr = static_cast<void*>(src->data());
+        sz = src->size();
+        break;
+    }
+    }
+
+    if (ptr && sz) rlSetUniform(in0, ptr, in2, sz);
+}
+
+
+extern "C" DLLEXPORT int32_t ray_GetTextureId(Texture2D* texPtr)
+{
+    return texPtr->id;
+}
+
+extern "C" DLLEXPORT void ray_test()
+{
+
 }
 
 
@@ -133,7 +200,11 @@ extern "C" DLLEXPORT void ray_InitAudioDevice() { InitAudioDevice(); }
 extern "C" DLLEXPORT Font* ray_LoadFont(std::string* in0) { return new Font(LoadFont(in0->c_str())); }
 extern "C" DLLEXPORT void ray_DrawTextEx(Font* in0, std::string* in1, double in2a, double in2b, double in3, double in4, int32_t in5) { DrawTextEx(*in0, in1->c_str(), { float(in2a), float(in2b) }, in3, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
 extern "C" DLLEXPORT Image* ray_LoadImage(std::string* in0) { return new Image(LoadImage(in0->c_str())); }
+extern "C" DLLEXPORT void ray_UnloadImage(Image* in0) { UnloadImage(*in0); }
 extern "C" DLLEXPORT Texture2D* ray_LoadTextureFromImage(Image* in0) { return new Texture2D(LoadTextureFromImage(*in0)); }
+extern "C" DLLEXPORT void ray_UnloadTexture(Texture2D* in0) { UnloadTexture(*in0); }
+extern "C" DLLEXPORT void ray_ImageFlipVertical(Image* in0) { ImageFlipVertical(in0); }
+extern "C" DLLEXPORT void ray_ImageFlipHorizontal(Image* in0) { ImageFlipHorizontal(in0); }
 extern "C" DLLEXPORT void ray_rlClearColor(int32_t in0, int32_t in1, int32_t in2, int32_t in3) { rlClearColor(in0, in1, in2, in3); }
 extern "C" DLLEXPORT Shader* ray_LoadShader(std::string* in0, std::string* in1) { return new Shader(LoadShader(in0->c_str(), in1->c_str())); }
 extern "C" DLLEXPORT int32_t ray_rlLoadVertexArray() { return rlLoadVertexArray(); }
@@ -154,6 +225,14 @@ extern "C" DLLEXPORT void ray_rlEnableShader(int32_t in0) { rlEnableShader(in0);
 extern "C" DLLEXPORT void ray_rlDisableShader() { rlDisableShader(); }
 extern "C" DLLEXPORT int32_t ray_rlLoadShaderCode(std::string* in0, std::string* in1) { return rlLoadShaderCode(in0->c_str(), in1->c_str()); }
 extern "C" DLLEXPORT void ray_rlUnloadShaderProgram(int32_t in0) { rlUnloadShaderProgram(in0); }
+extern "C" DLLEXPORT int32_t ray_rlGetLocationUniform(int32_t in0, std::string* in1) { return rlGetLocationUniform(in0, in1->c_str()); }
+extern "C" DLLEXPORT void ray_rlEnableVertexBufferElement(int32_t in0) { rlEnableVertexBufferElement(in0); }
+extern "C" DLLEXPORT void ray_rlDisableVertexBufferElement() { rlDisableVertexBufferElement(); }
+extern "C" DLLEXPORT void ray_rlEnableTexture(int32_t in0) { rlEnableTexture(in0); }
+extern "C" DLLEXPORT void ray_rlDisableTexture() { rlDisableTexture(); }
+extern "C" DLLEXPORT void ray_rlCheckErrors() { rlCheckErrors(); }
+extern "C" DLLEXPORT void ray_rlActiveTextureSlot(int32_t in0) { rlActiveTextureSlot(in0); }
+extern "C" DLLEXPORT void ray_rlDisableBackfaceCulling() { rlDisableBackfaceCulling(); }
 
 //
 
@@ -401,9 +480,37 @@ static void LoadExtensions_Raylib(
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadImage", *module);
+        env->DefineFunction("ray::UnloadImage", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadTextureFromImage", *module);
         env->DefineFunction("ray::LoadTextureFromImage", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_POINTER);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadTexture", *module);
+        env->DefineFunction("ray::UnloadTexture", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImageFlipVertical", *module);
+        env->DefineFunction("ray::ImageFlipVertical", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImageFlipHorizontal", *module);
+        env->DefineFunction("ray::ImageFlipHorizontal", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -545,6 +652,59 @@ static void LoadExtensions_Raylib(
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlUnloadShaderProgram", *module);
         env->DefineFunction("ray::rlUnloadShaderProgram", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlGetLocationUniform", *module);
+        env->DefineFunction("ray::rlGetLocationUniform", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_INTEGER);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableVertexBufferElement", *module);
+        env->DefineFunction("ray::rlEnableVertexBufferElement", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableVertexBufferElement", *module);
+        env->DefineFunction("ray::rlDisableVertexBufferElement", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableTexture", *module);
+        env->DefineFunction("ray::rlEnableTexture", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableTexture", *module);
+        env->DefineFunction("ray::rlDisableTexture", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlCheckErrors", *module);
+        env->DefineFunction("ray::rlCheckErrors", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlActiveTextureSlot", *module);
+        env->DefineFunction("ray::rlActiveTextureSlot", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableBackfaceCulling", *module);
+        env->DefineFunction("ray::rlDisableBackfaceCulling", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
 
     //-------------------------------------------------------------------------
     // manual functions
@@ -597,12 +757,81 @@ static void LoadExtensions_Raylib(
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBuffer", *module);
         env->DefineFunction("ray::rlLoadVertexBuffer", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, { }, args, {}, LITERAL_TYPE_INTEGER);
     }
-
-    // Inject variables into environment
     {
-        llvm::Type* defty = builder->getInt32Ty();
-        llvm::Value* defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(RL_FLOAT), "RL_FLOAT");
-        env->DefineVariable(LITERAL_TYPE_INTEGER, "RL_FLOAT", defval, defty, nullptr);
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getInt1Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBufferElement", *module);
+        env->DefineFunction("ray::rlLoadVertexBufferElement", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, { }, args, {}, LITERAL_TYPE_INTEGER);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetUniform", *module);
+        env->DefineFunction("ray::rlSetUniform", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetTextureId", *module);
+        env->DefineFunction("ray::GetTextureId", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INTEGER);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDrawVertexArrayElements", *module);
+        env->DefineFunction("ray::rlDrawVertexArrayElements", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+    }
+
+    {
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_test", *module);
+        env->DefineFunction("ray::test", ftn, { }, { }, {}, {}, LITERAL_TYPE_INVALID);
+    }
+
+
+    // Inject enums into environment
+    {
+        std::vector<int> vals = {
+            RL_FLOAT,
+            RL_SHADER_UNIFORM_FLOAT,
+            RL_SHADER_UNIFORM_VEC2,
+            RL_SHADER_UNIFORM_VEC3,
+            RL_SHADER_UNIFORM_VEC4,
+            RL_SHADER_UNIFORM_INT,
+            RL_SHADER_UNIFORM_IVEC2,
+            RL_SHADER_UNIFORM_IVEC3,
+            RL_SHADER_UNIFORM_IVEC4,
+            RL_SHADER_UNIFORM_SAMPLER2D
+        };
+
+        std::vector<std::string> names = {
+            "RL_FLOAT",
+            "RL_SHADER_UNIFORM_FLOAT",
+            "RL_SHADER_UNIFORM_VEC2",
+            "RL_SHADER_UNIFORM_VEC3",
+            "RL_SHADER_UNIFORM_VEC4",
+            "RL_SHADER_UNIFORM_INT",
+            "RL_SHADER_UNIFORM_IVEC2",
+            "RL_SHADER_UNIFORM_IVEC3",
+            "RL_SHADER_UNIFORM_IVEC4",
+            "RL_SHADER_UNIFORM_SAMPLER2D"
+        };
+
+        for (size_t i = 0; i < vals.size(); ++i)
+        {
+            llvm::Type* defty = builder->getInt32Ty();
+            llvm::Value* defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
+            env->DefineVariable(LITERAL_TYPE_INTEGER, names[i], defval, defty, nullptr);
+        }
     }
 }
 

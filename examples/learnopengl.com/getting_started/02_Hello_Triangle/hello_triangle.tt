@@ -1,13 +1,13 @@
 // Equivalent output to https://learnopengl.com/Getting-started/Hello-Triangle
 
 // create window
-ray::InitWindow(800, 600, "Tutorial 02");
+ray::InitWindow(800, 600, "Getting Started - Hello Triangle");
 ray::SetTargetFPS(60);
 
 ray::rlClearColor(51, 77, 77, 255);
 
 // load the shader for tutorial 2
-i32 program = ray::rlLoadShaderCode(file::readstring("tut-02.vs"), file::readstring("tut-02.fs"));
+i32 program = ray::rlLoadShaderCode(file::readstring("hello_triangle.vs"), file::readstring("hello_triangle.fs"));
 
 // create a vertex array object
 i32 vao = ray::rlLoadVertexArray();

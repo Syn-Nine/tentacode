@@ -185,7 +185,18 @@ TValue FunctionStmt::codegen_prototype(std::unique_ptr<llvm::LLVMContext>& conte
 			tokens.push_back(new Token(m_params[i]));
 			args.push_back(builder->getInt32Ty());
 			break;
+
+		case TOKEN_VAR_STRING:
+			types.push_back(LITERAL_TYPE_STRING);
+			tokens.push_back(new Token(m_params[i]));
+			args.push_back(builder->getPtrTy());
+			break;
+		
+		default:
+			env->Error(new Token(m_params[i]), "Invalid function parameter type.");
+			break;
 		}
+
 		names.push_back(m_params[i].Lexeme());
 	}
 
@@ -229,7 +240,7 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	int i = 0;
 	for (auto& arg : ftn->args())
 	{
-		llvm::Value* defval =CreateEntryAlloca(builder, args[i]);
+		llvm::Value* defval = CreateEntryAlloca(builder, args[i]);
 		llvm::Type* defty = arg.getType();
 		builder->CreateStore(&arg, defval);
 		env->DefineVariable(types[i], names[i], defval, defty, tokens[i]);
