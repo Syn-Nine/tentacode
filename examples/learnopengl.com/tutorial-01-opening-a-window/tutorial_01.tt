@@ -1,0 +1,22 @@
+// Equivalent output to https://learnopengl.com/Getting-started/Hello-Window
+
+// create window
+ray::InitWindow(800, 600, "Tutorial 01");
+ray::SetTargetFPS(60);
+
+ray::rlClearColor(51, 77, 77, 255);
+
+// main loop
+loop {
+	
+	// rendering
+	ray::BeginDrawing();
+		ray::rlClearScreenBuffers();
+		
+	ray::EndDrawing();
+
+	// check for window close event
+	if ray::WindowShouldClose() { break; }
+}
+
+ray::CloseWindow();

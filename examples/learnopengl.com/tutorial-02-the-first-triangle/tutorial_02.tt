@@ -1,0 +1,53 @@
+// Equivalent output to https://learnopengl.com/Getting-started/Hello-Triangle
+
+// create window
+ray::InitWindow(800, 600, "Tutorial 02");
+ray::SetTargetFPS(60);
+
+ray::rlClearColor(51, 77, 77, 255);
+
+// load the shader for tutorial 2
+i32 program = ray::rlLoadShaderCode(file::readstring("tut-02.vs"), file::readstring("tut-02.fs"));
+
+// create a vertex array object
+i32 vao = ray::rlLoadVertexArray();
+ray::rlEnableVertexArray(vao);
+
+// create vertices and load them to a vertex buffer object
+vec<f32> verts = [
+	-0.5, -0.5, 0.0,
+	 0.5, -0.5, 0.0,
+	 0.0,  0.5, 0.0
+	 ];
+
+i32 vbo = ray::rlLoadVertexBuffer(verts, false);
+ray::rlSetVertexAttribute(0, 3, RL_FLOAT, false, 3 * 4, 0);
+ray::rlEnableVertexAttribute(0);
+
+ray::rlDisableVertexBuffer();
+ray::rlDisableVertexArray();
+
+// main loop
+loop {
+	
+	// rendering
+	ray::BeginDrawing();
+		ray::rlClearScreenBuffers();
+		
+		ray::rlEnableShader(program);
+			ray::rlEnableVertexArray(vao);
+			ray::rlDrawVertexArray(0, 3);
+			ray::rlDisableVertexArray();
+		ray::rlDisableShader();
+
+	ray::EndDrawing();
+
+	// check for window close event
+	if ray::WindowShouldClose() { break; }
+}
+
+ray::rlUnloadVertexArray(vao);
+ray::rlUnloadVertexBuffer(vbo);
+ray::rlUnloadShaderProgram(program);
+
+ray::CloseWindow();

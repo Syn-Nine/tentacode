@@ -298,8 +298,14 @@ void Scanner::ScanString()
 	while (c != '"' && !IsAtEnd())
 	{
 		if (c == '\n') m_line++;
-		if (c == '\\' && PeekNext() == 'n') { inner_line = true; Advance(); }
-		if (c == '\\' && PeekNext() == '\"') { inner_quote = true; Advance(); }
+		if (c == '\\') {
+			if (PeekNext() == 'n') {
+				inner_line = true; Advance();
+			}
+			else if (PeekNext() == '\"') {
+				inner_quote = true; Advance();
+			}
+		}
 		Advance();
 		c = Peek();
 	}

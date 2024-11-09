@@ -721,6 +721,32 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 			return TValue::NullInvalid();
 		}
 	}
+	else if (0 == name.compare("file::readstring"))
+	{
+		if (1 == m_arguments.size())
+		{
+			TValue arg = m_arguments[0]->codegen(context, builder, module, env);
+			if (arg.IsString())
+			{
+				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), arg.value, "loadtmp");
+				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
+				builder->CreateStore(builder->CreateCall(module->getFunction("__file_readstring"), { tmp }, "calltmp"), a);
+				TValue ret = TValue::String(a);
+				env->AddToCleanup(ret);
+				return ret;
+			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
+		}
+		}
 	else if (0 == name.compare("file::writelines"))
 	{
 		if (2 == m_arguments.size())
@@ -732,6 +758,30 @@ TValue CallExpr::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
 				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
 				builder->CreateCall(module->getFunction("__file_writelines"), { lhs_load, rhs_load }, "calltmp");
+			}
+			else
+			{
+				env->Error(callee, "Argument type mismatch.");
+				return TValue::NullInvalid();
+			}
+		}
+		else
+		{
+			env->Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
+		}
+	}
+	else if (0 == name.compare("file::writestring"))
+	{
+		if (2 == m_arguments.size())
+		{
+			TValue lhs = m_arguments[0]->codegen(context, builder, module, env);
+			TValue rhs = m_arguments[1]->codegen(context, builder, module, env);
+			if (lhs.IsString() && rhs.IsString())
+			{
+				llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.value, "loadtmp");
+				llvm::Value* rhs_load = builder->CreateLoad(builder->getPtrTy(), rhs.value, "loadtmp");
+				builder->CreateCall(module->getFunction("__file_writestring"), { lhs_load, rhs_load }, "calltmp");
 			}
 			else
 			{

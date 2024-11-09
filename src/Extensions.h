@@ -108,6 +108,23 @@ extern "C" DLLEXPORT void* __file_readlines(std::string* filename)
 	return static_cast<void*>(ret);
 }
 
+extern "C" DLLEXPORT void* __file_readstring(std::string* filename)
+{
+	std::ifstream file(filename->c_str());
+
+	std::string ret;
+	
+	if (file.is_open())
+	{
+		std::ostringstream sstr;
+		sstr << file.rdbuf();
+		ret = sstr.str();
+	}
+
+	return new std::string(ret);
+}
+
+
 extern "C" DLLEXPORT void __file_writelines(std::string* filename, llvm::SmallVector<std::string*>* srcPtr)
 {
 	std::ofstream file(filename->c_str());
@@ -118,6 +135,17 @@ extern "C" DLLEXPORT void __file_writelines(std::string* filename, llvm::SmallVe
 		{
 			file << *s << std::endl;
 		}
+		file.close();
+	}
+}
+
+extern "C" DLLEXPORT void __file_writestring(std::string* filename, std::string* output)
+{
+	std::ofstream file(filename->c_str());
+
+	if (file.is_open())
+	{
+		file << *output;
 		file.close();
 	}
 }
@@ -744,6 +772,7 @@ static void LoadExtensions(
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), { builder->getPtrTy(), builder->getPtrTy() }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_assign", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__file_writelines", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__file_writestring", *module);
 	}
 
 	{	// int = ftn(int)
@@ -787,6 +816,7 @@ static void LoadExtensions(
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), { builder->getPtrTy() }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__new_std_string_ptr", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__file_readlines", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__file_readstring", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_toupper", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_tolower", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_ltrim", *module);

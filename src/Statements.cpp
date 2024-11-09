@@ -657,7 +657,7 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		builder->CreateStore(addr, defval);
 		env->AddToCleanup(TValue::String(defval));
 	}
-	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType)
+	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType || TOKEN_VAR_SHADER == varType)
 	{
 		defty = builder->getPtrTy();
 		if (global)
@@ -713,6 +713,10 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		{
 			env->Error(m_type, "Invalid identifier type.");
 		}
+	}
+	else
+	{
+		env->Error(m_type, "Unrecognized variable type token.");
 	}
 
 	if (defval && m_expr && EXPRESSION_ASSIGN == m_expr->GetType())
