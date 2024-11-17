@@ -8,6 +8,7 @@
 #include "Token.h"
 #include "Literal.h"
 #include "Environment.h"
+#include "Utility.h"
 
 #include "llvm/IR/Value.h"
 #include "llvm/IR/LLVMContext.h"
@@ -20,9 +21,9 @@ class Expr
 {
 public:
 	virtual ExpressionTypeEnum GetType() = 0;
-	virtual TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
+	virtual TValue codegen(
+		llvm::IRBuilder<>* builder,
+		llvm::Module* module,
 		Environment* env) = 0;
 };
 
@@ -48,10 +49,7 @@ public:
 	Expr* Right() { return m_right; }
 	Expr* VecIndex() { return m_vecIndex; }*/
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -80,10 +78,7 @@ public:
 	Expr* Left() { return m_left; }
 	Expr* Right() { return m_right; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -109,10 +104,7 @@ public:
 	//Token* Operator() { return m_token; }
 	//ArgList GetArguments() { return m_arguments; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 
 private:
@@ -140,10 +132,7 @@ public:
 	Token* Operator() { return m_token; }
 	ArgList GetArguments() { return m_arguments; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_callee;
@@ -171,10 +160,7 @@ public:
 	Expr* Object() { return m_object; }
 	Expr* VecIndex() { return m_right; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -197,13 +183,10 @@ public:
 	
 	Expr* Expression() { return m_expression; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env)
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 	{
 		if (2 <= Environment::GetDebugLevel()) printf("GroupExpr::codegen()\n");
-		return m_expression->codegen(context, builder, module, env);
+		return m_expression->codegen(builder, module, env);
 	}
 
 private:
@@ -217,26 +200,28 @@ class LiteralExpr : public Expr
 {
 public:
 	LiteralExpr() = delete; // null not allowed
-	LiteralExpr(int32_t val) : m_literal(val) {}
-	LiteralExpr(double val) : m_literal(val) {}
-	LiteralExpr(std::string val) : m_literal(val) {}
-	LiteralExpr(EnumLiteral val) : m_literal(val) {}
-	LiteralExpr(bool val) : m_literal(val) {}
+	LiteralExpr(Token* token, int32_t val) : m_token(token), m_literal(val) {}
+	LiteralExpr(Token* token, double val) : m_token(token), m_literal(val) {}
+	LiteralExpr(Token* token, std::string val) : m_token(token), m_literal(val) {}
+	LiteralExpr(Token* token, EnumLiteral val) : m_token(token), m_literal(val) {}
+	LiteralExpr(Token* token, bool val) : m_token(token), m_literal(val) {}
 
-	std::string ToString() { return m_literal.ToString(); }
+	//std::string ToString() { return m_literal.ToString(); }
 
 	ExpressionTypeEnum GetType() { return EXPRESSION_LITERAL; }
 	
 	Literal GetLiteral() { return m_literal; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	{
+		if (2 <= Environment::GetDebugLevel()) printf("LiteralExpr::codegen()\n");
+		return TValue::FromLiteral(m_token, m_literal);
+	}
 	
 
 private:
 	Literal m_literal;
+	Token* m_token;
 };
 
 
@@ -259,10 +244,7 @@ public:
 	Expr* Left() { return m_left; }
 	Expr* Right() { return m_right; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -291,10 +273,7 @@ public:
 	Expr* Left() { return m_left; }
 	Expr* Right() { return m_right; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -322,15 +301,12 @@ public:
 	Expr* Left() { return m_left; }
 	Expr* Right() { return m_right; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env)
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 	{
 		if (2 <= Environment::GetDebugLevel()) printf("ReplicateExpr::codegen()\n");
 
-		TValue val = m_left->codegen(context, builder, module, env);
-		TValue qty = m_left->codegen(context, builder, module, env);
+		TValue val = m_left->codegen(builder, module, env);
+		TValue qty = m_left->codegen(builder, module, env);
 
 		/*AllocaInst* a = entry_builder.CreateAlloca(builder->getInt64Ty(), nullptr, "alloc_vec_ptr");
 		if (LITERAL_TYPE_INTEGER == val.type && LITERAL_TYPE_INTEGER == qty.type)
@@ -418,10 +394,7 @@ public:
 	Expr* Object() { return m_object; }
 	Expr* Value() { return m_value; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_object;
@@ -446,10 +419,7 @@ public:
 	Token* Operator() { return m_token; }
 	Expr* Right() { return m_right; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;
@@ -474,10 +444,7 @@ public:
 	Token* Operator() { return m_token; }
 	Expr* VecIndex() { return m_vecIndex; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_token;

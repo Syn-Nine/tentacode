@@ -236,12 +236,10 @@ extern "C" DLLEXPORT void ray_rlDisableBackfaceCulling() { rlDisableBackfaceCull
 
 //
 
-static void LoadExtensions_Raylib(
-    std::unique_ptr<llvm::IRBuilder<>>& builder,
-    std::unique_ptr<llvm::Module>& module,
-    Environment* env)
+static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
     rayenv = env;
+    return;
 
     {
         std::vector<llvm::Type*> args;
@@ -270,7 +268,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawCircle", *module);
-        env->DefineFunction("ray::DrawCircle", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        env->DefineFunction("ray::DrawCircle", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -376,7 +374,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureV", *module);
-        env->DefineFunction("ray::DrawTextureV", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        env->DefineFunction("ray::DrawTextureV", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -387,7 +385,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureEx", *module);
-        env->DefineFunction("ray::DrawTextureEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        env->DefineFunction("ray::DrawTextureEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -399,7 +397,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTexturePro", *module);
-        env->DefineFunction("ray::DrawTexturePro", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        env->DefineFunction("ray::DrawTexturePro", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -414,7 +412,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetGamepadAxisMovement", *module);
-        env->DefineFunction("ray::GetGamepadAxisMovement", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_DOUBLE);
+        env->DefineFunction("ray::GetGamepadAxisMovement", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_FLOAT);
     }
     {
         std::vector<llvm::Type*> args;
@@ -468,7 +466,7 @@ static void LoadExtensions_Raylib(
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextEx", *module);
-        env->DefineFunction("ray::DrawTextEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_STRING, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        env->DefineFunction("ray::DrawTextEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_STRING, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
     {
         std::vector<llvm::Type*> args;
@@ -723,7 +721,7 @@ static void LoadExtensions_Raylib(
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureTileMap", *module);
         env->DefineFunction("ray::DrawTextureTileMap", ftn, {
             LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER,
-            LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_DOUBLE, LITERAL_TYPE_POINTER,
+            LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_POINTER,
             LITERAL_TYPE_ENUM
             }, { }, args, {}, LITERAL_TYPE_INVALID);
     }
@@ -830,7 +828,7 @@ static void LoadExtensions_Raylib(
         {
             llvm::Type* defty = builder->getInt32Ty();
             llvm::Value* defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
-            env->DefineVariable(LITERAL_TYPE_INTEGER, names[i], defval, defty, nullptr);
+            //env->DefineVariable(LITERAL_TYPE_INTEGER, names[i], defval, defty, nullptr);
         }
     }
 }

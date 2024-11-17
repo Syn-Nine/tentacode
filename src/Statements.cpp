@@ -1,38 +1,25 @@
 #include "Statements.h"
 
 
-static llvm::Value* CreateEntryAlloca(std::unique_ptr<llvm::IRBuilder<>>& builder, llvm::Type* Ty, llvm::Value* ArraySize = nullptr,
-	const llvm::Twine& Name = "")
-{
-	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-	llvm::IRBuilder<> entry_builder(&ftn->getEntryBlock(), ftn->getEntryBlock().begin());
-	return entry_builder.CreateAlloca(Ty, ArraySize, Name);
-}
-
-
 //-----------------------------------------------------------------------------
-TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue BlockStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("BlockStmt::codegen()\n");
 
 	llvm::Value* stack = builder->CreateStackSave("stksave");
 
-	Environment* sub_env = new Environment(env);
+	Environment* sub_env = Environment::Push();
 
 	for (auto& statement : *m_block)
 	{
 		if (env->HasErrors()) break;
 		if (STATEMENT_FUNCTION != statement->GetType())
 		{
-			statement->codegen(context, builder, module, sub_env);
+			statement->codegen(builder, module, sub_env);
 		}
 	}
 
-	sub_env->EmitCleanup(builder, module);
-	delete sub_env;
+	Environment::Pop();
 
 	builder->CreateStackRestore(stack, "stkrest");
 
@@ -41,13 +28,10 @@ TValue BlockStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 
 //-----------------------------------------------------------------------------
-TValue BreakStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue BreakStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ExpressionStmt::codegen()\n");
-
+	
 	llvm::BasicBlock* bb = env->GetParentLoopBreak();
 	if (bb)
 	{
@@ -56,27 +40,24 @@ TValue BreakStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 		// for follow-on non-redirected code insertion
 		llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-		llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "breaktail", ftn);
+		llvm::BasicBlock* tail = llvm::BasicBlock::Create(module->getContext(), "breaktail", ftn);
 		builder->SetInsertPoint(tail);
 	}
 	else
 	{
 		env->Error(m_keyword, "No parent block for `break`.");
 	}
-
+	
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue ContinueStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue ContinueStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ExpressionStmt::codegen()\n");
-
+	
 	llvm::BasicBlock* bb = env->GetParentLoopContinue();
 	if (bb)
 	{
@@ -85,37 +66,37 @@ TValue ContinueStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 		// for follow-on non-redirected code insertion
 		llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-		llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "conttail", ftn);
+		llvm::BasicBlock* tail = llvm::BasicBlock::Create(module->getContext(), "conttail", ftn);
 		builder->SetInsertPoint(tail);
 	}
-
+	else
+	{
+		env->Error(m_keyword, "No parent block for `continue`.");
+	}
+	
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue ExpressionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue ExpressionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ExpressionStmt::codegen()\n");
-	return m_expr->codegen(context, builder, module, env);
+	return m_expr->codegen(builder, module, env);
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue FunctionStmt::codegen_prototype(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
+TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
+	llvm::Module* module,
 	Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("FunctionStmt::codegen_prototype()\n");
 
 	std::string name = m_name->Lexeme();
-
+	/*
 	// check for existing function definition
 	if (env->IsFunction(name))
 	{
@@ -204,18 +185,15 @@ TValue FunctionStmt::codegen_prototype(std::unique_ptr<llvm::LLVMContext>& conte
 	llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, name, *module);
 
 	env->DefineFunction(name, ftn, types, names, args, tokens, retliteral);
-
+	*/
 	return TValue::NullInvalid();
 }
 
 
-TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue FunctionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("FunctionStmt::codegen()\n");
-
+	/*
 	std::string name = m_name->Lexeme();
 
 	// check for existing function definition
@@ -252,7 +230,7 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (env->HasErrors()) break;
 		if (STATEMENT_FUNCTION != statement->GetType())
 		{
-			statement->codegen(context, builder, module, sub_env);
+			statement->codegen(builder, module, sub_env);
 		}
 	}
 
@@ -283,39 +261,36 @@ TValue FunctionStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	}
 
 	verifyFunction(*ftn);
-
+	*/
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue IfStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("IfStmt::codegen()\n");
-	TValue CondV = m_condition->codegen(context, builder, module, env);
-	if (!CondV.value) return TValue::NullInvalid();
+	TValue CondV = m_condition->codegen(builder, module, env);
+	if (CondV.IsInvalid()) return TValue::NullInvalid();
 
 	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+	llvm::LLVMContext& context = builder->getContext();
+	llvm::BasicBlock* ThenBB = llvm::BasicBlock::Create(context, "then", ftn);
+	llvm::BasicBlock* ElseBB = llvm::BasicBlock::Create(context, "else");
+	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(context, "ifcont");
 
-	llvm::BasicBlock* ThenBB = llvm::BasicBlock::Create(*context, "then", ftn);
-	llvm::BasicBlock* ElseBB = llvm::BasicBlock::Create(*context, "else");
-	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(*context, "ifcont");
-
-	builder->CreateCondBr(CondV.value, ThenBB, ElseBB);
+	builder->CreateCondBr(CondV.Value(), ThenBB, ElseBB);
 	builder->SetInsertPoint(ThenBB);
 
-	m_thenBranch->codegen(context, builder, module, env);
+	m_thenBranch->codegen(builder, module, env);
 
 	builder->CreateBr(MergeBB);
 
 	ftn->insert(ftn->end(), ElseBB);
 	builder->SetInsertPoint(ElseBB);
 
-	if (m_elseBranch) m_elseBranch->codegen(context, builder, module, env);
+	if (m_elseBranch) m_elseBranch->codegen(builder, module, env);
 
 	builder->CreateBr(MergeBB);
 
@@ -328,10 +303,7 @@ TValue IfStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 
 //-----------------------------------------------------------------------------
-TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue PrintStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("PrintStmt::codegen()\n");
 
@@ -345,10 +317,11 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		return TValue::NullInvalid();
 	}
 
-	TValue v = m_expr->codegen(context, builder, module, env);
+	TValue v = m_expr->codegen(builder, module, env);
+	if (v.IsInvalid()) return TValue::NullInvalid();
 
 	// convert gep to raw value
-	if (EXPRESSION_GET == m_expr->GetType())
+	/*if (EXPRESSION_GET == m_expr->GetType())
 	{
 		llvm::Type* ty = nullptr;
 		if (v.IsInteger() || v.IsEnum()) ty = builder->getInt32Ty();
@@ -358,50 +331,19 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		if (ty) v = TValue(v.type, builder->CreateLoad(ty, v.value, "gep_load"));
 	}
 
+	*/
 
-	if (!v.IsString())
-	{
-		if (v.IsInteger())
-		{
-			llvm::Value* s = builder->CreateCall(module->getFunction("__int_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-			builder->CreateStore(s, a);
-			v = TValue::String(a);
-			env->AddToCleanup(v);
-		}
-		else if (v.IsDouble())
-		{
-			llvm::Value* s = builder->CreateCall(module->getFunction("__double_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-			builder->CreateStore(s, a);
-			v = TValue::String(a);
-			env->AddToCleanup(v);
-		}
-		else if (v.IsBool())
-		{
-			llvm::Value* s = builder->CreateCall(module->getFunction("__bool_to_string"), { v.value }, "calltmp");
-			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-			builder->CreateStore(s, a);
-			v = TValue::String(a);
-			env->AddToCleanup(v);
-		}
-		else if (v.IsVec())
-		{
-			llvm::Value* srcType = builder->getInt32(v.fixed_vec_type);
-			llvm::Value* srcPtr = builder->CreateLoad(builder->getPtrTy(), v.value);
-			llvm::Value* s = builder->CreateCall(module->getFunction("__vec_to_string"), { srcType, srcPtr }, "calltmp");
-			llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-			builder->CreateStore(s, a);
-			v = TValue::String(a);
-			env->AddToCleanup(v);
-		}
-	}
+	v = v.As(TOKEN_VAR_STRING);
+	if (v.IsInvalid()) return TValue::NullInvalid();
+	
+	//llvm::Value* tmp = v.Value();//builder->CreateLoad(builder->getPtrTy(), v.Value(), "loadtmp");
+	llvm::Value* tmp = v.GetFromStorage().Value();
 
-	llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp");
 	if (m_newline)
 		builder->CreateCall(module->getFunction("println"), { tmp }, "calltmp");
 	else
 		builder->CreateCall(module->getFunction("print"), { tmp }, "calltmp");
+	
 
 	return TValue::NullInvalid();
 }
@@ -409,18 +351,15 @@ TValue PrintStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 
 //-----------------------------------------------------------------------------
-TValue ReturnStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ReturnStmt::codegen()\n");
 
-	TValue v = m_value->codegen(context, builder, module, env);
+	TValue v = m_value->codegen(builder, module, env);
 
 	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
 	llvm::Type* retty = ftn->getReturnType();
-
+	/*
 	if (retty->isIntegerTy() && v.IsDouble())
 	{
 		// convert rhs to int
@@ -436,20 +375,17 @@ TValue ReturnStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "rettail", ftn);
 	builder->SetInsertPoint(tail);
-
+	*/
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue StructStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("StructStmt::codegen()\n");
-
+	/*
 	std::vector<llvm::Type*> arg_ty;
 	std::vector<Token*> arg_types;
 	std::vector<LiteralTypeEnum> arg_vec_types;
@@ -510,19 +446,20 @@ TValue StructStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 		llvm::StructType* stype = llvm::StructType::create(*context, arg_ty, id);
 		env->DefineUdt(id, stype, arg_types, arg_names, arg_ty, arg_vec_types, arg_vec_types_id);
 	}
-
+	*/
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
+void init_udt(llvm::IRBuilder<>* builder,
+	llvm::Module* module,
 	Environment* env,
 	std::string udtname,
 	llvm::Value* defval, llvm::Type* defty, std::vector<llvm::Value*> args)
 {
+	/*
 	if (!env->GetUdt(udtname)) return;
 	
 	std::vector<llvm::Type*> arg_ty = env->GetUdtTy(udtname);
@@ -560,8 +497,8 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__new_std_string_void"), {}, "calltmp");
 				builder->CreateStore(s, gep);
-				TValue tmp = TValue::String(gep);
-				env->AddToCleanup(tmp);
+				//TValue tmp = TValue::String(gep);
+				//env->AddToCleanup(tmp);
 			}
 			else if (TOKEN_VAR_VEC == argVarType)
 			{
@@ -569,23 +506,39 @@ void init_udt(std::unique_ptr<llvm::IRBuilder<>>& builder,
 				std::string vecTypeId = arg_var_vec_type_ids[i];
 				llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
 				builder->CreateStore(addr, gep);
-				TValue tmp = TValue::Vec(gep, vecType, vecTypeId);
-				env->AddToCleanup(tmp);
+				//TValue tmp = TValue::Vec(gep, vecType, vecTypeId);
+				//env->AddToCleanup(tmp);
 			}
 			else
 			{
 				env->Error(arg_var_tokens[i], "Initializer not present.");
 			}
 		}
-	}
+	}*/
 }
 
-TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("VarStmt::codegen()\n");
+
+	bool global = !env->HasParent();
+	std::string lexeme = m_id->Lexeme();
+
+	TValue val = TValue::Construct(m_type, m_vecArgs, lexeme, global); // if val is null then gets default initializer
+	
+	if (val.Value())
+	{
+		env->DefineVariable(val, lexeme);
+		if (m_expr && EXPRESSION_ASSIGN == m_expr->GetType())
+		{
+			// run assignment expression
+			m_expr->codegen(builder, module, env);
+		}
+	}
+
+	return TValue::NullInvalid();
+
+	/*
 
 	TokenTypeEnum varType = m_type->GetType();
 	LiteralTypeEnum vecType = m_vecType;
@@ -595,79 +548,6 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 	bool global = !env->HasParent();
 
-	if (TOKEN_VAR_I32 == varType)
-	{
-		defty = builder->getInt32Ty();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_i32");
-			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
-		}
-		env->DefineVariable(LITERAL_TYPE_INTEGER, m_token->Lexeme(), defval, defty, m_type);
-	}
-	else if (TOKEN_VAR_ENUM == varType)
-	{
-		defty = builder->getInt32Ty();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(0), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_enum_i32");
-			if (!m_expr) builder->CreateStore(builder->getInt32(0), defval);
-		}
-		env->DefineVariable(LITERAL_TYPE_ENUM, m_token->Lexeme(), defval, defty, m_type);
-	}
-	else if (TOKEN_VAR_BOOL == varType)
-	{
-		defty = builder->getInt1Ty();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getFalse(), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_bool");
-			if (!m_expr) builder->CreateStore(builder->getFalse(), defval);
-		}
-		env->DefineVariable(LITERAL_TYPE_BOOL, m_token->Lexeme(), defval, defty, m_type);
-	}
-	else if (TOKEN_VAR_F32 == varType)
-	{
-		defty = builder->getDoubleTy();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantFP::get(*context, llvm::APFloat(0.0)), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_f64");
-			if (!m_expr) builder->CreateStore(llvm::Constant::getNullValue(defty), defval);
-		}
-		env->DefineVariable(LITERAL_TYPE_DOUBLE, m_token->Lexeme(), defval, defty, m_type);
-	}
-	else if (TOKEN_VAR_STRING == varType)
-	{
-		defty = builder->getPtrTy();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_ptr");
-
-		}
-		env->DefineVariable(LITERAL_TYPE_STRING, m_token->Lexeme(), defval, defty, m_type);
-		llvm::Value* addr = builder->CreateCall(module->getFunction("__new_std_string_void"), { }, "calltmp");
-		builder->CreateStore(addr, defval);
-		env->AddToCleanup(TValue::String(defval));
-	}
 	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType || TOKEN_VAR_SHADER == varType)
 	{
 		defty = builder->getPtrTy();
@@ -681,23 +561,6 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 
 		}
 		env->DefineVariable(LITERAL_TYPE_POINTER, m_token->Lexeme(), defval, defty, m_type);
-	}
-	else if (TOKEN_VAR_VEC == varType)
-	{
-		defty = builder->getPtrTy();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_vec_ptr");
-
-		}
-		env->DefineVariable(LITERAL_TYPE_VEC, m_token->Lexeme(), defval, defty, m_type, vecType);
-		llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
-		builder->CreateStore(addr, defval);
-		env->AddToCleanup(TValue::Vec(defval, vecType));
 	}
 	else if (TOKEN_IDENTIFIER == varType)
 	{
@@ -733,49 +596,47 @@ TValue VarStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	if (defval && m_expr && EXPRESSION_ASSIGN == m_expr->GetType())
 	{
 		// run assignment expression
-		m_expr->codegen(context, builder, module, env);
+		m_expr->codegen(builder, module, env);
 	}
 
-	return TValue::NullInvalid();
+	return TValue::NullInvalid();*/
 }
 
 
 
 //-----------------------------------------------------------------------------
-TValue WhileStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
-	std::unique_ptr<llvm::IRBuilder<>>& builder,
-	std::unique_ptr<llvm::Module>& module,
-	Environment* env)
+TValue WhileStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("WhileStmt::codegen()\n");
 
 	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*context, "loop", ftn);
-	llvm::BasicBlock* BodyBB = llvm::BasicBlock::Create(*context, "body");
-	llvm::BasicBlock* PostBB = llvm::BasicBlock::Create(*context, "post");
-	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(*context, "loopcont");
-
+	llvm::LLVMContext& context = builder->getContext();
+	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(context, "loop", ftn);
+	llvm::BasicBlock* BodyBB = llvm::BasicBlock::Create(context, "body");
+	llvm::BasicBlock* PostBB = llvm::BasicBlock::Create(context, "post");
+	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(context, "loopcont");
+	
 	env->PushLoopBreakContinue(MergeBB, PostBB);
 
 	builder->CreateBr(LoopBB);
 	builder->SetInsertPoint(LoopBB);
 
-	TValue CondV = m_condition->codegen(context, builder, module, env);
-	if (!CondV.value) return TValue::NullInvalid();
+	TValue CondV = m_condition->codegen(builder, module, env);
+	if (!CondV.Value()) return TValue::NullInvalid();
 
-	builder->CreateCondBr(CondV.value, BodyBB, MergeBB);
+	builder->CreateCondBr(CondV.Value(), BodyBB, MergeBB);
 
 	ftn->insert(ftn->end(), BodyBB);
 	builder->SetInsertPoint(BodyBB);
 
-	if (m_body) m_body->codegen(context, builder, module, env);
+	if (m_body) m_body->codegen(builder, module, env);
 
 	builder->CreateBr(PostBB); // go back to the top
 
 	ftn->insert(ftn->end(), PostBB);
 	builder->SetInsertPoint(PostBB);
 
-	if (m_post) m_post->codegen(context, builder, module, env);
+	if (m_post) m_post->codegen(builder, module, env);
 
 	builder->CreateBr(LoopBB); // go back to the top
 
@@ -783,6 +644,6 @@ TValue WhileStmt::codegen(std::unique_ptr<llvm::LLVMContext>& context,
 	builder->SetInsertPoint(MergeBB);
 
 	env->PopLoopBreakContinue();
-
+	
 	return TValue::NullInvalid();
 }

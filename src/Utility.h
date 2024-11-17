@@ -3,8 +3,13 @@
 
 #include <sstream>
 #include <iomanip>
-#include <llvm/ADT/SmallVector.h>
 #include <string>
+
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/IR/Value.h>
+#include <llvm/IR/Type.h>
+#include "llvm/IR/IRBuilder.h"
+
 
 static std::string StrJoin(llvm::SmallVector<std::string> s, std::string delimiter) {
     std::string ret;
@@ -64,6 +69,14 @@ static std::string GenerateUUID()
     }
 
     return ss.str();
+}
+
+static llvm::Value* CreateEntryAlloca(llvm::IRBuilder<>* builder, llvm::Type* Ty, llvm::Value* ArraySize = nullptr,
+    const llvm::Twine& Name = "")
+{
+    llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+    llvm::IRBuilder<> entry_builder(&ftn->getEntryBlock(), ftn->getEntryBlock().begin());
+    return entry_builder.CreateAlloca(Ty, ArraySize, Name);
 }
 
 #endif

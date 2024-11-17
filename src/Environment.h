@@ -16,14 +16,55 @@
 
 class Environment
 {
-public:
-	Environment() = delete;
-	Environment(Environment* parent = nullptr)
+private:
+	struct var_struct
 	{
-		m_parent = parent;
-		m_loopBreak = nullptr;
-		m_loopContinue = nullptr;
+		TValue tvalue;
+		std::string lexeme;
+
+		var_struct() {}
+		var_struct(TValue val, std::string lex) : tvalue(val), lexeme(lex)
+		{}
+	};
+
+
+public:
+	
+	static Environment* Push()
+	{
+		Environment* e = new Environment();
+		if (!m_stack.empty()) e->m_parent = m_stack.back();
+		m_stack.push_back(e);
+		return e;
 	}
+
+	static void Pop()
+	{
+		if (!m_stack.empty())
+		{
+			m_stack.back()->EmitCleanup();
+			delete m_stack.back();
+			m_stack.pop_back();
+		}
+		else
+		{
+			Error(nullptr, "Attempting to pop empty environment.");
+		}
+	}
+
+	static void AddToCleanup(TValue v)
+	{
+		if (!m_stack.empty())
+		{
+			m_stack.back()->m_cleanup.push_back(v);
+		}
+		else
+		{
+			Error(nullptr, "Attempting to add cleanup to empty environment.");
+		}
+	}
+
+	//-------------------------------------------------------------------------
 
 	bool HasParent() const { return m_parent; }
 	static bool HasErrors()
@@ -32,7 +73,11 @@ public:
 		return false;
 	}
 
-	static void RegisterErrorHandler(ErrorHandler* eh) { m_errorHandler = eh; }
+	static void RegisterErrorHandler(ErrorHandler* eh)
+	{
+		m_errorHandler = eh;
+	}
+
 	static void Error(Token* token, const std::string& err)
 	{
 		if (token)
@@ -45,15 +90,79 @@ public:
 		}
 	}
 
-	void DefineVariable(LiteralTypeEnum type, std::string id, llvm::Value* value, llvm::Type* ty, Token* token, LiteralTypeEnum vecType = LITERAL_TYPE_INVALID)
+	void DefineVariable(TValue val, std::string lexeme)
 	{
-		m_vars[id] = value;
-		m_ty[id] = ty;
-		m_types[id] = type;
-		m_vecTypes[id] = vecType;
-		m_var_tokens[id] = token;
-		if (2 <= Environment::GetDebugLevel()) printf("DefineVariable(%d, %s, %lu, %d)\n", type, id.c_str(), value, vecType);
+		m_vars[lexeme] = var_struct(val, lexeme);
 	}
+
+	void AssignToVariable(const std::string& var, TValue rhs);
+	
+	void AssignToVariableVectorIndex(const std::string& var, TValue idx, TValue rhs);
+	
+
+	TValue GetVariable(Token* token, const std::string& var)
+	{
+		if (IsVariable(var)) return m_vars.at(var).tvalue;
+		if (m_parent) return m_parent->GetVariable(token, var);
+		Error(token, "Variable not found in environment.");
+		return TValue::NullInvalid();
+	}
+
+	void DefineFunction(std::string id, llvm::Function* ftn, std::vector<LiteralTypeEnum> types, std::vector<std::string> names, std::vector<llvm::Type*> args, std::vector<Token*> tokens, LiteralTypeEnum rettype)
+	{
+	}
+
+	static int GetEnumAsInt(const EnumLiteral& e)
+	{
+		std::string val = e.enumValue;
+
+		if (0 == m_enumMap.count(val))
+		{
+			m_enumCounter++;
+			m_enumMap.insert(std::make_pair(val, m_enumCounter));
+			m_enumReflectMap.insert(std::make_pair(m_enumCounter, val));
+			return m_enumCounter;
+		}
+
+		return m_enumMap.at(val);
+	}
+
+	static std::string GetEnumAsString(int val)
+	{
+		if (0 == m_enumReflectMap.count(val)) return "<Enum Invalid>";
+		return m_enumReflectMap.at(val);
+	}
+
+	static void SetDebugLevel(int level) { m_debugLevel = level; }
+	static int GetDebugLevel() { return m_debugLevel; }
+
+
+	llvm::BasicBlock* GetParentLoopBreak()
+	{
+		if (!m_parent) return nullptr;
+		if (m_parent->m_loopBreak) return m_parent->m_loopBreak;
+		return m_parent->GetParentLoopBreak();
+	}
+
+	llvm::BasicBlock* GetParentLoopContinue()
+	{
+		if (!m_parent) return nullptr;
+		if (m_parent->m_loopContinue) return m_parent->m_loopContinue;
+		return m_parent->GetParentLoopContinue();
+	}
+
+	void PushLoopBreakContinue(llvm::BasicBlock* b, llvm::BasicBlock* c)
+	{
+		m_loopBreak = b;
+		m_loopContinue = c;
+	}
+
+	void PopLoopBreakContinue()
+	{
+		PushLoopBreakContinue(nullptr, nullptr);
+	}
+
+	/*
 
 	void DefineFunction(std::string id, llvm::Function* ftn, std::vector<LiteralTypeEnum> types, std::vector<std::string> names, std::vector<llvm::Type*> args, std::vector<Token*> tokens, LiteralTypeEnum rettype)
 	{
@@ -84,43 +193,6 @@ public:
 		m_udt_name_to_idx[id] = name_to_idx;
 
 		if (2 <= Environment::GetDebugLevel()) printf("DefineUdt(%s)\n", id.c_str());
-	}
-
-	llvm::Value* GetVariable(std::string id)
-	{
-		if (0 != m_vars.count(id)) return m_vars.at(id);		
-		if (m_parent) return m_parent->GetVariable(id);
-		//printf("Error - unable to find variable `%s` in environment!\n", id.c_str());
-		return nullptr;
-	}
-
-	Token* GetVariableToken(std::string id)
-	{
-		if (0 != m_var_tokens.count(id)) return m_var_tokens.at(id);
-		if (m_parent) return m_parent->GetVariableToken(id);
-		return nullptr;
-	}
-
-	llvm::Type* GetVariableTy(std::string id)
-	{
-		if (0 != m_ty.count(id)) return m_ty.at(id);
-		if (m_parent) return m_parent->GetVariableTy(id);
-		//printf("Error - unable to find variable `%s` in environment!\n", id.c_str());
-		return nullptr;
-	}
-
-	LiteralTypeEnum GetVariableType(std::string id)
-	{
-		if (0 != m_vars.count(id)) return m_types.at(id);
-		if (m_parent) return m_parent->GetVariableType(id);
-		return LITERAL_TYPE_INVALID;
-	}
-
-	LiteralTypeEnum GetVecType(std::string id)
-	{
-		if (0 != m_vecTypes.count(id)) return m_vecTypes.at(id);
-		if (m_parent) return m_parent->GetVecType(id);
-		return LITERAL_TYPE_INVALID;
 	}
 
 	llvm::Function* GetFunction(std::string id)
@@ -270,84 +342,14 @@ public:
 		return ret;
 	}
 
-	llvm::BasicBlock* GetParentLoopBreak()
-	{
-		if (!m_parent) return nullptr;
-		if (m_parent->m_loopBreak) return m_parent->m_loopBreak;
-		return m_parent->GetParentLoopBreak();
-	}
+	
 
-	llvm::BasicBlock* GetParentLoopContinue()
-	{
-		if (!m_parent) return nullptr;
-		if (m_parent->m_loopContinue) return m_parent->m_loopContinue;
-		return m_parent->GetParentLoopContinue();
-	}
+	
 
-	void PushLoopBreakContinue(llvm::BasicBlock* b, llvm::BasicBlock* c)
-	{
-		m_loopBreak = b;
-		m_loopContinue = c;
-	}
-
-	void PopLoopBreakContinue()
-	{
-		PushLoopBreakContinue(nullptr, nullptr);
-	}
-
-	int GetEnumAsInt(const EnumLiteral& e)
-	{
-		std::string val = e.enumValue;
-
-		if (0 == m_enumMap.count(val))
-		{
-			m_enumCounter++;
-			m_enumMap.insert(std::make_pair(val, m_enumCounter));
-			m_enumReflectMap.insert(std::make_pair(m_enumCounter, val));
-			return m_enumCounter;
-		}
-		
-		return m_enumMap.at(val);
-	}
-
-	std::string GetEnumAsString(int val)
-	{
-		if (0 == m_enumReflectMap.count(val)) return "<Enum Invalid>";
-		return m_enumReflectMap.at(val);
-	}
-
-	void AddToCleanup(TValue v)
-	{
-		m_cleanup.push_back(v);
-	}
-
-	void EmitCleanup(std::unique_ptr<llvm::IRBuilder<>>& builder, std::unique_ptr<llvm::Module>& module)
-	{
-		if (m_cleanup.empty()) return;
-
-		for (auto& v : m_cleanup)
-		{
-			if (v.IsString())
-			{
-				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "tmpload");
-				builder->CreateCall(module->getFunction("__del_std_string_ptr"), { tmp }, "delstr");
-			}
-			else if (v.IsVec())
-			{
-				llvm::Value* tmp = builder->CreateLoad(builder->getPtrTy(), v.value, "tmpload");
-				builder->CreateCall(module->getFunction("__vec_del"), { builder->getInt32(v.fixed_vec_type), tmp }, "delvec");
-			}
-		}
-	}
-	std::vector<TValue> GetCleanup() { return m_cleanup; }
-
-	static void SetDebugLevel(int level) { m_debugLevel = level; }
-	static int GetDebugLevel() { return m_debugLevel; }
-
+	
 
 private:
 
-	Environment* m_parent;
 	std::map<std::string, llvm::Value*> m_vars;
 	std::map<std::string, llvm::Type*> m_ty;
 	std::map<std::string, Token*> m_var_tokens;
@@ -369,17 +371,54 @@ private:
 	std::map<std::string, std::vector<LiteralTypeEnum> > m_udt_vecTypes;
 	std::map<std::string, std::vector<std::string> > m_udt_vecTypeIds;
 
+	
+	*/
+
+private:
+
+	Environment()
+	{
+		m_parent = nullptr;
+		m_loopBreak = nullptr;
+		m_loopContinue = nullptr;
+	}
+
+	void EmitCleanup()
+	{
+		if (m_cleanup.empty()) return;
+
+		for (auto& v : m_cleanup)
+		{
+			v.Cleanup();
+		}
+	}
+
+	bool IsVariable(const std::string& var)
+	{
+		return 0 != m_vars.count(var);
+	}
+
+
+	//std::vector<TValue> GetCleanup() { return m_cleanup; }
+
+	Environment* m_parent;
+
+	static std::vector<Environment*> m_stack;
+
+	std::map<std::string, var_struct> m_vars;
+	
 	std::vector<TValue> m_cleanup;
 
 	static std::map<std::string, int> m_enumMap;
 	static std::map<int, std::string> m_enumReflectMap;
 	static int m_enumCounter;
+
+	static ErrorHandler* m_errorHandler;
 	static int m_debugLevel;
 
 	llvm::BasicBlock* m_loopBreak;
 	llvm::BasicBlock* m_loopContinue;
 
-	static ErrorHandler* m_errorHandler;
 };
 
 #endif // ENVIRONMENT_H

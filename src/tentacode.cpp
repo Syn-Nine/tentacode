@@ -58,34 +58,41 @@ bool Run(const char* buf, const char* filename)
 	{
 		Parser parser(tokens, errorHandler);
 		StmtList stmts = parser.Parse();
-		Environment* env = new Environment(nullptr);
+
+		// push global environment
+		Environment* env = Environment::Push();
 		env->RegisterErrorHandler(errorHandler);
 
-		LoadExtensions(builder, module, env);
-		LoadExtensions_Raylib(builder, module, env);
+		TValue::RegisterErrorHandler(errorHandler);
+		TValue::RegisterLLVM(builder.get(), module.get());
+
+		LoadExtensions(builder.get(), module.get(), env);
+		LoadExtensions_Raylib(builder.get(), module.get(), env);
 
 		if (2 <= Environment::GetDebugLevel()) printf("\nWalking AST...\n");
 
-		
 		// walk function and struct definitions
 		for (auto& statement : stmts)
 		{
 			if (env->HasErrors()) break;
 			if (STATEMENT_STRUCT == statement->GetType())
 			{
-				statement->codegen(context, builder, module, env);
+				statement->codegen(builder.get(), module.get(), env);
 			}
 
 			if (STATEMENT_FUNCTION == statement->GetType())
 			{
-				static_cast<FunctionStmt*>(statement)->codegen_prototype(context, builder, module, env);
+				static_cast<FunctionStmt*>(statement)->codegen_prototype(builder.get(), module.get(), env);
 			}
 		}
 
 		llvm::FunctionType* funcType = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
-		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", *module);
+		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", module.get());
 		llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context, "entry", mainFunc);
 		builder->SetInsertPoint(entry);
+
+		// push main ftn environment
+		Environment* sub_env = Environment::Push();
 
 		// walk main code
 		for (auto& statement : stmts)
@@ -93,11 +100,12 @@ bool Run(const char* buf, const char* filename)
 			if (env->HasErrors()) break;
 			if (STATEMENT_FUNCTION != statement->GetType() && STATEMENT_STRUCT != statement->GetType())
 			{
-				statement->codegen(context, builder, module, env);
+				statement->codegen(builder.get(), module.get(), env);
 			}
 		}
 
-		env->EmitCleanup(builder, module);
+		// pop main ftn environment
+		Environment::Pop();
 
 		builder->CreateRetVoid();
 		verifyFunction(*mainFunc);
@@ -108,11 +116,12 @@ bool Run(const char* buf, const char* filename)
 			if (env->HasErrors()) break;
 			if (STATEMENT_FUNCTION == statement->GetType())
 			{
-				statement->codegen(context, builder, module, env);
+				statement->codegen(builder.get(), module.get(), env);
 			}
 		}
 
-		delete env;
+		// pop global environment
+		Environment::Pop();
 
 
 		if (1 <= Environment::GetDebugLevel())

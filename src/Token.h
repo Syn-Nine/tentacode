@@ -73,9 +73,7 @@ public:
 		case TOKEN_GREATER_EQUAL: type = "TOKEN_GREATER_EQUAL"; break;
 		case TOKEN_LESS: type = "TOKEN_LESS"; break;
 		case TOKEN_LESS_EQUAL: type = "TOKEN_LESS_EQUAL"; break;
-		case TOKEN_TILDE_TILDE: type = "TOKEN_TILDE_TILDE"; break;
-		case TOKEN_BANG_TILDE: type = "TOKEN_BANG_TILDE"; break;
-
+		
 
 		// literals
 		case TOKEN_IDENTIFIER: type = "TOKEN_IDENTIFIER"; break;
@@ -91,8 +89,11 @@ public:
 		case TOKEN_PRINTLN: type = "TOKEN_PRINTLN"; break;
 		case TOKEN_FORMAT: type = "TOKEN_FORMAT"; break;
 		case TOKEN_PAIR: type = "TOKEN_PAIR"; break;
+		case TOKEN_VAR_I16: type = "TOKEN_VAR_I16"; break;
 		case TOKEN_VAR_I32: type = "TOKEN_VAR_I32"; break;
+		case TOKEN_VAR_I64: type = "TOKEN_VAR_I64"; break;
 		case TOKEN_VAR_F32: type = "TOKEN_VAR_F32"; break;
+		case TOKEN_VAR_F64: type = "TOKEN_VAR_F64"; break;
 		case TOKEN_VAR_STRING: type = "TOKEN_VAR_STRING"; break;
 		case TOKEN_VAR_VEC: type = "TOKEN_VAR_VEC"; break;
 		case TOKEN_VAR_MAP: type = "TOKEN_VAR_MAP"; break;
@@ -114,7 +115,7 @@ public:
 		case TOKEN_STRUCT: type = "TOKEN_STRUCT"; break;
 		case TOKEN_INCLUDE: type = "TOKEN_INCLUDE"; break;
 		case TOKEN_INTERNAL: type = "TOKEN_INTERNAL"; break;
-		case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
+		//case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
 		case TOKEN_FILELINE: type = "TOKEN_FILELINE"; break;
 		case TOKEN_PI: type = "TOKEN_PI"; break;
 
@@ -159,5 +160,6 @@ private:
 };
 
 typedef std::vector<Token> TokenList;
+typedef std::vector<Token*> TokenPtrList;
 
 #endif // TOKEN_H

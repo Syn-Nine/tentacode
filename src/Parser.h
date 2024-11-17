@@ -45,14 +45,15 @@ private:
 	//-----------------------------------------------------------------------------
 	Stmt* Declaration()
 	{
-		m_global = false;
-		if (Match(1, TOKEN_GLOBAL)) m_global = true;
+		//m_global = false;
+		//if (Match(1, TOKEN_GLOBAL)) m_global = true;
 		
 		if (Match(1, TOKEN_STRUCT)) return StructDeclaration();
 		
 		if (Check(TOKEN_DEF)) return Function("function");
 		
-		if (Match(8, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+		if (Match(11, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
+			TOKEN_VAR_F32, TOKEN_VAR_F64, TOKEN_VAR_STRING,
 			TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
 			return VarDeclaration();
 		
@@ -93,8 +94,11 @@ private:
 
 		// check for return type
 		Token* rettype = nullptr;
-		if (Check(TOKEN_VAR_I32) ||
+		if (Check(TOKEN_VAR_I16) ||
+			Check(TOKEN_VAR_I32) ||
+			Check(TOKEN_VAR_I64) ||
 			Check(TOKEN_VAR_F32) ||
+			Check(TOKEN_VAR_F64) ||
 			Check(TOKEN_VAR_BOOL) ||
 			Check(TOKEN_VAR_STRING))
 		{
@@ -114,8 +118,11 @@ private:
 			do
 			{
 				if (Check(TOKEN_IDENTIFIER)) Error(Peek(), "Expected 'type' before identifier.");
-				if (Check(TOKEN_VAR_I32) ||
+				if (Check(TOKEN_VAR_I16) ||
+					Check(TOKEN_VAR_I32) ||
+					Check(TOKEN_VAR_I64) ||
 					Check(TOKEN_VAR_F32) ||
+					Check(TOKEN_VAR_F64) ||
 					Check(TOKEN_VAR_BOOL) ||
 					Check(TOKEN_VAR_ENUM) ||
 					Check(TOKEN_VAR_STRING))
@@ -147,7 +154,8 @@ private:
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd() && !m_errorHandler->HasErrors())
 		{
-			if (Match(14, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING,
+			if (Match(17, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
+				TOKEN_VAR_F32, TOKEN_VAR_F64, TOKEN_VAR_STRING,
 				TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
 
 				// raylib custom
@@ -176,36 +184,21 @@ private:
 	Stmt* VarDeclaration()
 	{
 		Token* type = new Token(Previous());
+		Token* vtype = nullptr;
+		Token* vsize = nullptr;
 
-		std::string vtypeid;
-		LiteralTypeEnum vtype = LITERAL_TYPE_INVALID; 
 		if (TOKEN_VAR_VEC == type->GetType())
 		{
 			if (Consume(TOKEN_LESS, "Expected <type> after vec."))
 			{
-				if (Match(6, TOKEN_VAR_BOOL, TOKEN_VAR_I32, TOKEN_VAR_F32,
-					TOKEN_VAR_STRING, TOKEN_VAR_ENUM, TOKEN_IDENTIFIER))
+				vtype = new Token(Advance());
+				if (Check(TOKEN_COMMA))
 				{
-					TokenTypeEnum prevType = Previous().GetType();
-					if (TOKEN_VAR_BOOL == prevType)
-						vtype = LITERAL_TYPE_BOOL;
-					else if (TOKEN_VAR_I32 == prevType)
-						vtype = LITERAL_TYPE_INTEGER;
-					else if (TOKEN_VAR_F32 == prevType)
-						vtype = LITERAL_TYPE_DOUBLE;
-					else if (TOKEN_VAR_STRING == prevType)
-						vtype = LITERAL_TYPE_STRING;
-					else if (TOKEN_VAR_ENUM == prevType)
-						vtype = LITERAL_TYPE_ENUM;
-					else if (TOKEN_IDENTIFIER == prevType)
+					Advance();
+					if (Consume(TOKEN_INTEGER, "Expected integer literal for vector fixed length size."))
 					{
-						vtype = LITERAL_TYPE_UDT;
-						vtypeid = Previous().Lexeme();
+						vsize = new Token(Previous());
 					}
-				}
-				else
-				{
-					Error(Previous(), "Invalid vector type.");
 				}
 				Consume(TOKEN_GREATER, "Expected '>' after vector type.");
 			}
@@ -224,7 +217,10 @@ private:
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, vtype, vtypeid, m_global);
+		TokenPtrList* vecArgs = new TokenPtrList();
+		vecArgs->push_back(vtype);
+		vecArgs->push_back(vsize);
+		return new VarStmt(type, id, expr, vecArgs);
 	}
 
 
@@ -248,7 +244,7 @@ private:
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, LITERAL_TYPE_INVALID, "", m_global);
+		return new VarStmt(type, id, expr, nullptr);
 	}
 	
 
@@ -269,7 +265,7 @@ private:
 					if (TOKEN_DOT_DOT_EQUAL == r->Operator()->GetType())
 					{
 						// overwrite old range expression with one that increments the right side
-						Expr* temp = new BinaryExpr(r->Right(), new Token(TOKEN_PLUS, "+", r->Operator()->Line(), r->Operator()->Filename()), new LiteralExpr(int32_t(1)));
+						Expr* temp = new BinaryExpr(r->Right(), new Token(TOKEN_PLUS, "+", r->Operator()->Line(), r->Operator()->Filename()), new LiteralExpr(id, int32_t(1)));
 						Expr* old = expr;
 						expr = new RangeExpr(r->Left(), r->Operator(), temp);
 						delete old;
@@ -277,9 +273,9 @@ private:
 				}
 				else // attempt to build range expression starting at 0
 				{
-					expr = new RangeExpr(new LiteralExpr(int32_t(0)), new Token(TOKEN_DOT_DOT, "..", id->Line(), id->Filename()), expr);
+					expr = new RangeExpr(new LiteralExpr(id, int32_t(0)), new Token(TOKEN_DOT_DOT, "..", id->Line(), id->Filename()), expr);
 				}
-				return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, LITERAL_TYPE_INVALID, "");
+				return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, nullptr);
 			}
 		}
 		
@@ -303,8 +299,8 @@ private:
 			if (body)
 			{
 				// build increment
-				Expr* rhs = new LiteralExpr(int32_t(1));
-				Token* var = ((VarStmt*)initializer)->Operator();
+				Expr* rhs = new LiteralExpr(new Token(Previous()), int32_t(1));
+				Token* var = ((VarStmt*)initializer)->Id();
 				Expr* lhs = new VariableExpr(new Token(*var), nullptr);
 				Expr* binary = new BinaryExpr(lhs, new Token(TOKEN_PLUS, "+", var->Line(), var->Filename()), rhs);
 				Expr* increment = new AssignExpr(var, binary, nullptr);
@@ -321,7 +317,7 @@ private:
 
 				// build new initializer
 				Expr* assign_expr = new AssignExpr(var, rangeLeft, nullptr);
-				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, LITERAL_TYPE_INVALID, "");
+				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, nullptr);
 
 				// build outer block
 				StmtList* list = new StmtList();
@@ -349,7 +345,7 @@ private:
 			if (body)
 			{
 				std::string label = GenerateUUID();
-				return new WhileStmt(new LiteralExpr(true), body, nullptr, label);
+				return new WhileStmt(new LiteralExpr(nullptr, true), body, nullptr, label);
 			}
 		}
 		else
@@ -572,7 +568,7 @@ private:
 	{
 		Expr* expr = Comparison();
 
-		while (Match(4, TOKEN_BANG_EQUAL, TOKEN_EQUAL_EQUAL, TOKEN_TILDE_TILDE, TOKEN_BANG_TILDE))
+		while (Match(2, TOKEN_BANG_EQUAL, TOKEN_EQUAL_EQUAL))
 		{
 			Token* oper = new Token(Previous());
 			Expr* right = Comparison();
@@ -705,14 +701,14 @@ private:
 	//-----------------------------------------------------------------------------
 	Expr* Primary()
 	{
-		if (Match(1, TOKEN_FILELINE)) return new LiteralExpr(std::string("File:" + Previous().Filename() + ", Line:" + std::to_string(Previous().Line())));
-		if (Match(1, TOKEN_FALSE)) return new LiteralExpr(false);
-		if (Match(1, TOKEN_TRUE)) return new LiteralExpr(true);
-		if (Match(1, TOKEN_FLOAT)) return new LiteralExpr(Previous().DoubleValue());
-		if (Match(1, TOKEN_INTEGER)) return new LiteralExpr(Previous().IntValue());
-		if (Match(1, TOKEN_STRING)) return new LiteralExpr(Previous().StringValue());
-		if (Match(1, TOKEN_ENUM)) return new LiteralExpr(Previous().EnumValue());
-		if (Match(1, TOKEN_PI)) return new LiteralExpr(acos(-1));
+		if (Match(1, TOKEN_FILELINE)) return new LiteralExpr(new Token(Previous()), std::string("File:" + Previous().Filename() + ", Line:" + std::to_string(Previous().Line())));
+		if (Match(1, TOKEN_FALSE)) return new LiteralExpr(new Token(Previous()), false);
+		if (Match(1, TOKEN_TRUE)) return new LiteralExpr(new Token(Previous()), true);
+		if (Match(1, TOKEN_FLOAT)) return new LiteralExpr(new Token(Previous()), Previous().DoubleValue());
+		if (Match(1, TOKEN_INTEGER)) return new LiteralExpr(new Token(Previous()), Previous().IntValue());
+		if (Match(1, TOKEN_STRING)) return new LiteralExpr(new Token(Previous()), Previous().StringValue());
+		if (Match(1, TOKEN_ENUM)) return new LiteralExpr(new Token(Previous()), Previous().EnumValue());
+		if (Match(1, TOKEN_PI)) return new LiteralExpr(new Token(Previous()), acos(-1));
 
 		if (Match(1, TOKEN_LEFT_PAREN))
 		{
@@ -722,7 +718,9 @@ private:
 		}
 
 		// used for AS syntax
-		if (Match(4, TOKEN_VAR_I32, TOKEN_VAR_F32, TOKEN_VAR_STRING, TOKEN_VAR_ENUM)) return new VariableExpr(new Token(Previous()), nullptr);
+		if (Match(7, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
+			TOKEN_VAR_F32, TOKEN_VAR_F64,
+			TOKEN_VAR_STRING, TOKEN_VAR_ENUM)) return new VariableExpr(new Token(Previous()), nullptr);
 
 		if (Match(1, TOKEN_IDENTIFIER))
 		{
@@ -869,7 +867,7 @@ private:
 	ErrorHandler* m_errorHandler;
 	TokenList m_tokenList;
 	int m_current;
-	bool m_global;
+	//bool m_global;
 	
 };
 

@@ -8,9 +8,9 @@
 #include "Token.h"
 #include "Expressions.h"
 #include "Environment.h"
+#include "Utility.h"
 
 #include "llvm/IR/Value.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallVector.h"
@@ -26,9 +26,9 @@ class Stmt
 public:
 	virtual StatementTypeEnum GetType() = 0;
 	virtual Expr* Expression() { return nullptr; }
-	virtual TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
+	virtual TValue codegen(
+		llvm::IRBuilder<>* builder,
+		llvm::Module* module,
 		Environment* env) = 0;
 };
 
@@ -52,10 +52,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_BLOCK; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	StmtList* m_block;
@@ -78,10 +75,7 @@ public:
 
 	//Expr* GetValueExpr() { return m_value; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_keyword;
@@ -104,10 +98,7 @@ public:
 
 	//Expr* GetValueExpr() { return m_value; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_keyword;
@@ -130,10 +121,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_EXPRESSION; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_expr;
@@ -163,15 +151,9 @@ public:
 	TokenList GetParams() { return m_params; }
 	StmtList* GetBody() { return m_body; }*/
 
-	TValue codegen_prototype(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen_prototype(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_name;
@@ -202,10 +184,7 @@ public:
 	Stmt* GetThenBranch() { return m_thenBranch; }
 	Stmt* GetElseBranch() { return m_elseBranch; }*/
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_condition;
@@ -231,10 +210,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_PRINT; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_expr;
@@ -259,10 +235,7 @@ public:
 
 	// Expr* GetValueExpr() { return m_value; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_keyword;
@@ -285,13 +258,10 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_STRUCT; }
 
-	Token* Operator() { return m_name; }
-	StmtList* GetVars() { return m_vars; }
+	//Token* Operator() { return m_name; }
+	//StmtList* GetVars() { return m_vars; }
 	
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 		
 
 private:
@@ -307,36 +277,30 @@ class VarStmt : public Stmt
 public:
 	VarStmt() = delete;
 
-	VarStmt(Token* type, Token* name, Expr* expr, LiteralTypeEnum vtype, std::string vtypeid, bool global = false)
+	VarStmt(Token* type, Token* id, Expr* expr, TokenPtrList* vecArgs)
 	{
 		m_type = type;
-		m_token = name;
+		m_id = id;
 		m_expr = expr;
-		m_vecType = vtype;
-		m_global = global;
-		m_vecTypeId = vtypeid;
+		m_vecArgs = vecArgs;
 	}
 
+	Token* Id() { return m_id; }
+
 	Expr* Expression() { return m_expr; }
-	Token* Operator() { return m_token; }
-	Token* VarType() { return m_type; }
+	/*Token* VarType() { return m_type; }
 	LiteralTypeEnum VarVecType() { return m_vecType; }
-	std::string VarVecTypeId() { return m_vecTypeId; }
+	std::string VarVecTypeId() { return m_vecTypeId; }*/
 
 	StatementTypeEnum GetType() { return STATEMENT_VAR; }
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Token* m_type;
-	LiteralTypeEnum m_vecType;
-	std::string m_vecTypeId;
-	Token* m_token;
+	Token* m_id;
 	Expr* m_expr;
-	bool m_global;
+	TokenPtrList* m_vecArgs;
 };
 
 
@@ -361,10 +325,7 @@ public:
 	Expr* GetPost() { return m_post; }
 	Stmt* GetBody() { return m_body; }*/
 
-	TValue codegen(std::unique_ptr<llvm::LLVMContext>& context,
-		std::unique_ptr<llvm::IRBuilder<>>& builder,
-		std::unique_ptr<llvm::Module>& module,
-		Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
 	Expr* m_condition;

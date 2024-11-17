@@ -1,95 +1,131 @@
 #ifndef TVALUE_H
 #define TVALUE_H
 
-#include "Literal.h"
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Type.h>
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Constants.h"
+
 #include <vector>
 
-struct TValue
+#include "Literal.h"
+#include "Token.h"
+#include "ErrorHandler.h"
+#include "Utility.h"
+
+class TValue
 {
-	LiteralTypeEnum type;
-	llvm::Value* value;
-	size_t fixed_vec_sz;
-	LiteralTypeEnum fixed_vec_type;
-	std::string vec_udt_name;
-	std::string udt_name;
-	llvm::Type* udt_ty;
-	std::vector<llvm::Value*> udt_args;
-	//void* addr;
+public:
 
-	TValue() = delete;
-	TValue(LiteralTypeEnum t, llvm::Value* v) : type(t), value(v)
-	{}
+	typedef std::vector<TValue> TValueList;
 
-	bool IsInteger()    { return type == LITERAL_TYPE_INTEGER; }
-	bool IsDouble()		{ return type == LITERAL_TYPE_DOUBLE; }
-	bool IsBool()		{ return type == LITERAL_TYPE_BOOL; }
-	bool IsString()		{ return type == LITERAL_TYPE_STRING; }
-	bool IsEnum()		{ return type == LITERAL_TYPE_ENUM; }
-	bool IsVec()        { return type == LITERAL_TYPE_VEC; }
-	bool IsFixedVec()   { return type == LITERAL_TYPE_VEC_FIXED; }
-	bool IsPointer()    { return type == LITERAL_TYPE_POINTER; }
-	bool IsUDT()		{ return type == LITERAL_TYPE_UDT; }
-	bool IsInvalid()    { return type == LITERAL_TYPE_INVALID; }
+	TValue()
+	{
+		m_type = LITERAL_TYPE_INVALID;
+		m_value = nullptr;
+		m_ty = nullptr;
+		m_bits = 0;
+		m_is_storage = false;
+	}
 
-	bool IsIntegerTy()  { return value->getType()->isIntegerTy(); }
-	bool IsDoubleTy()	{ return value->getType()->isDoubleTy();  }
-	bool IsPtrTy()		{ return value->getType()->isPointerTy(); }
-	
-	//llvm::Type* GetTy() { return value->getType(); }
+	static void RegisterErrorHandler(ErrorHandler* eh) { m_errorHandler = eh; }
+	static void RegisterLLVM(llvm::IRBuilder<>* builder, llvm::Module* module)
+	{
+		m_builder = builder;
+		m_module = module;
+	}
+
+	static TValue Construct(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs = nullptr);
+	static TValue ConstructExplicit(
+		Token* token,
+		LiteralTypeEnum type,
+		llvm::Value* value,
+		llvm::Type* ty,
+		int bits,
+		bool is_storage,
+		int fixed_vec_len,
+		LiteralTypeEnum vec_type)
+	{
+		TValue ret;
+		ret.m_token = token;
+		ret.m_type = type;
+		ret.m_value = value;
+		ret.m_ty = ty;
+		ret.m_bits = bits;
+		ret.m_is_storage = is_storage;
+		ret.m_fixed_vec_len = fixed_vec_len;
+		ret.m_vec_type = vec_type;
+		return ret;
+	}
+
+	size_t FixedVecLen() const { return m_fixed_vec_len; }
+	static TValue FromLiteral(Token* token, const Literal& literal);
 
 	static TValue NullInvalid()
 	{
 		return TValue(LITERAL_TYPE_INVALID, nullptr);
 	}
 
-	static TValue Integer(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_INTEGER, v);
-	}
+	// type checking
+	bool IsInteger()    { return m_type == LITERAL_TYPE_INTEGER; }
+	bool IsFloat()      { return m_type == LITERAL_TYPE_FLOAT; }
+	bool IsBool()       { return m_type == LITERAL_TYPE_BOOL; }
+	bool IsString()     { return m_type == LITERAL_TYPE_STRING; }
+	bool IsEnum()       { return m_type == LITERAL_TYPE_ENUM; }
+	//bool IsPointer()    { return m_type == LITERAL_TYPE_POINTER; }
+	//bool IsUDT()        { return m_type == LITERAL_TYPE_UDT; }
 
-	static TValue Enum(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_ENUM, v);
-	}
+	bool IsVecAny()     { return m_type == LITERAL_TYPE_VEC_DYNAMIC || m_type == LITERAL_TYPE_VEC_FIXED; }
+	bool IsVecDynamic() { return m_type == LITERAL_TYPE_VEC_DYNAMIC; }
+	bool IsVecFixed()   { return m_type == LITERAL_TYPE_VEC_FIXED; }
 
-	static TValue Double(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_DOUBLE, v);
-	}
+	TValue As(TokenTypeEnum newType);
 
-	static TValue Bool(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_BOOL, v);
-	}
+	// binary operations
+	TValue Add(TValue rhs);
+	TValue Divide(TValue rhs);
+	TValue Modulus(TValue rhs);
+	TValue Multiply(TValue rhs);
+	TValue Subtract(TValue rhs);
+	//
+	TValue IsGreaterThan(TValue rhs, bool or_equal);
+	TValue IsLessThan(TValue rhs, bool or_equal);
+	TValue IsEqual(TValue rhs);
+	TValue IsNotEqual(TValue rhs);
+	
+	TValue GetFromStorage();
+	Token* GetToken() { return m_token; }
+	LiteralTypeEnum GetVecType() { return m_vec_type; }
 
-	static TValue String(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_STRING, v);
-	}
+	bool IsInvalid() { return m_type == LITERAL_TYPE_INVALID; }
 
-	static TValue Pointer(llvm::Value* v)
-	{
-		return TValue(LITERAL_TYPE_POINTER, v);
-	}
+	llvm::Value* Value() { return m_value; }
 
-	static TValue FixedVec(llvm::Value* v, LiteralTypeEnum type, size_t sz)
-	{
-		TValue ret = TValue(LITERAL_TYPE_VEC_FIXED, v);
-		ret.fixed_vec_sz = sz;
-		ret.fixed_vec_type = type;
-		return ret;
-	}
+	TValue CastToFloat(int bits);
+	TValue CastToInt(int bits);
+	TValue CastToMatchImplicit(TValue src);
 
-	static TValue Vec(llvm::Value* v, LiteralTypeEnum type, std::string vec_udt_name = "")
-	{
-		TValue ret = TValue(LITERAL_TYPE_VEC, v);
-		ret.fixed_vec_type = type;
-		ret.vec_udt_name = vec_udt_name;
-		return ret;
-	}
+	void Cleanup();
 
+	TValue GetAtVectorIndex(TValue idx);
+
+	void Store(TValue rhs);
+	void StoreAtIndex(TValue idx, TValue rhs);
+
+	static TValue MakeBool(Token* token, llvm::Value* value);
+	static TValue MakeInt64(Token* token, llvm::Value* value);
+	static TValue MakeFloat64(Token* token, llvm::Value* value);
+
+	TValue Negate();
+	TValue Not();
+
+	void EmitAppend(TValue rhs);
+	TValue EmitLen();
+
+	int NumBits() const { return m_bits; }
+	
+	/*
 	static TValue UDT(std::string udt_name, llvm::Type* ty, llvm::Value* v, std::vector<llvm::Value*> args)
 	{
 		TValue ret = TValue(LITERAL_TYPE_UDT, v);
@@ -98,6 +134,74 @@ struct TValue
 		ret.udt_args = args;
 		return ret;
 	}
+
+	std::string vec_udt_name;
+	std::string udt_name;
+	llvm::Type* udt_ty;
+	std::vector<llvm::Value*> udt_args;
+	*/
+
+private:
+
+	TValue(LiteralTypeEnum t, llvm::Value* v) : m_type(t), m_value(v)
+	{
+		if (v) m_ty = v->getType();
+		m_token = nullptr;
+		m_bits = 0;
+		m_fixed_vec_len = 0;
+		m_is_storage = false;
+		m_vec_type = LITERAL_TYPE_INVALID;
+	}
+	
+	TValue(Token* tk, LiteralTypeEnum t, llvm::Value* v) : m_token(tk), m_type(t), m_value(v)
+	{
+		if (v) m_ty = v->getType();
+		m_bits = 0;
+		m_fixed_vec_len = 0;
+		m_is_storage = false;
+		m_vec_type = LITERAL_TYPE_INVALID;
+	}
+
+	static void Error(Token* token, const std::string& err)
+	{
+		if (token)
+		{
+			m_errorHandler->Error(token->Filename(), token->Line(), "at '" + token->Lexeme() + "'", err);
+		}
+		else
+		{
+			m_errorHandler->Error("<File>", -1, "at '<at>'", err);
+		}
+	}
+
+	TValue AsInt(int bits);
+	TValue AsFloat(int bits);
+	TValue AsString();
+
+	static void CastToMaxBits(TValue& lhs, TValue& rhs);
+
+	static TValue Construct_Int(Token* type, int bits, std::string lexeme, bool global);
+	static TValue Construct_Float(Token* type, int bits, std::string lexeme, bool global);
+	static TValue Construct_Bool(Token* type, std::string lexeme, bool global);
+	static TValue Construct_Enum(Token* type, std::string lexeme, bool global);
+	static TValue Construct_String(Token* type, std::string lexeme, bool global);
+	static TValue Construct_Vec_Dynamic(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
+	static TValue Construct_Vec_Fixed(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
+
+	void GetFromStorage(TValue& lhs, TValue& rhs);
+
+	static ErrorHandler* m_errorHandler;
+	static llvm::IRBuilder<>* m_builder;
+	static llvm::Module* m_module;
+
+	llvm::Value* m_value;
+	llvm::Type* m_ty;
+	LiteralTypeEnum m_type;
+	int m_bits;
+	Token* m_token;
+	bool m_is_storage;
+	int m_fixed_vec_len;
+	LiteralTypeEnum m_vec_type;
 };
 
 

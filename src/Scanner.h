@@ -30,8 +30,11 @@ public:
 		m_keywordList.insert(std::make_pair("pair", TOKEN_PAIR));
 		m_keywordList.insert(std::make_pair("false", TOKEN_FALSE));
 		m_keywordList.insert(std::make_pair("true", TOKEN_TRUE));
+		m_keywordList.insert(std::make_pair("i16", TOKEN_VAR_I16));
 		m_keywordList.insert(std::make_pair("i32", TOKEN_VAR_I32));
+		m_keywordList.insert(std::make_pair("i64", TOKEN_VAR_I64));
 		m_keywordList.insert(std::make_pair("f32", TOKEN_VAR_F32));
+		m_keywordList.insert(std::make_pair("f64", TOKEN_VAR_F64));
 		m_keywordList.insert(std::make_pair("vec", TOKEN_VAR_VEC));
 		m_keywordList.insert(std::make_pair("map", TOKEN_VAR_MAP));
 		m_keywordList.insert(std::make_pair("enum", TOKEN_VAR_ENUM));
@@ -51,7 +54,7 @@ public:
 		m_keywordList.insert(std::make_pair("struct", TOKEN_STRUCT));
 		m_keywordList.insert(std::make_pair("include", TOKEN_INCLUDE));
 		m_keywordList.insert(std::make_pair("internal", TOKEN_INTERNAL));
-		m_keywordList.insert(std::make_pair("global", TOKEN_GLOBAL));
+		//m_keywordList.insert(std::make_pair("global", TOKEN_GLOBAL));
 		m_keywordList.insert(std::make_pair("FILELINE", TOKEN_FILELINE));
 		m_keywordList.insert(std::make_pair("pi", TOKEN_PI));
 		

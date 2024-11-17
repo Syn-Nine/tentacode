@@ -186,10 +186,6 @@ void Scanner::ScanToken()
 		{
 			AddToken(TOKEN_BANG_EQUAL);
 		}
-		else if (Match('~'))
-		{
-			AddToken(TOKEN_BANG_TILDE);
-		}
 		else
 		{
 			AddToken(TOKEN_BANG);
@@ -201,7 +197,6 @@ void Scanner::ScanToken()
 	case '<': AddToken(Match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS); break;
 	
 	// two character tokens
-	case '~': Match('~') ? AddToken(TOKEN_TILDE_TILDE) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
 	case '&': Match('&') ? AddToken(TOKEN_AND) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
 	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
 	case ':':
