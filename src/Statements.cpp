@@ -1,4 +1,5 @@
 #include "Statements.h"
+#include "TFunction.h"
 
 
 //-----------------------------------------------------------------------------
@@ -96,7 +97,7 @@ TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
 	if (2 <= Environment::GetDebugLevel()) printf("FunctionStmt::codegen_prototype()\n");
 
 	std::string name = m_name->Lexeme();
-	/*
+
 	// check for existing function definition
 	if (env->IsFunction(name))
 	{
@@ -104,88 +105,10 @@ TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
 		return TValue::NullInvalid();
 	}
 
-	// build up the return and parameter types
-	LiteralTypeEnum retliteral = LITERAL_TYPE_INVALID;
-	llvm::Type* rettype = nullptr;
-	if (!m_rettype)
-	{
-		rettype = builder->getVoidTy();
-	}
-	else
-	{
-		switch (m_rettype->GetType())
-		{
-		case TOKEN_VAR_I32:
-			rettype = builder->getInt32Ty();
-			retliteral = LITERAL_TYPE_INTEGER;
-			break;
-		case TOKEN_VAR_F32:
-			rettype = builder->getDoubleTy();
-			retliteral = LITERAL_TYPE_DOUBLE;
-			break;
-		case TOKEN_VAR_ENUM:
-			rettype = builder->getInt32Ty();
-			retliteral = LITERAL_TYPE_ENUM;
-			break;
-		case TOKEN_VAR_BOOL:
-			rettype = builder->getInt1Ty();
-			retliteral = LITERAL_TYPE_BOOL;
-			break;
-		}
-	}
-
-	std::vector<LiteralTypeEnum> types;
-	std::vector<std::string> names;
-	std::vector<Token*> tokens;
-
-	std::vector<llvm::Type*> args;
-	for (size_t i = 0; i < m_params.size(); ++i)
-	{
-		switch (m_types[i].GetType())
-		{
-		case TOKEN_VAR_I32:
-			types.push_back(LITERAL_TYPE_INTEGER);
-			tokens.push_back(new Token(m_params[i]));
-			args.push_back(builder->getInt32Ty());
-			break;
-
-		case TOKEN_VAR_F32:
-			types.push_back(LITERAL_TYPE_DOUBLE);
-			tokens.push_back(new Token(m_params[i]));
-			args.push_back(builder->getDoubleTy());
-			break;
-
-		case TOKEN_VAR_BOOL:
-			types.push_back(LITERAL_TYPE_BOOL);
-			tokens.push_back(new Token(m_params[i]));
-			args.push_back(builder->getInt1Ty());
-			break;
-
-		case TOKEN_VAR_ENUM:
-			types.push_back(LITERAL_TYPE_ENUM);
-			tokens.push_back(new Token(m_params[i]));
-			args.push_back(builder->getInt32Ty());
-			break;
-
-		case TOKEN_VAR_STRING:
-			types.push_back(LITERAL_TYPE_STRING);
-			tokens.push_back(new Token(m_params[i]));
-			args.push_back(builder->getPtrTy());
-			break;
-		
-		default:
-			env->Error(new Token(m_params[i]), "Invalid function parameter type.");
-			break;
-		}
-
-		names.push_back(m_params[i].Lexeme());
-	}
-
-	llvm::FunctionType* FT = llvm::FunctionType::get(rettype, args, false);
-	llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, name, *module);
-
-	env->DefineFunction(name, ftn, types, names, args, tokens, retliteral);
-	*/
+	TFunction func = TFunction::Construct_Prototype(m_name, m_rettype, m_types, m_params, m_body);
+	
+	if (func.IsValid()) env->DefineFunction(func, name);
+	
 	return TValue::NullInvalid();
 }
 
@@ -193,75 +116,14 @@ TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
 TValue FunctionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("FunctionStmt::codegen()\n");
-	/*
+	
 	std::string name = m_name->Lexeme();
 
 	// check for existing function definition
-	llvm::Function* ftn = env->GetFunction(name);
-	if (!ftn)
-	{
-		env->Error(m_name, "Function not defined in environment.");
-		return TValue::NullInvalid();
-	}
-
-	llvm::BasicBlock* body = llvm::BasicBlock::Create(*context, "entry", ftn);
-	builder->SetInsertPoint(body);
-
-	Environment* sub_env = new Environment(env);
-
-	std::vector<LiteralTypeEnum> types = env->GetFunctionParamTypes(name);
-	std::vector<std::string> names = env->GetFunctionParamNames(name);
-	std::vector<llvm::Type*> args = env->GetFunctionArgTy(name);
-	std::vector<Token*> tokens = env->GetFunctionParamTokens(name);
-
+	TFunction func = env->GetFunction(m_name, name);
 	
-	int i = 0;
-	for (auto& arg : ftn->args())
-	{
-		llvm::Value* defval = CreateEntryAlloca(builder, args[i]);
-		llvm::Type* defty = arg.getType();
-		builder->CreateStore(&arg, defval);
-		env->DefineVariable(types[i], names[i], defval, defty, tokens[i]);
-		i = i + 1;
-	}
-
-	for (auto& statement : *m_body)
-	{
-		if (env->HasErrors()) break;
-		if (STATEMENT_FUNCTION != statement->GetType())
-		{
-			statement->codegen(builder, module, sub_env);
-		}
-	}
-
-	delete sub_env;
-
-	LiteralTypeEnum rettype = env->GetFunctionReturnType(name);
-
-
-	llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "rettail", ftn);
-	builder->CreateBr(tail);
-	builder->SetInsertPoint(tail);
-
-	if (LITERAL_TYPE_INVALID == rettype)
-	{
-		builder->CreateRetVoid();
-	}
-	else if (LITERAL_TYPE_INTEGER == rettype || LITERAL_TYPE_ENUM)
-	{
-		builder->CreateRet(llvm::Constant::getNullValue(builder->getInt32Ty()));
-	}
-	else if (LITERAL_TYPE_BOOL == rettype)
-	{
-		builder->CreateRet(llvm::Constant::getNullValue(builder->getInt1Ty()));
-	}
-	else if (LITERAL_TYPE_DOUBLE == rettype)
-	{
-		builder->CreateRet(llvm::Constant::getNullValue(builder->getDoubleTy()));
-	}
-
-	verifyFunction(*ftn);
-	*/
+	if (func.IsValid()) func.Construct_Body();
+	
 	return TValue::NullInvalid();
 }
 
@@ -355,10 +217,24 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ReturnStmt::codegen()\n");
 
-	TValue v = m_value->codegen(builder, module, env);
+	TValue v = m_value->codegen(builder, module, env).GetFromStorage();
 
-	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-	llvm::Type* retty = ftn->getReturnType();
+	TFunction tfunc = env->GetParentFunction();
+	TValue ret = tfunc.GetReturn();
+	if (ret.IsInvalid())
+	{
+		env->Error(ret.GetToken(), "Function does not have a return type declared.");
+	}
+
+	llvm::Function* ftn = tfunc.GetLLVMFunc();
+
+	//llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+	//llvm::Type* ret_ty = ftn->getReturnType();
+
+	if (v.isNumeric())
+	{
+		v = v.CastToMatchImplicit(ret);
+	}
 	/*
 	if (retty->isIntegerTy() && v.IsDouble())
 	{
@@ -370,12 +246,12 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		// convert rhs to double
 		v = TValue::Double(builder->CreateSIToFP(v.value, builder->getDoubleTy(), "cast_to_dbl"));
 	}
-
-	builder->CreateRet(v.value);
-
-	llvm::BasicBlock* tail = llvm::BasicBlock::Create(*context, "rettail", ftn);
-	builder->SetInsertPoint(tail);
 	*/
+	builder->CreateRet(v.Value());
+
+	llvm::BasicBlock* tail = llvm::BasicBlock::Create(builder->getContext(), "rettail", ftn);
+	builder->SetInsertPoint(tail);
+	
 	return TValue::NullInvalid();
 }
 

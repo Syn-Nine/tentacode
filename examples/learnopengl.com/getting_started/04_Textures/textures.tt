@@ -7,7 +7,7 @@ ray::SetTargetFPS(60);
 ray::rlClearColor(51, 77, 77, 255);
 
 // load the shader for tutorial 2
-i32 program = shader::load("textures.vs", "textures.fs");
+i32 program = shader::load("../../assets/textures.vs", "../../assets/textures.fs");
 
 // create vertices and load them to a vertex buffer object
 vec<f32> verts = [

@@ -11,6 +11,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "Literal.h"
 #include "Token.h"
+#include "TFunction.h"
 #include "TValue.h"
 #include "ErrorHandler.h"
 
@@ -24,6 +25,16 @@ private:
 
 		var_struct() {}
 		var_struct(TValue val, std::string lex) : tvalue(val), lexeme(lex)
+		{}
+	};
+
+	struct func_struct
+	{
+		TFunction tfunc;
+		std::string lexeme;
+
+		func_struct() {}
+		func_struct(TFunction func, std::string lex) : tfunc(func), lexeme(lex)
 		{}
 	};
 
@@ -108,9 +119,6 @@ public:
 		return TValue::NullInvalid();
 	}
 
-	void DefineFunction(std::string id, llvm::Function* ftn, std::vector<LiteralTypeEnum> types, std::vector<std::string> names, std::vector<llvm::Type*> args, std::vector<Token*> tokens, LiteralTypeEnum rettype)
-	{
-	}
 
 	static int GetEnumAsInt(const EnumLiteral& e)
 	{
@@ -162,6 +170,38 @@ public:
 		PushLoopBreakContinue(nullptr, nullptr);
 	}
 
+	//----------------------------------------------------------------------------
+
+	static bool IsFunction(std::string id)
+	{
+		return 0 != m_func.count(id);
+	}
+
+
+	static void DefineFunction(TFunction func, std::string lexeme)
+	{
+		m_func[lexeme] = func_struct(func, lexeme);
+	}
+
+	TFunction GetFunction(Token* token, const std::string& func)
+	{
+		if (IsFunction(func)) return m_func.at(func).tfunc;
+		Error(token, "Function not found in environment.");
+		return TFunction();
+	}
+
+	TFunction GetParentFunction()
+	{
+		if (m_parent_function.IsValid()) return m_parent_function;
+		if (m_parent) return m_parent->GetParentFunction();
+		return TFunction();
+	}
+
+	void SetParentFunction(Token* token, const std::string& func)
+	{
+		m_parent_function = GetFunction(token, func);
+	}
+
 	/*
 
 	void DefineFunction(std::string id, llvm::Function* ftn, std::vector<LiteralTypeEnum> types, std::vector<std::string> names, std::vector<llvm::Type*> args, std::vector<Token*> tokens, LiteralTypeEnum rettype)
@@ -201,13 +241,6 @@ public:
 		if (m_parent) return m_parent->GetFunction(id);
 		//printf("Error - unable to find function `%s` in environment!\n", id.c_str());
 		return nullptr;
-	}
-
-	bool IsFunction(std::string id)
-	{
-		if (0 != m_ftns.count(id)) return true;
-		if (m_parent) return m_parent->IsFunction(id);
-		return false;
 	}
 
 	int GetFunctionArity(std::string id)
@@ -355,7 +388,6 @@ private:
 	std::map<std::string, Token*> m_var_tokens;
 	std::map<std::string, LiteralTypeEnum> m_types;
 	std::map<std::string, LiteralTypeEnum> m_vecTypes;
-	std::map<std::string, llvm::Function*> m_ftns;
 	std::map<std::string, int> m_arity;
 	std::map<std::string, std::vector<LiteralTypeEnum> > m_param_types;
 	std::map<std::string, std::vector<Token*> > m_param_tokens;
@@ -418,6 +450,9 @@ private:
 
 	llvm::BasicBlock* m_loopBreak;
 	llvm::BasicBlock* m_loopContinue;
+
+	TFunction m_parent_function;
+	static std::map<std::string, func_struct> m_func;
 
 };
 

@@ -18,6 +18,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include "TFunction.h"
 #include "TValue.h"
 #include "Token.h"
 #include "Parser.h"
@@ -65,6 +66,9 @@ bool Run(const char* buf, const char* filename)
 
 		TValue::RegisterErrorHandler(errorHandler);
 		TValue::RegisterLLVM(builder.get(), module.get());
+
+		TFunction::RegisterErrorHandler(errorHandler);
+		TFunction::RegisterLLVM(builder.get(), module.get());
 
 		LoadExtensions(builder.get(), module.get(), env);
 		LoadExtensions_Raylib(builder.get(), module.get(), env);

@@ -487,21 +487,8 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			TValue arg = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
 			if (arg.IsString())
 			{
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				llvm::Value* v = builder->CreateCall(module->getFunction("__file_readlines"), { arg.Value() }, "calltmp");
-				builder->CreateStore(v, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_VEC_DYNAMIC, // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					false,                    // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_STRING       // LiteralTypeEnum vec_type
-					);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeDynVec(callee, v, LITERAL_TYPE_STRING, 64);
 			}
 			else
 			{
@@ -522,21 +509,8 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			TValue arg = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
 			if (arg.IsString())
 			{
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
 				llvm::Value* s = builder->CreateCall(module->getFunction("__file_readstring"), { arg.Value() }, "calltmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -613,17 +587,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (lhs.IsString() && rhs.IsString())
 			{
 				llvm::Value* b = builder->CreateCall(module->getFunction("__str_contains"), { lhs.Value(), rhs.Value() }, "calltmp");
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_BOOL,        // LiteralTypeEnum type,
-					b,                        // llvm::Value * value,
-					builder->getInt1Ty(),     // llvm::Type * ty,
-					1,                        // int bits,
-					false,                    // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				return ret;
+				return TValue::MakeBool(callee, b);
 			}
 			else
 			{
@@ -647,20 +611,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (lhs.IsString() && mhs.IsString() && rhs.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_replace"), { lhs.Value(), mhs.Value(), rhs.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -682,21 +633,8 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
 			if (lhs.IsString() && rhs.IsString())
 			{
-				llvm::Value* s = builder->CreateCall(module->getFunction("__str_split"), { lhs.Value(), rhs.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_VEC_DYNAMIC, // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					false,                    // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_STRING       // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				llvm::Value* v = builder->CreateCall(module->getFunction("__str_split"), { lhs.Value(), rhs.Value() }, "calltmp");
+				return TValue::MakeDynVec(callee, v, LITERAL_TYPE_STRING, 64);
 			}
 			else
 			{
@@ -723,35 +661,14 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 				{
 					llvm::Value* lhs_load = builder->CreateLoad(builder->getPtrTy(), lhs.Value(), "loadtmp");
 					s = builder->CreateCall(module->getFunction("__str_join_dyn_vec"), { lhs_load, rhs.Value() }, "calltmp");
+					return TValue::MakeString(callee, s);
 				}
 				else
 				{
 					llvm::Value* gep = builder->CreateGEP(builder->getPtrTy(), lhs.Value(), builder->getInt32(0), "geptmp");
 					llvm::Value* len = builder->getInt64(lhs.FixedVecLen());
 					s = builder->CreateCall(module->getFunction("__str_join_fixed_vec"), { gep, rhs.Value(), len }, "calltmp");
-				}
-
-				if (s)
-				{
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(s, a);
-					TValue ret = TValue::ConstructExplicit(
-						callee,                   // Token * token,
-						LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-						a,                        // llvm::Value * value,
-						builder->getPtrTy(),      // llvm::Type * ty,
-						64,                       // int bits,
-						true,                     // bool is_storage,
-						0,                        // int fixed_vec_len,
-						LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-					);
-					env->AddToCleanup(ret);
-					return ret;
-				}
-				else
-				{
-					env->Error(callee, "Failed to join strings.");
-					return TValue::NullInvalid();
+					return TValue::MakeString(callee, s);
 				}
 			}
 			else
@@ -774,42 +691,20 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
 			if (lhs.IsString() && rhs.IsInteger())
 			{
-				TValue len;
+				llvm::Value* len;
 				if (2 < m_arguments.size())
 				{
-					len = m_arguments[2]->codegen(builder, module, env).GetFromStorage();
+					len = m_arguments[2]->codegen(builder, module, env).GetFromStorage().Value();
 				}
 				else
 				{
-					len = TValue::ConstructExplicit(
-						callee,                   // Token * token,
-						LITERAL_TYPE_INTEGER,     // LiteralTypeEnum type,
-						builder->getInt32(-1),    // llvm::Value * value,
-						builder->getInt32Ty(),    // llvm::Type * ty,
-						32,                       // int bits,
-						false,                    // bool is_storage,
-						0,                        // int fixed_vec_len,
-						LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-					);
+					len = builder->getInt32(-1);
 				}
 
-				if (len.IsInteger())
+				if (len->getType()->isIntegerTy())
 				{
-					llvm::Value* s = builder->CreateCall(module->getFunction("__str_substr"), { lhs.Value(), rhs.Value(), len.Value() }, "calltmp");
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(s, a);
-					TValue ret = TValue::ConstructExplicit(
-						callee,                   // Token * token,
-						LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-						a,                        // llvm::Value * value,
-						builder->getPtrTy(),      // llvm::Type * ty,
-						64,                       // int bits,
-						true,                     // bool is_storage,
-						0,                        // int fixed_vec_len,
-						LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-					);
-					env->AddToCleanup(ret);
-					return ret;
+					llvm::Value* s = builder->CreateCall(module->getFunction("__str_substr"), { lhs.Value(), rhs.Value(), len }, "calltmp");
+					return TValue::MakeString(callee, s);
 				}
 				else
 				{
@@ -837,20 +732,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (arg.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_toupper"), { arg.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -872,20 +754,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (arg.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_tolower"), { arg.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -907,20 +776,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (arg.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_ltrim"), { arg.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -942,20 +798,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (arg.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_rtrim"), { arg.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -977,20 +820,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			if (arg.IsString())
 			{
 				llvm::Value* s = builder->CreateCall(module->getFunction("__str_trim"), { arg.Value() }, "calltmp");
-				llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-				builder->CreateStore(s, a);
-				TValue ret = TValue::ConstructExplicit(
-					callee,                   // Token * token,
-					LITERAL_TYPE_STRING,      // LiteralTypeEnum type,
-					a,                        // llvm::Value * value,
-					builder->getPtrTy(),      // llvm::Type * ty,
-					64,                       // int bits,
-					true,                     // bool is_storage,
-					0,                        // int fixed_vec_len,
-					LITERAL_TYPE_INVALID      // LiteralTypeEnum vec_type
-				);
-				env->AddToCleanup(ret);
-				return ret;
+				return TValue::MakeString(callee, s);
 			}
 			else
 			{
@@ -1158,34 +988,33 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			env->Error(callee, "Argument count mismatch.");
 			return TValue::NullInvalid();
 		}
-	}
+	}*/
 	else
 	{
-		llvm::Function* ftn = env->GetFunction(name);
-		if (ftn)
+		TFunction tfunc = env->GetFunction(callee, name);
+		if (tfunc.IsValid())
 		{
-			std::vector<LiteralTypeEnum> types = env->GetFunctionParamTypes(name);
-			if (m_arguments.size() != types.size())
+			llvm::Function* ftn = tfunc.GetLLVMFunc();
+
+			std::vector<TValue> params = tfunc.GetParams();
+			TValue ret = tfunc.GetReturn();
+
+			if (m_arguments.size() != params.size())
 			{
 				env->Error(callee, "Argument count mismatch.");
 				return TValue::NullInvalid();
 			}
-
+			
 			std::vector<llvm::Value*> args;
 			for (size_t i = 0; i < m_arguments.size(); ++i)
 			{
-				TValue v = m_arguments[i]->codegen(builder, module, env);
-				if (LITERAL_TYPE_INTEGER == types[i] && LITERAL_TYPE_DOUBLE == v.type)
+				TValue v = m_arguments[i]->codegen(builder, module, env).GetFromStorage();
+
+				if (params[i].isNumeric())
 				{
-					// convert rhs to int
-					v = TValue::Integer(builder->CreateFPToSI(v.value, builder->getInt32Ty(), "int_cast_tmp"));
+					v = v.CastToMatchImplicit(params[i]);
 				}
-				else if (LITERAL_TYPE_DOUBLE == types[i] && LITERAL_TYPE_INTEGER == v.type)
-				{
-					// convert rhs to double
-					v = TValue::Double(builder->CreateSIToFP(v.value, builder->getDoubleTy(), "cast_to_dbl"));
-				}
-				else if (v.IsFixedVec())
+				/*else if (v.IsFixedVec())
 				{
 					// convert to regular vec
 					LiteralTypeEnum vecType = v.fixed_vec_type;
@@ -1195,20 +1024,15 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 					builder->CreateStore(addr, a);
 					v = TValue::Vec(a, vecType);
 					env->AddToCleanup(v);
-				}
-				if (v.IsString() || v.IsVec()) v.value = builder->CreateLoad(builder->getPtrTy(), v.value, "loadtmp");
-				args.push_back(v.value);
+				}*/
+				args.push_back(v.Value());
 			}
 			llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
-			LiteralTypeEnum retType = env->GetFunctionReturnType(name);
-			return TValue(retType, rval);
-		}
-		else
-		{
-			env->Error(callee, "Function not found.");
+			ret.SetValue(rval);
+			return ret;
 		}
 	}
-	*/
+	
 	return TValue::NullInvalid();
 
 }

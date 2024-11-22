@@ -299,6 +299,7 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 	TokenTypeEnum vtype = args->at(0)->GetType();
 
 	llvm::Type* ty = nullptr;
+
 	switch (vtype)
 	{
 	case TOKEN_VAR_I16:
@@ -527,6 +528,54 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 }
 
 
+TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
+{
+	TValue ret;
+	ret.m_token = token;
+	ret.m_type = type;
+	ret.m_bits = bits;
+	ret.m_ty = MakeTy(type, bits);
+
+	if (!ret.m_ty)
+	{
+		Error(token, "Invalid type in literal constructor.");
+		return NullInvalid();
+	}
+
+	ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
+
+	return ret;
+}
+
+
+TValue TValue::Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bits, llvm::Value* value)
+{
+	TValue ret;
+	ret.m_token = token;
+	ret.m_type = type;
+	ret.m_bits = bits;
+	ret.m_value = value;
+	ret.m_ty = MakeTy(type, bits);
+
+	if (!ret.m_ty)
+	{
+		Error(token, "Invalid type in literal constructor.");
+		return NullInvalid();
+	}
+
+	if (LITERAL_TYPE_STRING == type || LITERAL_TYPE_VEC_DYNAMIC == type)
+	{
+		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
+		m_builder->CreateStore(value, a);
+		ret.m_value = a;
+		ret.m_is_storage = true;
+		Environment::AddToCleanup(ret);
+	}
+
+	return ret;
+}
+
+
 TValue TValue::MakeBool(Token* token, llvm::Value* value)
 {
 	TValue ret;
@@ -551,7 +600,6 @@ TValue TValue::MakeInt64(Token* token, llvm::Value* value)
 	return ret;
 }
 
-
 TValue TValue::MakeFloat64(Token* token, llvm::Value* value)
 {
 	TValue ret;
@@ -562,5 +610,53 @@ TValue TValue::MakeFloat64(Token* token, llvm::Value* value)
 	ret.m_bits = 64;
 	ret.m_is_storage = false;
 	return ret;
+}
+
+TValue TValue::MakeString(Token* token, llvm::Value* value)
+{
+	TValue ret;
+	ret.m_type = LITERAL_TYPE_STRING;
+	ret.m_ty = m_builder->getPtrTy();
+	ret.m_token = token;
+	ret.m_bits = 64;
+	llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
+	m_builder->CreateStore(value, a);
+	ret.m_value = a;
+	ret.m_is_storage = true;
+	Environment::AddToCleanup(ret);
+	return ret;
+}
+
+TValue TValue::MakeDynVec(Token* token, llvm::Value* value, LiteralTypeEnum vec_type, int vec_bits)
+{
+	TValue ret;
+	ret.m_type = LITERAL_TYPE_VEC_DYNAMIC;
+	ret.m_ty = MakeTy(vec_type, vec_bits);
+	ret.m_token = token;
+	ret.m_bits = vec_bits;
+	llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
+	m_builder->CreateStore(value, a);
+	ret.m_value = a;
+	ret.m_is_storage = false;
+	ret.m_vec_type = vec_type;
+	Environment::AddToCleanup(ret);
+	return ret;
+}
+
+
+llvm::Type* TValue::MakeTy(LiteralTypeEnum type, int bits)
+{
+	if (LITERAL_TYPE_INTEGER == type)          return m_builder->getIntNTy(bits);
+	else if (LITERAL_TYPE_FLOAT == type)
+	{
+		if (32 == bits)                        return m_builder->getFloatTy();
+		else if (64 == bits)                   return m_builder->getDoubleTy();
+	}
+	else if (LITERAL_TYPE_ENUM == type)        return m_builder->getInt32Ty();
+	else if (LITERAL_TYPE_BOOL == type)        return m_builder->getInt1Ty();
+	else if (LITERAL_TYPE_STRING == type)      return m_builder->getPtrTy();
+	else if (LITERAL_TYPE_VEC_DYNAMIC == type) return m_builder->getPtrTy();
+
+	return nullptr;
 }
 

@@ -9,6 +9,9 @@ std::vector<Environment*> Environment::m_stack;
 int Environment::m_debugLevel = 0;
 ErrorHandler* Environment::m_errorHandler = nullptr;
 
+std::map<std::string, Environment::func_struct> Environment::m_func;
+
+
 
 void Environment::AssignToVariable(const std::string& var, TValue rhs)
 {
