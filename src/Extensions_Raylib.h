@@ -239,26 +239,28 @@ extern "C" DLLEXPORT void ray_rlDisableBackfaceCulling() { rlDisableBackfaceCull
 static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
     rayenv = env;
-    return;
 
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_BeginDrawing", *module);
-        //env->DefineFunction("ray::BeginDrawing", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::BeginDrawing";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ClearBackground", *module);
-        //env->DefineFunction("ray::ClearBackground", ftn, { LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::ClearBackground";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_CloseWindow", *module);
-        //env->DefineFunction("ray::CloseWindow", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::CloseWindow";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -268,7 +270,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawCircle", *module);
-        //env->DefineFunction("ray::DrawCircle", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawCircle";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -279,7 +282,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawLine", *module);
-        //env->DefineFunction("ray::DrawLine", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawLine";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -290,7 +294,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawRectangle", *module);
-        //env->DefineFunction("ray::DrawRectangle", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawRectangle";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -301,13 +306,15 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawText", *module);
-        //env->DefineFunction("ray::DrawText", ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawText";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_EndDrawing", *module);
-        //env->DefineFunction("ray::EndDrawing", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::EndDrawing";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -316,46 +323,53 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_InitWindow", *module);
-        //env->DefineFunction("ray::InitWindow", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::InitWindow";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_STRING }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyDown", *module);
-        //env->DefineFunction("ray::IsKeyDown", ftn, { LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_BOOL);
+        std::string lexeme = "ray::IsKeyDown";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetMouseX", *module);
-        //env->DefineFunction("ray::GetMouseX", ftn, {  }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::GetMouseX";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetMouseY", *module);
-        //env->DefineFunction("ray::GetMouseY", ftn, {  }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::GetMouseY";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_SetTargetFPS", *module);
-        //env->DefineFunction("ray::SetTargetFPS", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::SetTargetFPS";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_WindowShouldClose", *module);
-        //env->DefineFunction("ray::WindowShouldClose", ftn, {  }, { }, args, {}, LITERAL_TYPE_BOOL);
+        std::string lexeme = "ray::WindowShouldClose";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_BOOL), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadTexture", *module);
-        //env->DefineFunction("ray::LoadTexture", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadTexture";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -365,7 +379,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTexture", *module);
-        //env->DefineFunction("ray::DrawTexture", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawTexture";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -374,7 +389,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureV", *module);
-        //env->DefineFunction("ray::DrawTextureV", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawTextureV";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -385,7 +401,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureEx", *module);
-        //env->DefineFunction("ray::DrawTextureEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawTextureEx";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -397,14 +414,16 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTexturePro", *module);
-        //env->DefineFunction("ray::DrawTexturePro", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawTexturePro";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsGamepadAvailable", *module);
-        //env->DefineFunction("ray::IsGamepadAvailable", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_BOOL);
+        std::string lexeme = "ray::IsGamepadAvailable";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_BOOL), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -412,7 +431,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetGamepadAxisMovement", *module);
-        //env->DefineFunction("ray::GetGamepadAxisMovement", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_FLOAT);
+        std::string lexeme = "ray::GetGamepadAxisMovement";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_FLOAT), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -420,41 +440,47 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsGamepadButtonDown", *module);
-        //env->DefineFunction("ray::IsGamepadButtonDown", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_BOOL);
+        std::string lexeme = "ray::IsGamepadButtonDown";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadSound", *module);
-        //env->DefineFunction("ray::LoadSound", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadSound";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadSound", *module);
-        //env->DefineFunction("ray::UnloadSound", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::UnloadSound";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_PlaySound", *module);
-        //env->DefineFunction("ray::PlaySound", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::PlaySound";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_InitAudioDevice", *module);
-        //env->DefineFunction("ray::InitAudioDevice", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::InitAudioDevice";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadFont", *module);
-        //env->DefineFunction("ray::LoadFont", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadFont";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -466,49 +492,56 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextEx", *module);
-        //env->DefineFunction("ray::DrawTextEx", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_STRING, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::DrawTextEx";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_STRING, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadImage", *module);
-        //env->DefineFunction("ray::LoadImage", ftn, { LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadImage";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadImage", *module);
-        //env->DefineFunction("ray::UnloadImage", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::UnloadImage";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadTextureFromImage", *module);
-        //env->DefineFunction("ray::LoadTextureFromImage", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadTextureFromImage";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadTexture", *module);
-        //env->DefineFunction("ray::UnloadTexture", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::UnloadTexture";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImageFlipVertical", *module);
-        //env->DefineFunction("ray::ImageFlipVertical", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::ImageFlipVertical";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImageFlipHorizontal", *module);
-        //env->DefineFunction("ray::ImageFlipHorizontal", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::ImageFlipHorizontal";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -518,7 +551,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlClearColor", *module);
-        //env->DefineFunction("ray::rlClearColor", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlClearColor";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -526,59 +560,68 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadShader", *module);
-        //env->DefineFunction("ray::LoadShader", ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_POINTER);
+        std::string lexeme = "ray::LoadShader";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_STRING }, args, LITERAL_TYPE_POINTER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexArray", *module);
-        //env->DefineFunction("ray::rlLoadVertexArray", ftn, {  }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlLoadVertexArray";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableVertexArray", *module);
-        //env->DefineFunction("ray::rlEnableVertexArray", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableVertexArray";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableVertexArray", *module);
-        //env->DefineFunction("ray::rlDisableVertexArray", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableVertexArray";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlClearScreenBuffers", *module);
-        //env->DefineFunction("ray::rlClearScreenBuffers", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlClearScreenBuffers";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_BeginShaderMode", *module);
-        //env->DefineFunction("ray::BeginShaderMode", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::BeginShaderMode";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableVertexAttribute", *module);
-        //env->DefineFunction("ray::rlEnableVertexAttribute", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableVertexAttribute";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableVertexBuffer", *module);
-        //env->DefineFunction("ray::rlEnableVertexBuffer", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableVertexBuffer";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableVertexBuffer", *module);
-        //env->DefineFunction("ray::rlDisableVertexBuffer", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableVertexBuffer";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -586,54 +629,62 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDrawVertexArray", *module);
-        //env->DefineFunction("ray::rlDrawVertexArray", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDrawVertexArray";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableVertexAttribute", *module);
-        //env->DefineFunction("ray::rlDisableVertexAttribute", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableVertexAttribute";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_EndShaderMode", *module);
-        //env->DefineFunction("ray::EndShaderMode", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::EndShaderMode";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlUnloadVertexBuffer", *module);
-        //env->DefineFunction("ray::rlUnloadVertexBuffer", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlUnloadVertexBuffer";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlUnloadVertexArray", *module);
-        //env->DefineFunction("ray::rlUnloadVertexArray", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlUnloadVertexArray";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_UnloadShader", *module);
-        //env->DefineFunction("ray::UnloadShader", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::UnloadShader";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableShader", *module);
-        //env->DefineFunction("ray::rlEnableShader", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableShader";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableShader", *module);
-        //env->DefineFunction("ray::rlDisableShader", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableShader";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -641,14 +692,16 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadShaderCode", *module);
-        //env->DefineFunction("ray::rlLoadShaderCode", ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlLoadShaderCode";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_STRING, LITERAL_TYPE_STRING }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlUnloadShaderProgram", *module);
-        //env->DefineFunction("ray::rlUnloadShaderProgram", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlUnloadShaderProgram";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -656,52 +709,60 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlGetLocationUniform", *module);
-        //env->DefineFunction("ray::rlGetLocationUniform", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_STRING }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlGetLocationUniform";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_STRING }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableVertexBufferElement", *module);
-        //env->DefineFunction("ray::rlEnableVertexBufferElement", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableVertexBufferElement";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableVertexBufferElement", *module);
-        //env->DefineFunction("ray::rlDisableVertexBufferElement", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableVertexBufferElement";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableTexture", *module);
-        //env->DefineFunction("ray::rlEnableTexture", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlEnableTexture";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableTexture", *module);
-        //env->DefineFunction("ray::rlDisableTexture", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableTexture";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlCheckErrors", *module);
-        //env->DefineFunction("ray::rlCheckErrors", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlCheckErrors";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlActiveTextureSlot", *module);
-        //env->DefineFunction("ray::rlActiveTextureSlot", ftn, { LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlActiveTextureSlot";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableBackfaceCulling", *module);
-        //env->DefineFunction("ray::rlDisableBackfaceCulling", ftn, {  }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDisableBackfaceCulling";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
 
     //-------------------------------------------------------------------------
@@ -719,11 +780,12 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureTileMap", *module);
-        /*env->DefineFunction("ray::DrawTextureTileMap", ftn, {
+        std::string lexeme = "ray::DrawTextureTileMap";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {
             LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER,
             LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_POINTER,
             LITERAL_TYPE_ENUM
-            }, { }, args, {}, LITERAL_TYPE_INVALID);*/
+            }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -733,7 +795,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImagePeek", *module);
-        //env->DefineFunction("ray::ImagePeek", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::ImagePeek";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -745,7 +808,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetVertexAttribute", *module);
-        //env->DefineFunction("ray::rlSetVertexAttribute", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_BOOL, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlSetVertexAttribute";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_BOOL, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -753,7 +817,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt1Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBuffer", *module);
-        //env->DefineFunction("ray::rlLoadVertexBuffer", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlLoadVertexBuffer";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -761,7 +826,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt1Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBufferElement", *module);
-        //env->DefineFunction("ray::rlLoadVertexBufferElement", ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlLoadVertexBufferElement";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -770,14 +836,16 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetUniform", *module);
-        //env->DefineFunction("ray::rlSetUniform", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlSetUniform";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetTextureId", *module);
-        //env->DefineFunction("ray::GetTextureId", ftn, { LITERAL_TYPE_POINTER }, { }, args, {}, LITERAL_TYPE_INTEGER);
+        std::string lexeme = "ray::rlDisableBackfaceCulling";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {
         std::vector<llvm::Type*> args;
@@ -786,13 +854,15 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDrawVertexArrayElements", *module);
-        //env->DefineFunction("ray::rlDrawVertexArrayElements", ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, { }, args, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::rlDrawVertexArrayElements";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
 
     {
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_test", *module);
-        //env->DefineFunction("ray::test", ftn, { }, { }, {}, {}, LITERAL_TYPE_INVALID);
+        std::string lexeme = "ray::test";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { }, {}, LITERAL_TYPE_INVALID), lexeme);
     }
 
 
@@ -828,7 +898,9 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         {
             llvm::Type* defty = builder->getInt32Ty();
             llvm::Value* defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
-            //env->DefineVariable(LITERAL_TYPE_INTEGER, names[i], defval, defty, nullptr);
+            TValue v = TValue::MakeInt32(nullptr, defval);
+            v.SetStorage(true);
+            env->DefineVariable(v, names[i]);
         }
     }
 }

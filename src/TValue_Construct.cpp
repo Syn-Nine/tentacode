@@ -89,6 +89,15 @@ TValue TValue::Construct(Token* token, TokenPtrList* args, std::string lexeme, b
 		{
 			Error(token, "Expected vector arguments.");
 		}
+
+	case TOKEN_VAR_IMAGE: // intentional fall-through
+	case TOKEN_VAR_TEXTURE:
+	case TOKEN_VAR_FONT:
+	case TOKEN_VAR_SOUND:
+	case TOKEN_VAR_SHADER:
+	case TOKEN_VAR_RENDER_TEXTURE_2D:
+		return Construct_Pointer(token, lexeme, global);
+		
 	default:
 		Error(token, "Invalid type in variable constructor.");
 	}
@@ -243,6 +252,41 @@ TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 	{
 		TValue ret;
 		ret.m_type = LITERAL_TYPE_ENUM;
+		ret.m_value = defval;
+		ret.m_ty = defty;
+		ret.m_token = token;
+		ret.m_is_storage = true;
+		return ret;
+	}
+
+	return NullInvalid();
+}
+
+
+TValue TValue::Construct_Pointer(Token* token, std::string lexeme, bool global)
+{
+	llvm::Type* defty = m_builder->getPtrTy();
+	llvm::Value* defval = nullptr;
+	llvm::Constant* nullval = llvm::Constant::getNullValue(defty);
+
+	if (global)
+	{
+		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, nullval, lexeme);
+		if (!defval) Error(token, "Failed to create global variable.");
+	}
+	else
+	{
+		defval = CreateEntryAlloca(m_builder, defty, nullptr, lexeme);
+		if (defval)
+			m_builder->CreateStore(nullval, defval);
+		else
+			Error(token, "Failed to create stack variable.");
+	}
+
+	if (defval)
+	{
+		TValue ret;
+		ret.m_type = LITERAL_TYPE_POINTER;
 		ret.m_value = defval;
 		ret.m_ty = defty;
 		ret.m_token = token;
@@ -535,14 +579,15 @@ TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
 	ret.m_type = type;
 	ret.m_bits = bits;
 	ret.m_ty = MakeTy(type, bits);
+	ret.m_value = nullptr;
 
 	if (!ret.m_ty)
 	{
-		Error(token, "Invalid type in literal constructor.");
+		Error(token, "Invalid type in null constructor.");
 		return NullInvalid();
 	}
 
-	ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
+	if (LITERAL_TYPE_INVALID != type) ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
 
 	return ret;
 }
@@ -559,7 +604,7 @@ TValue TValue::Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bit
 
 	if (!ret.m_ty)
 	{
-		Error(token, "Invalid type in literal constructor.");
+		Error(token, "Invalid type in return constructor.");
 		return NullInvalid();
 	}
 
@@ -584,6 +629,18 @@ TValue TValue::MakeBool(Token* token, llvm::Value* value)
 	ret.m_token = token;
 	ret.m_value = value;
 	ret.m_bits = 1;
+	ret.m_is_storage = false;
+	return ret;
+}
+
+TValue TValue::MakeInt32(Token* token, llvm::Value* value)
+{
+	TValue ret;
+	ret.m_type = LITERAL_TYPE_INTEGER;
+	ret.m_ty = m_builder->getInt32Ty();
+	ret.m_token = token;
+	ret.m_value = value;
+	ret.m_bits = 32;
 	ret.m_is_storage = false;
 	return ret;
 }
@@ -656,6 +713,8 @@ llvm::Type* TValue::MakeTy(LiteralTypeEnum type, int bits)
 	else if (LITERAL_TYPE_BOOL == type)        return m_builder->getInt1Ty();
 	else if (LITERAL_TYPE_STRING == type)      return m_builder->getPtrTy();
 	else if (LITERAL_TYPE_VEC_DYNAMIC == type) return m_builder->getPtrTy();
+	else if (LITERAL_TYPE_POINTER == type)     return m_builder->getPtrTy();
+	else if (LITERAL_TYPE_INVALID == type)     return m_builder->getVoidTy();
 
 	return nullptr;
 }

@@ -7,6 +7,69 @@ llvm::IRBuilder<>* TFunction::m_builder = nullptr;
 llvm::Module* TFunction::m_module = nullptr;
 
 
+
+TFunction TFunction::Construct_Internal(
+	std::string lexeme,
+	llvm::Function* ftn,
+	std::vector<LiteralTypeEnum> types,
+	std::vector<llvm::Type*> args,
+	LiteralTypeEnum rettype)
+{
+	TFunction ret;
+	ret.m_name = new Token(TOKEN_IDENTIFIER, lexeme, -1, "");
+	ret.m_body = nullptr;
+	ret.m_llvm_func = ftn;
+
+	int bits = 0;
+	if (LITERAL_TYPE_INTEGER) bits = 32;
+	else if (LITERAL_TYPE_FLOAT) bits = 64;
+	
+	ret.m_retval = TValue::Construct_Null(ret.m_name, rettype, bits);
+
+	// figure out parameter types
+	int v_bits;
+	LiteralTypeEnum v_type;
+	TValue v;
+
+	for (size_t i = 0; i < types.size(); ++i)
+	{
+		v_type = types[i];
+		switch (v_type)
+		{
+		case LITERAL_TYPE_ENUM:
+		case LITERAL_TYPE_INTEGER:
+			v_bits = 32;
+			break;
+		case LITERAL_TYPE_FLOAT:
+			v_bits = 64;
+			break;
+		case LITERAL_TYPE_BOOL:
+			v_bits = 1;
+			break;
+		case LITERAL_TYPE_STRING:
+			v_bits = 64;
+			break;
+		case LITERAL_TYPE_POINTER:
+			v_bits = 64;
+			break;
+		default:
+			Environment::Error(ret.m_name, "Failed to set parameter type when constructing internal function.");
+			return TFunction();
+		}
+		v = TValue::Construct_Null(ret.m_name, v_type, v_bits);
+		ret.m_param_names.push_back("");
+		ret.m_param_types.push_back(v);
+
+	}
+
+
+	ret.m_valid = true;
+
+	return ret;
+
+}
+
+
 TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, void* bodyPtr)
 {
 	TFunction ret;
@@ -114,7 +177,7 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 			v_bits = 64;
 			break;
 		default:
-			Environment::Error(name, "Failed to set return type.");
+			Environment::Error(name, "Failed to set parameter type.");
 			return TFunction();
 		}
 		v = TValue::Construct_Null(rettype, v_type, v_bits);

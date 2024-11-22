@@ -34,6 +34,13 @@ public:
 	}
 
 
+	static TFunction Construct_Internal(
+		std::string lexeme,
+		llvm::Function* ftn,
+		std::vector<LiteralTypeEnum> types,
+		std::vector<llvm::Type*> args,
+		LiteralTypeEnum rettype);
+
 	static TFunction Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, void* bodyPtr);
 	
 	void Construct_Body();

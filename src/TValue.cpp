@@ -237,6 +237,7 @@ void TValue::Store(TValue rhs)
 	case LITERAL_TYPE_INTEGER: // intentional fall-through
 	case LITERAL_TYPE_FLOAT:
 	case LITERAL_TYPE_ENUM:
+	case LITERAL_TYPE_POINTER:
 	case LITERAL_TYPE_BOOL:
 	{
 		rhs = rhs.GetFromStorage();

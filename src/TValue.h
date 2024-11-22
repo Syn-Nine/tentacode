@@ -98,6 +98,7 @@ public:
 	void StoreAtIndex(TValue idx, TValue rhs);
 
 	static TValue MakeBool(Token* token, llvm::Value* value);
+	static TValue MakeInt32(Token* token, llvm::Value* value);
 	static TValue MakeInt64(Token* token, llvm::Value* value);
 	static TValue MakeFloat64(Token* token, llvm::Value* value);
 	static TValue MakeString(Token* token, llvm::Value* value);
@@ -173,6 +174,7 @@ private:
 	static TValue Construct_Float(Token* type, int bits, std::string lexeme, bool global);
 	static TValue Construct_Bool(Token* type, std::string lexeme, bool global);
 	static TValue Construct_Enum(Token* type, std::string lexeme, bool global);
+	static TValue Construct_Pointer(Token* type, std::string lexeme, bool global);
 	static TValue Construct_String(Token* type, std::string lexeme, bool global);
 	static TValue Construct_Vec_Dynamic(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
 	static TValue Construct_Vec_Fixed(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
