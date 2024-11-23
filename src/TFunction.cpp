@@ -21,8 +21,8 @@ TFunction TFunction::Construct_Internal(
 	ret.m_llvm_func = ftn;
 
 	int bits = 0;
-	if (LITERAL_TYPE_INTEGER) bits = 32;
-	else if (LITERAL_TYPE_FLOAT) bits = 64;
+	if (LITERAL_TYPE_INTEGER == rettype) bits = 32;
+	else if (LITERAL_TYPE_FLOAT == rettype) bits = 64;
 	
 	ret.m_retval = TValue::Construct_Null(ret.m_name, rettype, bits);
 

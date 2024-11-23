@@ -313,3 +313,82 @@ TValue TValue::CastToMatchImplicit(TValue src)
 	Error(m_token, "Unable to implicit cast between types.");
 	return NullInvalid();
 }
+
+TValue TValue::CastFixedToDynVec()
+{
+	if (LITERAL_TYPE_VEC_FIXED != m_type)
+	{
+		Error(m_token, "LHS is not a fixed vector.");
+		return NullInvalid();
+	}
+	else if (m_fixed_vec_len == 0)
+	{
+		Error(m_token, "Fixed vector is empty.");
+		return NullInvalid();
+	}
+
+	TValue ret;
+	llvm::Value* defval = nullptr;
+	llvm::Type* defty = m_builder->getPtrTy();
+	defval = CreateEntryAlloca(m_builder, defty, nullptr, "alloc_vec_tmp");
+	llvm::Value* vtype = m_builder->getInt64(LITERAL_TYPE_INTEGER);
+	llvm::Value* span = m_builder->getInt64(4);
+	llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, span }, "calltmp");
+	ret.m_is_storage = false;
+	ret.m_value = defval;
+	ret.m_ty = m_builder->getInt32Ty();
+	ret.m_token = m_token;
+	ret.m_type = LITERAL_TYPE_VEC_DYNAMIC;
+	ret.m_vec_type = LITERAL_TYPE_INTEGER;
+	ret.m_bits = 32;
+	m_builder->CreateStore(ptr, defval);
+	Environment::AddToCleanup(ret);
+
+
+	llvm::Value* dstPtr = m_builder->CreateLoad(m_builder->getPtrTy(), ret.m_value, "loadtmp");
+	llvm::Value* srcLen = m_builder->getInt64(m_fixed_vec_len);
+	m_builder->CreateCall(m_module->getFunction("__dyn_vec_clear_presize"), { dstPtr, srcLen }, "calltmp");
+
+	m_builder->CreateCall(m_module->getFunction("__dyn_vec_assert_idx"), { dstPtr, m_builder->getInt32(m_fixed_vec_len - 1) }, "calltmp");
+	llvm::Value* dataPtr = m_builder->CreateCall(m_module->getFunction("__dyn_vec_data_ptr"), { dstPtr }, "calltmp");
+
+	for (size_t i = 0; i < m_fixed_vec_len; ++i)
+	{
+		llvm::Value* lhs_gep = m_builder->CreateGEP(ret.m_ty, dataPtr, { m_builder->getInt32(i) }, "lhs_geptmp");
+		llvm::Value* rhs_gep = m_builder->CreateGEP(m_ty, m_value, { m_builder->getInt32(i) }, "rhs_geptmp");
+		llvm::Value* tmp = m_builder->CreateLoad(m_ty, rhs_gep);
+
+		if (m_ty != ret.m_ty)
+		{
+			if (LITERAL_TYPE_INTEGER == ret.m_vec_type && LITERAL_TYPE_INTEGER == m_vec_type)
+			{
+				// match bitsize
+				tmp = m_builder->CreateIntCast(tmp, ret.m_ty, true, "int_cast");
+			}
+			else if (LITERAL_TYPE_FLOAT == ret.m_vec_type && LITERAL_TYPE_FLOAT == m_vec_type)
+			{
+				// match bitsize
+				tmp = m_builder->CreateFPCast(tmp, ret.m_ty, "fp_cast");
+			}
+			else if (LITERAL_TYPE_INTEGER == ret.m_vec_type && LITERAL_TYPE_FLOAT == m_vec_type)
+			{
+				// lhs is an int, but rhs is a float
+				tmp = m_builder->CreateFPToSI(tmp, ret.m_ty, "fp_to_int");
+			}
+			else if (LITERAL_TYPE_INTEGER == m_vec_type && LITERAL_TYPE_FLOAT == ret.m_vec_type)
+			{
+				// lhs is a float, but rhs is an int
+				tmp = m_builder->CreateSIToFP(tmp, ret.m_ty, "int_to_fp");
+			}
+			else
+			{
+				Error(m_token, "Failed to cast when storing value.");
+				return NullInvalid();
+			}
+		}
+
+		m_builder->CreateStore(tmp, lhs_gep);
+	}
+
+	return ret;
+}

@@ -42,6 +42,87 @@ public:
 		//printf("clear\n");
 	}
 
+	bool Contains_i16(int16_t val)
+	{
+		if (m_empty) return false;
+		if (LITERAL_TYPE_INTEGER != m_vtype) return false;
+		if (m_span != 2) return false;
+
+		int16_t* p = static_cast<int16_t*>(m_data);
+		for (size_t i = 0; i < m_count; ++i)
+		{
+			if (p[i] == val) return true;
+		}
+		return false;
+	}
+
+	bool Contains_i32(int32_t val)
+	{
+		if (m_empty) return false;
+		if (LITERAL_TYPE_INTEGER != m_vtype) return false;
+		if (m_span != 4) return false;
+
+		int32_t* p = static_cast<int32_t*>(m_data);
+		for (size_t i = 0; i < m_count; ++i)
+		{
+			if (p[i] == val) return true;
+		}
+		return false;
+	}
+
+	bool Contains_i64(int64_t val)
+	{
+		if (m_empty) return false;
+		if (LITERAL_TYPE_INTEGER != m_vtype) return false;
+		if (m_span != 8) return false;
+
+		int64_t* p = static_cast<int64_t*>(m_data);
+		for (size_t i = 0; i < m_count; ++i)
+		{
+			if (p[i] == val) return true;
+		}
+		return false;
+	}
+
+	void Fill_bool(bool val, size_t qty)
+	{
+		Clear();
+		Reserve(qty);
+		m_count = qty;
+		m_empty = false;
+		bool* p = static_cast<bool*>(m_data);
+		for (size_t i = 0; i < qty; ++i)
+		{
+			p[i] = val;
+		}
+	}
+
+	void Fill_i32(int32_t val, size_t qty)
+	{
+		Clear();
+		Reserve(qty);
+		m_count = qty;
+		m_empty = false;
+		int32_t* p = static_cast<int32_t*>(m_data);
+		for (size_t i = 0; i < qty; ++i)
+		{
+			p[i] = val;
+		}
+	
+	}
+	void Fill_f32(float val, size_t qty)
+	{
+		Clear();
+		Reserve(qty);
+		m_count = qty;
+		m_empty = false;
+		float* p = static_cast<float*>(m_data);
+		for (size_t i = 0; i < qty; ++i)
+		{
+			p[i] = val;
+		}
+	}
+
 	void Reserve(size_t capacity)
 	{
 		// over-allocate

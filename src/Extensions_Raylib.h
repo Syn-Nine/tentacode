@@ -38,13 +38,15 @@ static int StringToGamepadButton(const std::string& s);
 //-----------------------------------------------------------------------------
 // manual functions
 
-extern "C" DLLEXPORT void ray_DrawTextureTileMap(Texture2D* in0, int32_t xx, int32_t yy, int32_t width, int32_t w, int32_t h, double scale, void* srcPtr, int32_t color)
+extern "C" DLLEXPORT void ray_DrawTextureTileMap(Texture2D* in0, int32_t xx, int32_t yy, int32_t width, int32_t w, int32_t h, double scale, TVec* srcPtr, int32_t color)
 {
     Texture2D tex = *in0;
-    llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
-    llvm::SmallVector<int32_t>& tiles = *src;
+    int32_t* tiles = static_cast<int32_t*>(srcPtr->Data());
+
+    //llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
+    //llvm::SmallVector<int32_t>& tiles = *src;
     double rot = 0;
-    int32_t height = tiles.size() / width;
+    int32_t height = srcPtr->Size() / width;
     int32_t tw = (tex.width / w);
 
     Color c = StringToColor(rayenv->GetEnumAsString(color));

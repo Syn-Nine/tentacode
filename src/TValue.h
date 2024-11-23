@@ -86,6 +86,7 @@ public:
 
 	llvm::Value* Value() { return m_value; }
 
+	TValue CastFixedToDynVec();
 	TValue CastToFloat(int bits);
 	TValue CastToInt(int bits);
 	TValue CastToMatchImplicit(TValue src);
@@ -108,6 +109,7 @@ public:
 	TValue Not();
 
 	void EmitAppend(TValue rhs);
+	TValue EmitContains(TValue rhs);
 	TValue EmitLen();
 
 	int NumBits() const { return m_bits; }

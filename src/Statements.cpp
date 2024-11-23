@@ -142,7 +142,7 @@ TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environ
 	llvm::BasicBlock* ElseBB = llvm::BasicBlock::Create(context, "else");
 	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(context, "ifcont");
 
-	builder->CreateCondBr(CondV.Value(), ThenBB, ElseBB);
+	builder->CreateCondBr(CondV.GetFromStorage().Value(), ThenBB, ElseBB);
 	builder->SetInsertPoint(ThenBB);
 
 	m_thenBranch->codegen(builder, module, env);
@@ -424,20 +424,6 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 
 	bool global = !env->HasParent();
 
-	else if (TOKEN_VAR_TEXTURE == varType || TOKEN_VAR_IMAGE == varType || TOKEN_VAR_SOUND == varType || TOKEN_VAR_FONT == varType || TOKEN_VAR_SHADER == varType)
-	{
-		defty = builder->getPtrTy();
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, llvm::ConstantPointerNull::get(builder->getPtrTy()), m_token->Lexeme());
-		}
-		else
-		{
-			defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_ptr");
-
-		}
-		env->DefineVariable(LITERAL_TYPE_POINTER, m_token->Lexeme(), defval, defty, m_type);
-	}
 	else if (TOKEN_IDENTIFIER == varType)
 	{
 		std::string udtname = "struct." + m_type->Lexeme();
@@ -500,7 +486,7 @@ TValue WhileStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	TValue CondV = m_condition->codegen(builder, module, env);
 	if (!CondV.Value()) return TValue::NullInvalid();
 
-	builder->CreateCondBr(CondV.Value(), BodyBB, MergeBB);
+	builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
 
 	ftn->insert(ftn->end(), BodyBB);
 	builder->SetInsertPoint(BodyBB);

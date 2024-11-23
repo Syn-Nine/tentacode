@@ -355,7 +355,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 	}
 	else if (0 == name.compare("deg2rad") && 1 == m_arguments.size())
 	{
-		TValue v = m_arguments[0]->codegen(builder, module, env);
+		TValue v = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
 		if (v.IsInvalid()) return TValue::NullInvalid();
 		v = v.GetFromStorage().CastToFloat(64);
 		llvm::Value* tmp = llvm::ConstantFP::get(builder->getContext(), llvm::APFloat(DEG2RAD));
@@ -363,7 +363,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 	}
 	else if (0 == name.compare("rad2deg") && 1 == m_arguments.size())
 	{
-		TValue v = m_arguments[0]->codegen(builder, module, env);
+		TValue v = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
 		if (v.IsInvalid()) return TValue::NullInvalid();
 		v = v.GetFromStorage().CastToFloat(64);
 		llvm::Value* tmp = llvm::ConstantFP::get(builder->getContext(), llvm::APFloat(RAD2DEG));
@@ -379,10 +379,23 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 		0 == name.compare("floor") ||
 		0 == name.compare("sqrt"))
 	{
-		TValue v = m_arguments[0]->codegen(builder, module, env);
+		TValue v = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
 		if (v.IsInvalid()) return TValue::NullInvalid();
 		v = v.GetFromStorage().CastToFloat(64);
 		return TValue::MakeFloat64(callee, builder->CreateCall(module->getFunction(name), { v.Value()}, "calltmp"));
+	}
+	else if (1 == m_arguments.size() && 0 == name.compare("sgn"))
+	{
+		TValue v = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
+		if (v.IsInvalid()) return TValue::NullInvalid();
+		v = v.GetFromStorage().CastToFloat(64);
+		return TValue::MakeFloat64(callee, builder->CreateCall(module->getFunction("__sgn"), { v.Value() }, "calltmp"));
+	}
+	else if (2 == m_arguments.size() && 0 == name.compare("atan2"))
+	{
+		TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage().CastToFloat(64);
+		TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage().CastToFloat(64);
+		return TValue::MakeFloat64(callee, builder->CreateCall(module->getFunction(name), { lhs.Value(), rhs.Value() }, "calltmp"));
 	}
 	else if (0 == name.compare("clock"))
 	{
@@ -405,8 +418,8 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 		else if (1 == m_arguments.size() && EXPRESSION_RANGE == m_arguments[0]->GetType())
 		{
 			RangeExpr* re = static_cast<RangeExpr*>(m_arguments[0]);
-			TValue lhs = re->Left()->codegen(builder, module, env).CastToInt(64);
-			TValue rhs = re->Right()->codegen(builder, module, env).CastToInt(64);
+			TValue lhs = re->Left()->codegen(builder, module, env).GetFromStorage().CastToInt(64);
+			TValue rhs = re->Right()->codegen(builder, module, env).GetFromStorage().CastToInt(64);
 			return TValue::MakeInt64(callee, builder->CreateCall(module->getFunction("__rand_range_impl"), { lhs.Value(), rhs.Value()}, "calltmp"));
 		}
 	}
@@ -835,32 +848,18 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 		}
 	}
 
-	/*else if (0 == name.compare("vec::contains"))
+	else if (0 == name.compare("vec::contains"))
 	{
 		if (2 == m_arguments.size() && EXPRESSION_VARIABLE == m_arguments[0]->GetType())
 		{
 			VariableExpr* ve = static_cast<VariableExpr*>(m_arguments[0]);
 			std::string var = ve->Operator()->Lexeme();
-			llvm::Value* defval = env->GetVariable(var);
-			llvm::Type* defty = env->GetVariableTy(var);
-			LiteralTypeEnum varType = env->GetVariableType(var);
-			LiteralTypeEnum vecType = env->GetVecType(var);
 
-			if (LITERAL_TYPE_VEC == varType)
+			TValue tval = env->GetVariable(callee, var);
+			if (tval.IsVecAny())
 			{
-				TValue rhs = m_arguments[1]->codegen(builder, module, env);
-
-				llvm::Value* dst = builder->CreateLoad(defty, defval);
-
-				if (LITERAL_TYPE_INTEGER == vecType)
-				{
-					if (LITERAL_TYPE_DOUBLE == rhs.type)
-					{
-						// convert rhs to int
-						rhs = TValue::Integer(builder->CreateFPToSI(rhs.value, builder->getInt32Ty(), "int_cast_tmp"));
-					}
-					return TValue::Bool(builder->CreateCall(module->getFunction("__vec_contains_i32"), { dst, rhs.value }, "calltmp"));
-				}
+				TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
+				return tval.EmitContains(rhs);
 			}
 			else
 			{
@@ -876,23 +875,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 		}
 		}
 
-	else if (1 == m_arguments.size() && 0 == name.compare("sgn"))
-	{
-		TValue v = m_arguments[0]->codegen(builder, module, env);
-		if (v.IsInteger()) v = TValue::Double(builder->CreateSIToFP(v.value, builder->getDoubleTy(), "cast_to_dbl"));
-
-		return TValue::Double(builder->CreateCall(module->getFunction("__sgn"), { v.value }, "calltmp"));
-	}
-	else if (2 == m_arguments.size() && 0 == name.compare("atan2"))
-	{
-		TValue lhs = m_arguments[0]->codegen(builder, module, env);
-		TValue rhs = m_arguments[1]->codegen(builder, module, env);
-		if (lhs.IsInteger()) lhs = TValue::Double(builder->CreateSIToFP(lhs.value, builder->getDoubleTy(), "cast_to_dbl"));
-		if (rhs.IsInteger()) rhs = TValue::Double(builder->CreateSIToFP(rhs.value, builder->getDoubleTy(), "cast_to_dbl"));
-
-		return TValue::Double(builder->CreateCall(module->getFunction(name), { lhs.value, rhs.value }, "calltmp"));
-	}
-	else if (0 == name.compare("input"))
+	/*else if (0 == name.compare("input"))
 	{
 		llvm::Value* a = CreateEntryAlloca(builder, builder->getInt8Ty(), builder->getInt32(256), "alloctmp");
 		TValue b = TValue::String(builder->CreateGEP(static_cast<llvm::AllocaInst*>(a)->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
@@ -923,53 +906,38 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			env->Error(callee, "Argument count mismatch.");
 			return TValue::NullInvalid();
 		}
-	}
+	}*/
 	
 	
 	else if (0 == name.compare("vec::fill"))
 	{
 		if (2 == m_arguments.size())
 		{
-			TValue lhs = m_arguments[0]->codegen(builder, module, env);
-			TValue rhs = m_arguments[1]->codegen(builder, module, env);
+			TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
+			TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
 
 			if (rhs.IsInteger())
 			{
 				if (lhs.IsInteger())
 				{
-					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_i32"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(v, a);
-					TValue ret = TValue::Vec(a, LITERAL_TYPE_INTEGER, "");
-					env->AddToCleanup(ret);
-					return ret;
+					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_i32"), { lhs.Value(), rhs.Value() }, "calltmp");
+					return TValue::MakeDynVec(callee, v, LITERAL_TYPE_INTEGER, 32);
 				}
 				else if (lhs.IsBool())
 				{
-					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_bool"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(v, a);
-					TValue ret = TValue::Vec(a, LITERAL_TYPE_BOOL, "");
-					env->AddToCleanup(ret);
-					return ret;
+					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_bool"), { lhs.Value(), rhs.Value() }, "calltmp");
+					return TValue::MakeDynVec(callee, v, LITERAL_TYPE_BOOL, 1);
 				}
 				if (lhs.IsEnum())
 				{
-					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_enum"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(v, a);
-					TValue ret = TValue::Vec(a, LITERAL_TYPE_ENUM, "");
-					env->AddToCleanup(ret);
-					return ret;
+					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_enum"), { lhs.Value(), rhs.Value() }, "calltmp");
+					return TValue::MakeDynVec(callee, v, LITERAL_TYPE_ENUM, 32);
 				}
-				else if (lhs.IsDouble())
+				else if (lhs.IsFloat())
 				{
-					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_double"), { lhs.value, rhs.value }, "calltmp");
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					builder->CreateStore(v, a);
-					TValue ret = TValue::Vec(a, LITERAL_TYPE_DOUBLE, "");
-					env->AddToCleanup(ret);
-					return ret;
+					lhs = lhs.CastToFloat(32);
+					llvm::Value* v = builder->CreateCall(module->getFunction("__vec_new_rep_float"), { lhs.Value(), rhs.Value() }, "calltmp");
+					return TValue::MakeDynVec(callee, v, LITERAL_TYPE_FLOAT, 32);
 				}
 				else
 				{
@@ -988,7 +956,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			env->Error(callee, "Argument count mismatch.");
 			return TValue::NullInvalid();
 		}
-	}*/
+	}
 	else
 	{
 		TFunction tfunc = env->GetFunction(callee, name);
@@ -1014,17 +982,15 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 				{
 					v = v.CastToMatchImplicit(params[i]);
 				}
-				/*else if (v.IsFixedVec())
+				else if (v.IsVecDynamic())
 				{
-					// convert to regular vec
-					LiteralTypeEnum vecType = v.fixed_vec_type;
-					llvm::Value* a = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "alloctmp");
-					llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
-					builder->CreateCall(module->getFunction("__vec_assign_fixed"), { builder->getInt32(vecType), addr, builder->getInt32(vecType), v.value, builder->getInt32(v.fixed_vec_sz) }, "calltmp");
-					builder->CreateStore(addr, a);
-					v = TValue::Vec(a, vecType);
-					env->AddToCleanup(v);
-				}*/
+					v.SetValue(builder->CreateLoad(builder->getPtrTy(), v.Value(), "tmp_load"));
+				}
+				else if (v.IsVecFixed())
+				{
+					v = v.CastFixedToDynVec();
+					v.SetValue(builder->CreateLoad(builder->getPtrTy(), v.Value(), "tmp_load"));
+				}
 				args.push_back(v.Value());
 			}
 			llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
@@ -1120,8 +1086,8 @@ TValue LogicalExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 	if (2 <= Environment::GetDebugLevel()) printf("LogicalExpr::codegen()\n");
 	
 	if (!m_left || !m_right) return TValue::NullInvalid();
-	TValue lhs = m_left->codegen(builder, module, env);
-	TValue rhs = m_right->codegen(builder, module, env);
+	TValue lhs = m_left->codegen(builder, module, env).GetFromStorage();
+	TValue rhs = m_right->codegen(builder, module, env).GetFromStorage();
 	if (!lhs.Value() || !rhs.Value()) return TValue::NullInvalid();
 
 	switch (m_token->GetType())
@@ -1146,8 +1112,8 @@ TValue RangeExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	if (2 <= Environment::GetDebugLevel()) printf("RangeExpr::codegen()\n");
 	
 	if (!m_left || !m_right) return TValue::NullInvalid();
-	TValue lhs = m_left->codegen(builder, module, env);
-	TValue rhs = m_right->codegen(builder, module, env);
+	TValue lhs = m_left->codegen(builder, module, env).GetFromStorage();
+	TValue rhs = m_right->codegen(builder, module, env).GetFromStorage();
 	if (!lhs.Value() || !rhs.Value()) return TValue::NullInvalid();
 	
 	return TValue::NullInvalid();

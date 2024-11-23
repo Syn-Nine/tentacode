@@ -593,6 +593,50 @@ extern "C" DLLEXPORT void* __dyn_vec_to_string(TVec* srcPtr)
 
 }
 
+extern "C" DLLEXPORT void* __vec_new_rep_i32(int32_t dstVal, int32_t dstQty)
+{
+	TVec* ret = new TVec(LITERAL_TYPE_INTEGER, 4);
+	ret->Fill_i32(dstVal, dstQty);
+	return ret;
+}
+
+extern "C" DLLEXPORT void* __vec_new_rep_enum(int32_t dstVal, int32_t dstQty)
+{
+	TVec* ret = new TVec(LITERAL_TYPE_ENUM, 4);
+	ret->Fill_i32(dstVal, dstQty);
+	return ret;
+}
+
+extern "C" DLLEXPORT void* __vec_new_rep_bool(bool dstVal, int32_t dstQty)
+{
+	TVec* ret = new TVec(LITERAL_TYPE_BOOL, 1);
+	ret->Fill_bool(dstVal, dstQty);
+	return ret;
+}
+
+extern "C" DLLEXPORT void* __vec_new_rep_float(float dstVal, int32_t dstQty)
+{
+	TVec* ret = new TVec(LITERAL_TYPE_FLOAT, 4);
+	ret->Fill_f32(dstVal, dstQty);
+	return ret;
+}
+
+extern "C" DLLEXPORT bool __dyn_vec_contains_i16(TVec* srcPtr, int16_t val)
+{
+	return srcPtr->Contains_i16(val);
+}
+
+extern "C" DLLEXPORT bool __dyn_vec_contains_i32(TVec* srcPtr, int32_t val)
+{
+	return srcPtr->Contains_i32(val);
+}
+
+extern "C" DLLEXPORT bool __dyn_vec_contains_i64(TVec* srcPtr, int64_t val)
+{
+	return srcPtr->Contains_i64(val);
+}
+
+
 
 
 // file
@@ -943,27 +987,62 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_substr", *module);
 	}
 
-	/* {	// void = ftn(int)
-		std::vector<llvm::Type*> args(1, builder->getInt32Ty());
-		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
-		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "input", *module);
-	}
-
 	{	// double = ftn(double, double)
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), { builder->getDoubleTy(), builder->getDoubleTy() }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "atan2", *module);
 	}
 	
-	// vectors
+	/* {	// void = ftn(int)
+		std::vector<llvm::Type*> args(1, builder->getInt32Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "input", *module);
+	}*/
+
 	
+	// vectors
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt16Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__dyn_vec_contains_i16", *module);
+	}
 	{
 		std::vector<llvm::Type*> args;
 		args.push_back(builder->getPtrTy());
 		args.push_back(builder->getInt32Ty());
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
-		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_contains_i32", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__dyn_vec_contains_i32", *module);
 	}
-*/
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt64Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__dyn_vec_contains_i64", *module);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt32Ty()); // val
+		args.push_back(builder->getInt32Ty()); // qty
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_new_rep_i32", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_new_rep_enum", *module);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt8Ty()); // val
+		args.push_back(builder->getInt32Ty()); // qty
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_new_rep_bool", *module);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getFloatTy()); // val
+		args.push_back(builder->getInt32Ty());  // qty
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__vec_new_rep_float", *module);
+	}
 
 	{
 		std::vector<llvm::Type*> args;

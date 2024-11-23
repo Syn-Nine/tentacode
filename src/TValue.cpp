@@ -114,6 +114,81 @@ void TValue::EmitAppend(TValue rhs)
 	
 }
 
+TValue TValue::EmitContains(TValue rhs)
+{
+	if (LITERAL_TYPE_VEC_DYNAMIC != m_type)
+	{
+		Error(m_token, "Cannot check contents of type.");
+		return NullInvalid();
+	}
+	else if (m_vec_type != rhs.m_type)
+	{
+		Error(rhs.GetToken(), "Cannot check contents of mismatched type.");
+		return NullInvalid();
+	}
+
+	// get rhs into same type as lhs
+	rhs = rhs.GetFromStorage();
+	llvm::Value* tmp = rhs.m_value;
+
+	if (m_ty != rhs.m_ty)
+	{
+		if (LITERAL_TYPE_INTEGER == m_vec_type && LITERAL_TYPE_INTEGER == rhs.m_type)
+		{
+			// match bitsize
+			tmp = m_builder->CreateIntCast(tmp, m_ty, true, "int_cast");
+		}
+		else if (LITERAL_TYPE_FLOAT == m_vec_type && LITERAL_TYPE_FLOAT == rhs.m_type)
+		{
+			// match bitsize
+			tmp = m_builder->CreateFPCast(tmp, m_ty, "fp_cast");
+		}
+		else
+		{
+			Error(rhs.GetToken(), "Failed to bitcast when checking contents.");
+			return NullInvalid();
+		}
+	}
+
+	llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "loadtmp");
+	
+	TValue ret;
+
+	if (LITERAL_TYPE_INTEGER == m_vec_type)
+	{
+		llvm::Value* v = nullptr;
+		if (16 == m_bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i16"), { ptr, tmp }, "calltmp");
+		else if (32 == m_bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i32"), { ptr, tmp }, "calltmp");
+		else if (64 == m_bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i64"), { ptr, tmp }, "calltmp");
+
+		if (v) ret = TValue::MakeBool(m_token, v);
+	}
+	/*else if (LITERAL_TYPE_FLOAT == m_vec_type)
+	{
+		if (32 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f32"), { ptr, tmp }, "calltmp");
+		else if (64 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f64"), { ptr, tmp }, "calltmp");
+	}
+	else if (LITERAL_TYPE_ENUM == m_vec_type)
+	{
+		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_enum"), { ptr, tmp }, "calltmp");
+	}
+	else if (LITERAL_TYPE_BOOL == m_vec_type)
+	{
+		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_bool"), { ptr, tmp }, "calltmp");
+	}
+	else if (LITERAL_TYPE_STRING == m_vec_type)
+	{
+		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_string"), { ptr, tmp }, "calltmp");
+	}*/
+	else
+	{
+		Error(rhs.GetToken(), "Failed to check contents of dynamic vector.");
+		return NullInvalid();
+	}
+
+	return ret;
+}
+
 TValue TValue::EmitLen()
 {
 	TValue ret;
