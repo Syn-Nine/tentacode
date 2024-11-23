@@ -138,9 +138,14 @@ public:
 	ArgList GetArguments() { return m_arguments; }
 
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
-
+	
 private:
 
+	TValue codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	TValue codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	TValue codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	TValue codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	
 	bool CheckArgSize(int count);
 	
 	Expr* m_callee;
