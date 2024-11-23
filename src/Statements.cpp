@@ -1,6 +1,6 @@
 #include "Statements.h"
 #include "TFunction.h"
-
+#include "TStruct.h"
 
 //-----------------------------------------------------------------------------
 TValue BlockStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
@@ -114,6 +114,8 @@ TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
 }
 
 
+
+//-----------------------------------------------------------------------------
 TValue FunctionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("FunctionStmt::codegen()\n");
@@ -245,138 +247,26 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 TValue StructStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("StructStmt::codegen()\n");
-	/*
-	std::vector<llvm::Type*> arg_ty;
-	std::vector<Token*> arg_types;
-	std::vector<LiteralTypeEnum> arg_vec_types;
-	std::vector<std::string> arg_vec_types_id;
-	std::vector<std::string> arg_names;
 
-	for (auto& statement : *m_vars)
+	std::string name = m_name->Lexeme();
+
+	// check for existing function definition
+	if (env->IsStruct(name))
 	{
-		if (env->HasErrors()) break;
-		if (STATEMENT_VAR == statement->GetType())
-		{
-			VarStmt* vs = static_cast<VarStmt*>(statement);
-
-			std::string id = vs->Operator()->Lexeme();
-			TokenTypeEnum vtype = vs->VarType()->GetType();
-			switch (vtype)
-			{
-			case TOKEN_VAR_ENUM: // intentional fall-through
-			case TOKEN_VAR_I32:
-				arg_ty.push_back(builder->getInt32Ty());
-				break;
-			case TOKEN_VAR_BOOL:
-				arg_ty.push_back(builder->getInt1Ty());
-				break;
-			case TOKEN_VAR_F32:
-				arg_ty.push_back(builder->getDoubleTy());
-				break;
-			case TOKEN_VAR_STRING:
-				arg_ty.push_back(builder->getPtrTy());
-				break;
-			case TOKEN_IDENTIFIER:
-			{
-				llvm::Type* udt_ty = env->GetUdt("struct." + vs->VarType()->Lexeme());
-				if (udt_ty)
-					arg_ty.push_back(udt_ty);
-				else
-					env->Error(vs->VarType(), "Invalid structure member type");
-				break;
-			}
-			case TOKEN_VAR_VEC:
-				arg_ty.push_back(builder->getPtrTy());
-				break;
-
-			default:
-				env->Error(vs->VarType(), "Invalid structure member type");
-				break;
-			}
-			arg_vec_types.push_back(vs->VarVecType());
-			arg_vec_types_id.push_back(vs->VarVecTypeId());
-			arg_types.push_back(vs->VarType());
-			arg_names.push_back(id);
-		}
+		env->Error(m_name, "Structure already defined in environment.");
+		return TValue::NullInvalid();
 	}
 
-	if (!arg_ty.empty())
-	{
-		std::string id = "struct." + m_name->Lexeme();
-		llvm::StructType* stype = llvm::StructType::create(*context, arg_ty, id);
-		env->DefineUdt(id, stype, arg_types, arg_names, arg_ty, arg_vec_types, arg_vec_types_id);
-	}
-	*/
+	TStruct struc = TStruct::Construct(m_name, m_vars);
+
+	if (struc.IsValid()) env->DefineStruct(struc, name);
+
 	return TValue::NullInvalid();
 }
 
 
 
 //-----------------------------------------------------------------------------
-void init_udt(llvm::IRBuilder<>* builder,
-	llvm::Module* module,
-	Environment* env,
-	std::string udtname,
-	llvm::Value* defval, llvm::Type* defty, std::vector<llvm::Value*> args)
-{
-	/*
-	if (!env->GetUdt(udtname)) return;
-	
-	std::vector<llvm::Type*> arg_ty = env->GetUdtTy(udtname);
-	std::vector<Token*> arg_var_tokens = env->GetUdtMemberTokens(udtname);
-	std::vector<std::string> arg_var_names = env->GetUdtMemberNames(udtname);
-	std::vector<LiteralTypeEnum> arg_var_vec_types = env->GetUdtMemberVecTypes(udtname);
-	std::vector<std::string> arg_var_vec_type_ids = env->GetUdtMemberVecTypeIds(udtname);
-	
-	for (size_t i = 0; i < arg_ty.size(); ++i)
-	{
-		std::vector<llvm::Value*> argtmp = args;
-		argtmp.push_back(builder->getInt32(i));
-		TokenTypeEnum argVarType = arg_var_tokens[i]->GetType();
-
-		if (TOKEN_IDENTIFIER == argVarType)
-		{
-			std::string subname = "struct." + arg_var_tokens[i]->Lexeme();
-			if (env->IsUdt(subname))
-			{
-				init_udt(builder, module, env, subname, defval, defty, argtmp);
-			}
-			else
-			{
-				env->Error(arg_var_tokens[i], "Invalid identifier type.");
-			}
-		}
-		else
-		{
-			llvm::Value* gep = builder->CreateGEP(defty, defval, argtmp, "gep_" + arg_var_tokens[i]->Lexeme());
-			if (TOKEN_VAR_I32 == argVarType ||
-				TOKEN_VAR_ENUM == argVarType) builder->CreateStore(builder->getInt32(0), gep);
-			else if (TOKEN_VAR_BOOL == argVarType) builder->CreateStore(builder->getFalse(), gep);
-			else if (TOKEN_VAR_F32 == argVarType) builder->CreateStore(llvm::Constant::getNullValue(builder->getDoubleTy()), gep);
-			else if (TOKEN_VAR_STRING == argVarType)
-			{
-				llvm::Value* s = builder->CreateCall(module->getFunction("__new_std_string_void"), {}, "calltmp");
-				builder->CreateStore(s, gep);
-				//TValue tmp = TValue::String(gep);
-				//env->AddToCleanup(tmp);
-			}
-			else if (TOKEN_VAR_VEC == argVarType)
-			{
-				LiteralTypeEnum vecType = arg_var_vec_types[i];
-				std::string vecTypeId = arg_var_vec_type_ids[i];
-				llvm::Value* addr = builder->CreateCall(module->getFunction("__vec_new"), { builder->getInt32(vecType) }, "calltmp");
-				builder->CreateStore(addr, gep);
-				//TValue tmp = TValue::Vec(gep, vecType, vecTypeId);
-				//env->AddToCleanup(tmp);
-			}
-			else
-			{
-				env->Error(arg_var_tokens[i], "Initializer not present.");
-			}
-		}
-	}*/
-}
-
 TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("VarStmt::codegen()\n");
@@ -397,39 +287,6 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	}
 
 	return TValue::NullInvalid();
-
-	/*
-
-	TokenTypeEnum varType = m_type->GetType();
-	LiteralTypeEnum vecType = m_vecType;
-
-	else if (TOKEN_IDENTIFIER == varType)
-	{
-		std::string udtname = "struct." + m_type->Lexeme();
-		if (env->IsUdt(udtname))
-		{
-			defty = env->GetUdt(udtname);
-			if (global)
-			{
-				//defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt64(0), m_token->Lexeme());
-			}
-			else
-			{
-				defval = CreateEntryAlloca(builder, defty, nullptr, "alloc_udt");
-				if (!m_expr)
-				{
-					init_udt(builder, module, env, udtname, defval, defty, { builder->getInt32(0) });
-				}
-
-			}
-			env->DefineVariable(LITERAL_TYPE_UDT, m_token->Lexeme(), defval, defty, m_type);
-		}
-		else
-		{
-			env->Error(m_type, "Invalid identifier type.");
-		}
-	}
-	*/
 }
 
 

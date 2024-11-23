@@ -18,6 +18,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include "TStruct.h"
 #include "TFunction.h"
 #include "TValue.h"
 #include "Token.h"
@@ -66,10 +67,9 @@ bool Run(const char* buf, const char* filename)
 
 		TValue::RegisterErrorHandler(errorHandler);
 		TValue::RegisterLLVM(builder.get(), module.get());
-
-		TFunction::RegisterErrorHandler(errorHandler);
 		TFunction::RegisterLLVM(builder.get(), module.get());
-
+		TStruct::RegisterLLVM(builder.get(), module.get());
+		
 		LoadExtensions(builder.get(), module.get(), env);
 		LoadExtensions_Raylib(builder.get(), module.get(), env);
 
@@ -91,12 +91,12 @@ bool Run(const char* buf, const char* filename)
 		}
 
 		llvm::FunctionType* funcType = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
-		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "main", module.get());
+		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "jit_main", module.get());
 		llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context, "entry", mainFunc);
 		builder->SetInsertPoint(entry);
 
 		// push main ftn environment
-		Environment* sub_env = Environment::Push();
+		Environment::Push();
 
 		// walk main code
 		for (auto& statement : stmts)
@@ -224,7 +224,7 @@ int main(int nargs, char* argsv[])
 		auto TSM = llvm::orc::ThreadSafeModule(std::move(module), std::move(context));
 		TheJIT->addModule(std::move(TSM));
 
-		auto ExprSymbol = ExitOnErr(TheJIT->lookup("main"));
+		auto ExprSymbol = ExitOnErr(TheJIT->lookup("jit_main"));
 		void (*FP)() = ExprSymbol.getAddress().toPtr<void (*)()>();
 
 		printf("\nOutput:\n");

@@ -288,8 +288,9 @@ public:
 	Token* Id() { return m_id; }
 
 	Expr* Expression() { return m_expr; }
-	/*Token* VarType() { return m_type; }
-	LiteralTypeEnum VarVecType() { return m_vecType; }
+	Token* VarType() { return m_type; }
+
+	/*LiteralTypeEnum VarVecType() { return m_vecType; }
 	std::string VarVecTypeId() { return m_vecTypeId; }*/
 
 	StatementTypeEnum GetType() { return STATEMENT_VAR; }

@@ -948,18 +948,18 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 
 	{	// double = ftn()
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), {}, false);
-		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__clock_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__clock_impl", *module);
 	}
 
 	{
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), {}, false);
-		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__rand_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__rand_impl", *module);
 	}
 
 	{
 		std::vector<llvm::Type*> args(2, builder->getInt64Ty());
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
-		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__rand_range_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__rand_range_impl", *module);
 	}
 
 	{	// int = ftn(ptr)

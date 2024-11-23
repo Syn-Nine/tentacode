@@ -286,6 +286,96 @@ TValue TValue::GetAtVectorIndex(TValue idx)
 }
 
 
+TValue TValue::GetStructVariable(const std::string& name)
+{
+	if (IsInvalid()) return NullInvalid();
+
+	std::string udt_name = m_token->Lexeme();
+	TStruct struc = Environment::GetStruct(m_token, udt_name);
+	if (!struc.IsValid()) return TValue::NullInvalid();
+
+	TValue ret = struc.GetMember(m_token, name);
+	if (ret.IsInvalid()) return TValue::NullInvalid();
+
+	llvm::Value* gep_loc = struc.GetGEPLoc(m_token, name);
+	if (!gep_loc) return TValue::NullInvalid();
+
+	llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { m_builder->getInt32(0), gep_loc }, name);
+	ret.SetValue(gep);
+
+	return ret;
+
+
+
+
+	/*
+	// need the root defval and defty
+	// need to build arg path
+
+	std::vector<std::string> names;
+
+	Expr* expr = this;
+
+	while (EXPRESSION_GET == expr->GetType())
+	{
+		GetExpr* ge = static_cast<GetExpr*>(expr);
+		names.insert(names.begin(), ge->Operator()->Lexeme());
+		expr = ge->Object();
+	}
+
+	VariableExpr* vs = static_cast<VariableExpr*>(expr);
+	std::string var_name = vs->Operator()->Lexeme();
+
+	llvm::Value* defval = env->GetVariable(var_name);
+	llvm::Type* defty = env->GetVariableTy(var_name);
+
+	std::string udt_name = "struct." + env->GetVariableToken(var_name)->Lexeme();
+
+	std::vector<llvm::Value*> args(1, builder->getInt32(0));
+
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		int idx = env->GetUdtMemberIndex(udt_name, names[i]);
+		if (-1 == idx)
+		{
+			env->Error(env->GetVariableToken(var_name), "Error parsing UDT members");
+			return TValue::NullInvalid();
+		}
+
+		args.push_back(builder->getInt32(idx));
+
+		Token* token = env->GetUdtMemberTokenAt(udt_name, idx);
+		if (!token)
+		{
+			env->Error(env->GetVariableToken(var_name), "Invalid UDT member token");
+			return TValue::NullInvalid();
+		}
+
+		TokenTypeEnum ttype = token->GetType();
+		if (TOKEN_IDENTIFIER == ttype)
+		{
+			udt_name = "struct." + token->Lexeme();
+			ret = TValue::UDT(udt_name, defty, defval, args);
+		}
+		else
+		{
+			llvm::Value* gep = builder->CreateGEP(defty, defval, args, "get_member");
+			if (TOKEN_VAR_I32 == ttype) ret = TValue::Integer(gep);
+			else if (TOKEN_VAR_ENUM == ttype) ret = TValue::Enum(gep);
+			else if (TOKEN_VAR_BOOL == ttype) ret = TValue::Bool(gep);
+			else if (TOKEN_VAR_F32 == ttype) ret = TValue::Double(gep);
+			else if (TOKEN_VAR_STRING == ttype) ret = TValue::String(gep);
+			else if (TOKEN_VAR_VEC == ttype)
+			{
+				ret = TValue::Vec(gep, env->GetUdtMemberVecTypeAt(udt_name, idx), env->GetUdtMemberVecTypeIdAt(udt_name, idx));
+			}
+		}
+	}
+
+	return ret;*/
+}
+
+
 //-----------------------------------------------------------------------------
 void TValue::Store(TValue rhs)
 {
@@ -325,7 +415,7 @@ void TValue::Store(TValue rhs)
 	case LITERAL_TYPE_POINTER:
 	case LITERAL_TYPE_BOOL:
 	{
-		rhs = rhs.GetFromStorage();
+		rhs = rhs.GetFromStorage().CastToMatchImplicit(*this);
 		m_builder->CreateStore(rhs.m_value, m_value);
 		break;
 	}
@@ -578,6 +668,17 @@ bool TValue::TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& b
 		bits = 64;
 		ty = m_builder->getPtrTy();
 		type = LITERAL_TYPE_STRING;
+		break;
+
+	case TOKEN_VAR_IMAGE: // intentional fallthrough
+	case TOKEN_VAR_TEXTURE:
+	case TOKEN_VAR_FONT:
+	case TOKEN_VAR_SOUND:
+	case TOKEN_VAR_SHADER:
+	case TOKEN_VAR_RENDER_TEXTURE_2D:
+		bits = 64;
+		ty = m_builder->getPtrTy();
+		type = LITERAL_TYPE_POINTER;
 		break;
 
 	default:

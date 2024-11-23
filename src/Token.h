@@ -53,9 +53,11 @@ public:
 		case TOKEN_LEFT_BRACKET: type = "TOKEN_LEFT_BRACKET"; break;
 		case TOKEN_RIGHT_BRACKET: type = "TOKEN_RIGHT_BRACKET"; break;
 		case TOKEN_COMMA: type = "TOKEN_COMMA"; break;
+		case TOKEN_DOT: type = "TOKEN_DOT"; break;
 		case TOKEN_DOT_DOT: type = "TOKEN_DOT_DOT"; break;
 		case TOKEN_DOT_DOT_EQUAL: type = "TOKEN_DOT_DOT_EQUAL"; break;
 		case TOKEN_MINUS: type = "TOKEN_MINUS"; break;
+		case TOKEN_PERCENT: type = "TOKEN_PERCENT"; break;
 		case TOKEN_PLUS: type = "TOKEN_PLUS"; break;
 		case TOKEN_COLON: type = "TOKEN_COLON"; break;
 		//case TOKEN_COLON_COLON: type = "TOKEN_COLON_COLON"; break;
@@ -118,6 +120,9 @@ public:
 		//case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
 		case TOKEN_FILELINE: type = "TOKEN_FILELINE"; break;
 		case TOKEN_PI: type = "TOKEN_PI"; break;
+		case TOKEN_NAMESPACE_PUSH: type = "TOKEN_NAMESPACE_PUSH"; break;
+		case TOKEN_NAMESPACE_POP: type = "TOKEN_NAMESPACE_POP"; break;
+
 
 		// raylib custom
 		case TOKEN_VAR_FONT: type = "TOKEN_VAR_FONT"; break;
@@ -132,7 +137,7 @@ public:
 		}
 
 		std::string val;
-		if (TOKEN_STRING == m_type || TOKEN_ENUM) val = m_stringValue;
+		if (TOKEN_STRING == m_type || TOKEN_ENUM == m_type) val = m_stringValue;
 		if (TOKEN_INTEGER == m_type) val = std::to_string(m_intValue);
 		if (TOKEN_FLOAT == m_type) val = std::to_string(m_doubleValue);
 

@@ -38,6 +38,8 @@ public:
 
 	static TValue Construct(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs = nullptr);
 	static TValue Construct_Null(Token* token, LiteralTypeEnum type, int bits);
+	static TValue Construct_Prototype(Token* token);
+	static TValue Construct_Prototype(Token* token, LiteralTypeEnum type, int bits);
 	static TValue Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bits, llvm::Value* a);
 	
 
@@ -81,6 +83,7 @@ public:
 	Token* GetToken() { return m_token; }
 	llvm::Type* GetTy() { return m_ty; }
 	LiteralTypeEnum GetVecType() { return m_vec_type; }
+	TValue GetStructVariable(const std::string& name);
 
 	bool IsInvalid() { return m_type == LITERAL_TYPE_INVALID; }
 
@@ -117,21 +120,6 @@ public:
 	void SetValue(llvm::Value* val) { m_value = val; }
 	void SetStorage(bool val) { m_is_storage = val; }
 	
-	/*
-	static TValue UDT(std::string udt_name, llvm::Type* ty, llvm::Value* v, std::vector<llvm::Value*> args)
-	{
-		TValue ret = TValue(LITERAL_TYPE_UDT, v);
-		ret.udt_ty = ty;
-		ret.udt_name = udt_name;
-		ret.udt_args = args;
-		return ret;
-	}
-
-	std::string vec_udt_name;
-	std::string udt_name;
-	llvm::Type* udt_ty;
-	std::vector<llvm::Value*> udt_args;
-	*/
 
 private:
 
@@ -180,6 +168,7 @@ private:
 	static TValue Construct_String(Token* type, std::string lexeme, bool global);
 	static TValue Construct_Vec_Dynamic(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
 	static TValue Construct_Vec_Fixed(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
+	static TValue Construct_Struct(Token* type, std::string lexeme, bool global);
 	static TValue Construct_Explicit(Token* token, LiteralTypeEnum type, llvm::Value* value, llvm::Type* ty, int bits, bool is_storage, int fixed_vec_len, LiteralTypeEnum vec_type);
 
 	void GetFromStorage(TValue& lhs, TValue& rhs);
@@ -196,11 +185,11 @@ private:
 	static llvm::IRBuilder<>* m_builder;
 	static llvm::Module* m_module;
 
+	Token* m_token;
+	LiteralTypeEnum m_type;
 	llvm::Value* m_value;
 	llvm::Type* m_ty;
-	LiteralTypeEnum m_type;
 	int m_bits;
-	Token* m_token;
 	bool m_is_storage;
 	int m_fixed_vec_len;
 	LiteralTypeEnum m_vec_type;

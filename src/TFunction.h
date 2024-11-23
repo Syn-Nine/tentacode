@@ -8,11 +8,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/BasicBlock.h"
 
-
 #include "TValue.h"
 #include "Token.h"
 #include "Literal.h"
-#include "ErrorHandler.h"
 
 #include <vector>
 
@@ -26,7 +24,6 @@ public:
 		m_llvm_func = nullptr;
 	}
 
-	static void RegisterErrorHandler(ErrorHandler* eh) { m_errorHandler = eh; }
 	static void RegisterLLVM(llvm::IRBuilder<>* builder, llvm::Module* module)
 	{
 		m_builder = builder;
@@ -54,7 +51,6 @@ public:
 
 private:
 
-	static ErrorHandler* m_errorHandler;
 	static llvm::IRBuilder<>* m_builder;
 	static llvm::Module* m_module;
 

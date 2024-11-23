@@ -79,6 +79,7 @@ extern "C" DLLEXPORT int32_t ray_ImagePeek(Image* in0, int32_t in1, int32_t in2,
     {
         return raw[(y * img.width + x) * 4 + ofs];
     }
+    return 0;
 }
 
 extern "C" DLLEXPORT int32_t ray_rlLoadVertexBuffer(TVec* vecPtr, bool dynamic)

@@ -320,73 +320,13 @@ TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("GetExpr::codegen()\n");
+		
+	VariableExpr* vs = static_cast<VariableExpr*>(m_object); // parent object
 	
-	TValue ret = TValue::NullInvalid();
-	/*
-	// need the root defval and defty
-	// need to build arg path
-
-	std::vector<std::string> names;
-
-	Expr* expr = this;
-
-	while (EXPRESSION_GET == expr->GetType())
-	{
-		GetExpr* ge = static_cast<GetExpr*>(expr);
-		names.insert(names.begin(), ge->Operator()->Lexeme());
-		expr = ge->Object();
-	}
-
-	VariableExpr* vs = static_cast<VariableExpr*>(expr);
 	std::string var_name = vs->Operator()->Lexeme();
-
-	llvm::Value* defval = env->GetVariable(var_name);
-	llvm::Type* defty = env->GetVariableTy(var_name);
+	std::string mem_name = m_token->Lexeme();	
 	
-	std::string udt_name = "struct." + env->GetVariableToken(var_name)->Lexeme();
-
-	std::vector<llvm::Value*> args(1, builder->getInt32(0));
-
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		int idx = env->GetUdtMemberIndex(udt_name, names[i]);
-		if (-1 == idx)
-		{
-			env->Error(env->GetVariableToken(var_name), "Error parsing UDT members");
-			return TValue::NullInvalid();
-		}
-
-		args.push_back(builder->getInt32(idx));
-
-		Token* token = env->GetUdtMemberTokenAt(udt_name, idx);
-		if (!token)
-		{
-			env->Error(env->GetVariableToken(var_name), "Invalid UDT member token");
-			return TValue::NullInvalid();
-		}
-
-		TokenTypeEnum ttype = token->GetType();
-		if (TOKEN_IDENTIFIER == ttype)
-		{
-			udt_name = "struct." + token->Lexeme();
-			ret = TValue::UDT(udt_name, defty, defval, args);
-		}
-		else
-		{
-			llvm::Value* gep = builder->CreateGEP(defty, defval, args, "get_member");
-			if (TOKEN_VAR_I32 == ttype) ret = TValue::Integer(gep);
-			else if (TOKEN_VAR_ENUM == ttype) ret = TValue::Enum(gep);
-			else if (TOKEN_VAR_BOOL == ttype) ret = TValue::Bool(gep);
-			else if (TOKEN_VAR_F32 == ttype) ret = TValue::Double(gep);
-			else if (TOKEN_VAR_STRING == ttype) ret = TValue::String(gep);
-			else if (TOKEN_VAR_VEC == ttype)
-			{
-				ret = TValue::Vec(gep, env->GetUdtMemberVecTypeAt(udt_name, idx), env->GetUdtMemberVecTypeIdAt(udt_name, idx));
-			}
-		}
-	}
-	*/
-	return ret;
+	return env->GetVariable(m_token, var_name).GetStructVariable(mem_name);
 }
 
 
@@ -405,10 +345,11 @@ TValue LogicalExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 	{
 	case TOKEN_AND:
 		return TValue::MakeBool(m_token, builder->CreateAnd(lhs.Value(), rhs.Value(), "logical_and_cmp"));
-		break;
 
 	case TOKEN_OR:
 		return TValue::MakeBool(m_token, builder->CreateOr(lhs.Value(), rhs.Value(), "logical_or_cmp"));
+
+	default:
 		break;
 	}
 	
@@ -436,6 +377,43 @@ TValue RangeExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 TValue SetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("SetExpr::codegen()\n");
+	
+	TValue lhs = m_object->codegen(builder, module, env);
+	if (lhs.IsInvalid()) return TValue::NullInvalid();
+
+	TValue rhs = m_value->codegen(builder, module, env).GetFromStorage();
+	if (rhs.IsInvalid()) return TValue::NullInvalid();
+
+	rhs = rhs.CastToMatchImplicit(lhs);
+	if (rhs.IsInvalid()) return TValue::NullInvalid();
+
+	builder->CreateStore(rhs.Value(), lhs.Value());
+
+	return TValue::NullInvalid();
+	/*
+
+
+	VariableExpr* vs = static_cast<VariableExpr*>(m_object); // parent object
+
+	std::string var_name = vs->Operator()->Lexeme();
+	TValue var = env->GetVariable(m_token, var_name);
+
+	std::string udt_name = var.GetToken()->Lexeme();
+	TStruct struc = env->GetStruct(m_token, udt_name);
+	if (!struc.IsValid()) return TValue::NullInvalid();
+
+	std::string mem_name = m_token->Lexeme();
+	TValue ret = struc.GetMember(m_token, mem_name);
+	if (ret.IsInvalid()) return TValue::NullInvalid();
+
+	llvm::Value* gep_loc = struc.GetGEPLoc(m_token, mem_name);
+	if (!gep_loc) return TValue::NullInvalid();
+
+	llvm::Value* gep = builder->CreateGEP(ret.GetTy(), var.Value(), gep_loc, mem_name);
+	ret.SetValue(builder->CreateLoad(ret.GetTy(), gep, "load_tmp"));
+	*/
+
+
 	/*
 	TValue lhs = m_object->codegen(builder, module, env);
 	
@@ -549,8 +527,12 @@ TValue UnaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	{
 	case TOKEN_MINUS:
 		return rhs.Negate();
+	
 	case TOKEN_BANG:
 		return rhs.Not();
+	
+	default:
+		break;
 	}
 	
 	return TValue::NullInvalid();

@@ -7,9 +7,9 @@ if FILELINE != "File:unit_test.tt, Line:2" {
 //-----------------------------------------------------------------------------
 println("-- default initialization test for basic types");
 {
-	i32 i; f32 f; bool b; string s;// enum e;
+	i32 i; f32 f; bool b; string s; enum e;
 	if 0     != i { println("Test Failed, " + FILELINE); }
-	if 0.0   != f { println("Test Failed, " + FILELINE); }
+	if 0.0000000001 > f && 0.0000000001 < f { println("Test Failed, " + FILELINE); }
 	if false != b { println("Test Failed, " + FILELINE); }
 	if ""    != s { println("Test Failed, " + FILELINE); }
 	//if ""    != e as string { println("Test Failed, " + FILELINE); }
@@ -17,95 +17,69 @@ println("-- default initialization test for basic types");
 
 
 //-----------------------------------------------------------------------------
-println("-- approximation test");
-{
-	if 1 !~ 1 { println("Test Failed, " + FILELINE); }
-	if 1 ~~ 2 { println("Test Failed, " + FILELINE); }
-	
-	if "a" !~ "a" { println("Test Failed, " + FILELINE); }
-	if "b" ~~ "a" { println("Test Failed, " + FILELINE); }
-	
-	if true !~ true { println("Test Failed, " + FILELINE); }
-	if false ~~ true { println("Test Failed, " + FILELINE); }
-	
-	if :TEST !~ :TEST { println("Test Failed, " + FILELINE); }
-	if :FAIL ~~ :TEST { println("Test Failed, " + FILELINE); }
-
-	if 1.0 !~ 1.000000000000000000001 { println("Test Failed, " + FILELINE); }
-	if 1.0 ~~ 1.000000001 { println("Test Failed, " + FILELINE); }
-	if 1.0 !~ 1.0 { println("Test Failed, " + FILELINE); }
-	if 1.0 ~~ 2.0 { println("Test Failed, " + FILELINE); }
-}
-
-
-//-----------------------------------------------------------------------------
 println("-- assignment test for basic types");
 {
-	i32 i = 1; f32 f = 2.2; bool b = true; string s = "test"; enum e = :TEST;
+	i16 h = 3; i32 i = 1; i64 g = 5;
+	f32 m = 5.5; f64 f = 2.2;
+	bool b = true; string s = "test"; enum e = :TEST;
 	
 	// lhs test
+	if 3       != h { println("Test Failed, " + FILELINE); }
 	if 1       != i { println("Test Failed, " + FILELINE); }
-	if 2.2     != f { println("Test Failed, " + FILELINE); }
+	if 5       != g { println("Test Failed, " + FILELINE); }
+	if abs(5.5 - m) > 0.0000001 { println("Test Failed, " + FILELINE); }
+	if abs(2.2 - f) > 0.0000001 { println("Test Failed, " + FILELINE); }
 	if true    != b { println("Test Failed, " + FILELINE); }
 	if !b           { println("Test Failed, " + FILELINE); }
 	if "test"  != s { println("Test Failed, " + FILELINE); }
 	if :TEST   != e { println("Test Failed, " + FILELINE); }
 	
 	// rhs test
+	if h != 3      { println("Test Failed, " + FILELINE); }
 	if i != 1      { println("Test Failed, " + FILELINE); }
-	if f != 2.2    { println("Test Failed, " + FILELINE); }
+	if g != 5      { println("Test Failed, " + FILELINE); }
+	if 0.0000001 < abs(5.5 - m) { println("Test Failed, " + FILELINE); }
+	if 0.0000001 < abs(2.2 - f) { println("Test Failed, " + FILELINE); }
 	if b != true   { println("Test Failed, " + FILELINE); }
 	if s != "test" { println("Test Failed, " + FILELINE); }
 	if e != :TEST  { println("Test Failed, " + FILELINE); }
 
 	// float to int automatic cast
 	i32 c = 0.3;
-	if c == 0.3 { println("Test Failed, " + FILELINE); }
-	f32 d = 1;
-	if 1.0 !~ d { println("Test Failed, " + FILELINE); }
+	if c != 0 { println("Test Failed, " + FILELINE); }
+	f64 d = 1;
+	if abs(1.0 - d) > 0.0000001 { println("Test Failed, " + FILELINE); }
 	
 	// redefinition test
 	i32 aa = 5;
 	if 5 != aa { println("Test Failed, " + FILELINE); }
-	f32 aa = 6.7;
-	if 6.7 != aa { println("Test Failed, " + FILELINE); }
-}
-
-
-//-----------------------------------------------------------------------------
-println("-- global assignment test");
-{
-	global i32 global_i = 1;
-	global f32 global_f = 2.2;
-	global bool global_b = true;
-	global enum global_e = :TEST;
-	global vec<i32> global_v = [1, 2, 3];
-
-	if 1       != global_i { println("Test Failed, " + FILELINE); }
-	if 2.2     != global_f { println("Test Failed, " + FILELINE); }
-	if true    != global_b { println("Test Failed, " + FILELINE); }
-	if !global_b           { println("Test Failed, " + FILELINE); }
-	if :TEST   != global_e { println("Test Failed, " + FILELINE); }
-	if 3 != len(global_v)  { println("Test Failed, " + FILELINE); }
-	if 2 != global_v[1]    { println("Test Failed, " + FILELINE); }
+	f64 aa = 6.7;
+	if abs(6.7 - aa) > 0.0000001 { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
 println("-- absolute value test");
 {
-	f32 x = 0.1;
-	f32 y = -0.006;
-	f32 z = abs(x - y);
-	if abs(0.106 - z) > 0.0000000000001 { println("Test Failed, " + FILELINE); }
-	if 0.106 !~ z { println("Test Failed, " + FILELINE); }
+	f64 x = 0.1;
+	f64 y = -0.006;
+	f64 z = abs(x - y);
+	if abs(0.106 - z) > 0.0000001 { println("Test Failed, " + FILELINE); }
 
 	i32 a = 5;
 	i32 b = 33;
 	i32 c = abs(a - b);
 	if abs(28 - c) > 0 { println("Test Failed, " + FILELINE); }
-	if 28 !~ c { println("Test Failed, " + FILELINE); }
 	if 28 != c { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- basic math test");
+{
+	f32 f = (1 + 4 * 6 - 2 * 8) / 3;
+	if abs(3 - f) > 0.0000001 { println("Test Failed, " + FILELINE); }
+	if 2 != 7 % 5 { println("Test Failed, " + FILELINE); }
 }
 
 
@@ -116,15 +90,15 @@ println("-- trig ops test");
 	f32 y = deg2rad(x);
 	f32 z = rad2deg(y);
 	if abs(1.570796 - y) > 0.000001 { println("Test Failed, " + FILELINE); }
-	if 90 !~ z { println("Test Failed, " + FILELINE); }
+	if abs(90 - z) > 0.0000001 { println("Test Failed, " + FILELINE); }
 	
 	if abs(cos(30) - 0.154251) > 0.000001 { println("Test Failed, " + FILELINE); }
 	if abs(sin(30) - -0.988032) > 0.000001 { println("Test Failed, " + FILELINE); }
 	if abs(tan(30) - -6.405331) > 0.000001 { println("Test Failed, " + FILELINE); }
 	
-	if pi !~ 3.1415926535897932384626433832795028841971693993751058 { println("Test Failed, " + FILELINE); }
-	if rad2deg(pi) !~ 180 { println("Test Failed, " + FILELINE); }
-	if deg2rad(180) !~ pi { println("Test Failed, " + FILELINE); }
+	if abs(pi - 3.1415926535897932384626433832795028841971693993751058) > 0.0000001 { println("Test Failed, " + FILELINE); }
+	if (rad2deg(pi) - 180) > 0.0000001 { println("Test Failed, " + FILELINE); }
+	if (deg2rad(180) - pi) > 0.0000001 { println("Test Failed, " + FILELINE); }
 }
 
 
@@ -172,8 +146,12 @@ println("-- logical ops tests");
 	i32 a = 1;
 	i32 b = 2;
 	i32 c = 3;
-	if a < b && b < c {} else { println("Test Failed, " + FILELINE); }
-	if a > b || b < c {} else { println("Test Failed, " + FILELINE); }
+	bool p1 = false;
+	bool p2 = false;
+	if a < b && b < c { p1 = true; } else { println("Test Failed, " + FILELINE); }
+	if !p1 { println("Test Failed, " + FILELINE); }
+	if a > b || b < c { p2 = true; } else { println("Test Failed, " + FILELINE); }
+	if !p2 { println("Test Failed, " + FILELINE); }
 	if !(1 == 1) { println("Test Failed, " + FILELINE); }
 }
 
@@ -239,7 +217,7 @@ println("-- double break and continue test");
 println("-- random number generation test");
 {
 	f32 r = rand();
-	if r < 0.00000000000001 { println("Test Failed, " + FILELINE); }
+	if abs(r) < 0.000000000001 { println("Test Failed, " + FILELINE); }
 	i32 r = rand(1..5);
 	if r < 1 { println("Test Failed, " + FILELINE); }
 }
@@ -259,8 +237,8 @@ println("-- string conversion test");
 	i32 c = "5" as i32;
 	if 5 != c { println("Test Failed, " + FILELINE); }
 	
-	f32 d = "33.2" as f32;
-	if 33.2 != d { println("Test Failed, " + FILELINE); }
+	f64 d = "33.2" as f64;
+	if abs(d - 33.2) > 0.0000001 { println("Test Failed, " + FILELINE); }
 	
 	string e = "test" as string;
 	if "test" != e { println("Test Failed, " + FILELINE); }
@@ -272,319 +250,811 @@ println("-- string conversion test");
 
 
 //-----------------------------------------------------------------------------
-println("-- vec i32 test");
+println("-- fixed vec i32 test");
 {
-	vec<i32> ivec;
-	if len(ivec) != 0 { println("Test Failed, " + FILELINE); }
+	// zero initializer
+	vec<i32,1> ivec;
+	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if 0 != ivec[0] { println("Test Failed, " + FILELINE); }
 
-	ivec = [1];
-	if len(ivec) != 1 { println("Test Failed, " + FILELINE); }
-	if ivec[0] != 1 { println("Test Failed, " + FILELINE); }
-
-	vec::append(ivec, 3);
-	if len(ivec) != 2 { println("Test Failed, " + FILELINE); }
-	if ivec[1] != 3 { println("Test Failed, " + FILELINE); }
-
-	vec<i32> ivec = [1, 2, 3];
+	// bracket initializer list with redefinition
+	vec<i32,3> ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
 	if ivec[0] + ivec[1] + ivec[2] != 6 { println("Test Failed, " + FILELINE); }
 
-	vec<i32> tvec = ivec;
-	tvec[1] = 5;
-	if tvec[0] + tvec[1] + tvec[2] != 9 { println("Test Failed, " + FILELINE); }
+	// index assignment
+	ivec[1] = 4;
+	if ivec[0] + ivec[1] + ivec[2] != 8 { println("Test Failed, " + FILELINE); }
 
-	ivec = [55; 6];
-	if len(ivec) != 6 { println("Test Failed, " + FILELINE); }
-	if ivec[0] != ivec[1] || ivec[1] != ivec[2] || ivec[2] != ivec[3] { println("Test Failed, " + FILELINE); }
-	if ivec[3] != ivec[4] || ivec[4] != ivec[5] { println("Test Failed, " + FILELINE); }
-	if ivec[3] != 55 { println("Test Failed, " + FILELINE); }
-}
+	// deep copy using assignment
+	vec<i32,3> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] + avec[1] + avec[2] != 8 { println("Test Failed, " + FILELINE); }
 
+	// deep copy using initializer list
+	vec<i32,3> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] + bvec[1] + bvec[2] != 8 { println("Test Failed, " + FILELINE); }
 
-//-----------------------------------------------------------------------------
-println("-- vec f32 test");
-{
-	vec<f32> fvec;
-	if len(fvec) != 0 { println("Test Failed, " + FILELINE); }
+	// assignment after deep copy
+	bvec[1] = 5;
+	if avec[1] == bvec[1] { println("Test Failed, " + FILELINE); }
 
-	fvec = [1.1];
-	if len(fvec) != 1 { println("Test Failed, " + FILELINE); }
-	if 1.1 !~ fvec[0] { println("Test Failed, " + FILELINE); }
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = 6;
+	if bvec[1] != 6 { println("Test Failed, " + FILELINE); }
+	if bvec[idx] != 6 { println("Test Failed, " + FILELINE); }
+	bvec[idx] = idx;
+	if bvec[1] != 1 { println("Test Failed, " + FILELINE); }
+	if bvec[idx] != 1 { println("Test Failed, " + FILELINE); }
 
-	vec::append(fvec, 3.1);
-	if len(fvec) != 2 { println("Test Failed, " + FILELINE); }
-	if 3.1 !~ fvec[1] { println("Test Failed, " + FILELINE); }
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] + bvec[1] + bvec[2] != 6 { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] + bvec[1] + bvec[2] != 8 { println("Test Failed, " + FILELINE); }
 
-	vec<f32> fvec = [1, 2.3, 3]; // detect float in fixed vec
-	if fvec[0] + fvec[1] + fvec[2] !~ 6.3 { println("Test Failed, " + FILELINE); }
-
-	vec<f32> fvec = [1, 2, 3]; // implicit convert ints to float
-	if fvec[0] + fvec[1] + fvec[2] !~ 6 { println("Test Failed, " + FILELINE); }
-
-	vec<f32> tvec = fvec;
-	tvec[1] = 5.7;
-	tvec[2] = 7;
-	if tvec[0] + tvec[1] + tvec[2] !~ 13.7 { println("Test Failed, " + FILELINE); }
-
-	fvec = [55; 6];
-	if len(fvec) != 6 { println("Test Failed, " + FILELINE); }
-	f32 s = 0;
-	for i in 0..len(fvec) {
-		s = s + fvec[i];
+	// bracket initializer with replicator
+	vec<i32,5> ivec = [2; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
 	}
-	if s !~ 330 { println("Test Failed, " + FILELINE); }
+	if 10 != sum { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<i32,7> ivec = [1, 2;5, 3];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if 14 != sum { println("Test Failed, " + FILELINE); }
+	
+	//vec<i32> x = [1, 2, 3];
+	//if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	//if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
-println("-- vec enum test");
+println("-- dynamic vec i32 test");
 {
-	vec<enum> evec;
-	if len(evec) != 0 { println("Test Failed, " + FILELINE); }
+	// zero initializer
+	vec<i32> ivec;
+	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer list with redefinition
+	vec<i32> ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] + ivec[1] + ivec[2] != 6 { println("Test Failed, " + FILELINE); }
+	
+	// bracket assignment
+	vec<i32> ivec;
+	ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] + ivec[1] + ivec[2] != 6 { println("Test Failed, " + FILELINE); }
 
-	evec = [:TEST];
-	if len(evec) != 1 { println("Test Failed, " + FILELINE); }
-	if evec[0] != :TEST { println("Test Failed, " + FILELINE); }
+	// index assignment
+	ivec[1] = 4;
+	if ivec[0] + ivec[1] + ivec[2] != 8 { println("Test Failed, " + FILELINE); }
+	
+	// deep copy using assignment
+	vec<i32> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] + avec[1] + avec[2] != 8 { println("Test Failed, " + FILELINE); }
+	
+	// deep copy using initializer list
+	vec<i32> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] + bvec[1] + bvec[2] != 8 { println("Test Failed, " + FILELINE); }
 
-	vec::append(evec, :APPEND_TEST);
-	if len(evec) != 2 { println("Test Failed, " + FILELINE); }
-	if evec[1] != :APPEND_TEST { println("Test Failed, " + FILELINE); }
+	// assignment after deep copy
+	bvec[1] = 5;
+	if avec[1] == bvec[1] { println("Test Failed, " + FILELINE); }
 
-	vec<enum> evec = [:A, :B, :C];
-	if evec[0] != :A || evec[1] != :B || evec[2] != :C { println("Test Failed, " + FILELINE); }
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = 6;
+	if bvec[1] != 6 { println("Test Failed, " + FILELINE); }
+	if bvec[idx] != 6 { println("Test Failed, " + FILELINE); }
+	bvec[idx] = idx;
+	if bvec[1] != 1 { println("Test Failed, " + FILELINE); }
+	if bvec[idx] != 1 { println("Test Failed, " + FILELINE); }
 
-	vec<enum> tvec = evec;
-	tvec[1] = :INSERT;
-	if tvec[0] != :A || tvec[1] != :INSERT || tvec[2] != :C { println("Test Failed, " + FILELINE); }
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] + bvec[1] + bvec[2] != 6 { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] + bvec[1] + bvec[2] != 8 { println("Test Failed, " + FILELINE); }
 
-	evec = [:REP; 6];
-	if len(evec) != 6 { println("Test Failed, " + FILELINE); }
-	if evec[0] != evec[1] || evec[1] != evec[2] || evec[2] != evec[3] { println("Test Failed, " + FILELINE); }
-	if evec[3] != evec[4] || evec[4] != evec[5] { println("Test Failed, " + FILELINE); }
-	if evec[3] != :REP { println("Test Failed, " + FILELINE); }
+	// bracket initializer with replicator
+	vec<i32> ivec = [2; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<i32> ivec = [1, 2.1;5, 3];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if 14 != sum { println("Test Failed, " + FILELINE); }
+	
+	// append test
+	vec<i32> tvec = [1, 2];
+	vec::append(tvec, 3);
+	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
+	if tvec[2] != 3 { println("Test Failed, " + FILELINE); }
+	
+	vec<i32> x = [1, 2, 3];
+	if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	vec<i32> v = vec::fill(-1, 5);
+	i32 sum = 0;
+	for i in len(v) {
+		if v[i] == -1 { sum = sum + 1; }
+	}
+	if sum != 5 { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
-println("-- vec bool test");
+println("-- fixed vec f32 test");
 {
-	vec<bool> bvec;
-	if len(bvec) != 0 { println("Test Failed, " + FILELINE); }
+	// zero initializer
+	vec<f32,1> ivec;
+	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if abs(0 - ivec[0]) > 0.0000001 { println("Test Failed, " + FILELINE); }
 
-	bvec = [true];
-	if len(bvec) != 1 { println("Test Failed, " + FILELINE); }
-	if !bvec[0] { println("Test Failed, " + FILELINE); }
+	// bracket initializer list with redefinition
+	vec<f32,3> ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if abs(6 - (ivec[0] + ivec[1] + ivec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
 
-	vec::append(bvec, false);
-	if len(bvec) != 2 { println("Test Failed, " + FILELINE); }
+	// index assignment
+	ivec[1] = 4.4;
+	if abs(8.4 - (ivec[0] + ivec[1] + ivec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<f32,3> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if abs(8.4 - (avec[0] + avec[1] + avec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<f32,3> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if abs(8.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = 5.5;
+	if abs(avec[1] - bvec[1]) < 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = 6.6;
+	if abs(6.6 - bvec[1]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(6.6 - bvec[idx]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	bvec[idx] = idx;
+	if abs(1 - bvec[1]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(1 - bvec[idx]) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if abs(6.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if abs(8.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator
+	vec<f32,5> ivec = [2.2; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	f32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<f32,7> ivec = [1.1, 2.3;5, 3.4];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	f32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if abs(16 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+
+	// vec<f32> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- dynamic vec f32 test");
+{
+	// zero initializer
+	vec<f32> ivec;
+	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer list with redefinition
+	vec<f32> ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if abs(6 - (ivec[0] + ivec[1] + ivec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+	
+	// bracket assignment
+	vec<f32> ivec;
+	ivec = [1, 2, 3];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if abs(6 - (ivec[0] + ivec[1] + ivec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = 4.4;
+	if abs(8.4 - (ivec[0] + ivec[1] + ivec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<f32> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if abs(8.4 - (avec[0] + avec[1] + avec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<f32> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if abs(8.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = 5.5;
+	if abs(avec[1] - bvec[1]) < 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = 6.6;
+	if abs(6.6 - bvec[1]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(6.6 - bvec[idx]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	bvec[idx] = idx;
+	if abs(1 - bvec[1]) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if abs(1 - bvec[idx]) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if abs(6.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if abs(8.4 - (bvec[0] + bvec[1] + bvec[2])) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator
+	vec<f32> ivec = [2.2; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	f32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<f32> ivec = [1.1, 2.3;5, 3.4];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	f32 sum = 0;
+	for i in len(ivec) {
+		sum = sum + ivec[i];
+	}
+	if abs(16 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+	
+	// append test
+	vec<f32> tvec = [1.1, 2.2];
+	vec::append(tvec, 3.3);
+	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
+	if abs(3.3 - tvec[2]) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	// vec<f32> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	vec<f32> v = vec::fill(1.1, 5);
+	i32 sum = 0;
+	for i in len(v) {
+		if abs(1.1 - v[i]) < 0.000001 { sum = sum + 1; }
+	}
+	if sum != 5 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- fixed vec enum test");
+{
+	// zero initializer
+	vec<enum,1> ivec;
+	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer list with redefinition
+	vec<enum,3> ivec = [:A, :B, :C];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] != :A || :B != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = :D;
+	if ivec[0] != :A || :D != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<enum,3> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] != :A || :D != avec[1] || avec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<enum,3> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] != :A || :D != bvec[1] || bvec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = :E;
+	if bvec[0] != :A || :E != bvec[1] || bvec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = :F;
+	if bvec[idx] != :F { println("Test Failed, " + FILELINE); }
+	if bvec[1] != :F { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] != :A || :F != bvec[1] || bvec[2] != :D { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] != :A || :C != bvec[1] || bvec[2] != :D { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator
+	vec<enum,5> ivec = [:G; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == :G { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<enum,7> ivec = [:H, :I;5, :H];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == :H { sum = sum + 1; }
+	}
+	if 2 != sum { println("Test Failed, " + FILELINE); }
+
+	// vec<enum> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- dynamic vec enum test");
+{
+	// zero initializer
+	vec<enum> ivec;
+	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer list with redefinition
+	vec<enum> ivec = [:A, :B, :C];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] != :A || :B != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
+	
+	// bracket assignment
+	vec<enum> ivec;
+	ivec = [:A, :B, :C];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] != :A || :B != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = :D;
+	if ivec[0] != :A || :D != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
+	
+	// deep copy using assignment
+	vec<enum> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] != :A || :D != avec[1] || avec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<enum> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] != :A || :D != bvec[1] || bvec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = :E;
+	if bvec[0] != :A || :E != bvec[1] || bvec[2] != :C { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = :F;
+	if bvec[idx] != :F { println("Test Failed, " + FILELINE); }
+	if bvec[1] != :F { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] != :A || :F != bvec[1] || bvec[2] != :D { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] != :A || :C != bvec[1] || bvec[2] != :D { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator
+	vec<enum> ivec = [:G; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == :G { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<enum> ivec = [:H, :I;5, :H];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == :H { sum = sum + 1; }
+	}
+	if 2 != sum { println("Test Failed, " + FILELINE); }
+	
+	// append test
+	vec<enum> tvec = [:A, :B];
+	vec::append(tvec, :C);
+	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
+	if :C != tvec[2] { println("Test Failed, " + FILELINE); }
+
+	// vec<enum> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	vec<enum> v = vec::fill(:TEST, 5);
+	i32 sum = 0;
+	for i in len(v) {
+		if :TEST == v[i] { sum = sum + 1; }
+	}
+	if sum != 5 { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- fixed vec bool test");
+{
+	// zero initializer
+	vec<bool,1> ivec;
+	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if true == ivec[0] { println("Test Failed, " + FILELINE); }
+	if ivec[0] { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer list with redefinition
+	vec<bool,3> ivec = [false, true, true];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] || !ivec[1] || !ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = false;
+	if ivec[0] || ivec[1] || !ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<bool,3> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] || avec[1] || !avec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<bool,3> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] || bvec[1] || !bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = true;
+	if bvec[0] || !bvec[1] || !bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = false;
+	if bvec[idx] { println("Test Failed, " + FILELINE); }
 	if bvec[1] { println("Test Failed, " + FILELINE); }
 
-	vec<bool> bvec = [true, true, false];
-	if !bvec[0] || !bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] || bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] || !bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
 
-
-	vec<bool> tvec = bvec;
-	tvec[1] = false;
-	if !tvec[0] || tvec[1] || tvec[2] { println("Test Failed, " + FILELINE); }
-
-	bvec = [true; 7];
-	if len(bvec) != 7 { println("Test Failed, " + FILELINE); }
-	for i in 0..len(bvec) {
-		if !bvec[i] { println("Test Failed, " + FILELINE); }
+	// bracket initializer with replicator
+	vec<bool,5> ivec = [true; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] { sum = sum + 1; }
 	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator and list
+	vec<bool,7> ivec = [true, false, true;3, false, true];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+
+	// vec<bool> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+
 }
 
 
 //-----------------------------------------------------------------------------
-println("-- vec string test");
+println("-- dynamic vec bool test");
 {
-	vec<string> t;
-	if 0 != len(t) { println("Test Failed, " + FILELINE); }
-
-	t = ["sss"];
-	if 1 != len(t) { println("Test Failed, " + FILELINE); }
-	if "sss" != t[0] { println("Test Failed, " + FILELINE); }
-
-	vec<string> v = ["a"; 3];
-
-	if len(v) != 3 { println("Test Failed, " + FILELINE); }
-	if v[0] != "a" || v[1] != "a" || v[2] != "a" { println("Test Failed, " + FILELINE); }
-
-	v[1] = "b";
-	if v[1] != "b" { println("Test Failed, " + FILELINE); }
-
-	vec::append(v, "c");
-	if len(v) != 4 { println("Test Failed, " + FILELINE); }
-	if "c" != v[3] { println("Test Failed, " + FILELINE); }
-
-	vec<string> u;
-	vec::append(u, "d");
-
-	v = u;
-	if 1 != len(v) { println("Test Failed, " + FILELINE); }
-	if "d" != v[0] { println("Test Failed, " + FILELINE); }
-
-	string s = v[0];
-	if "d" != s { println("Test Failed, " + FILELINE); }
-
-	u[0] = "e";
-	if "e" != u[0] { println("Test Failed, " + FILELINE); }
-	u[0] = v[0];
-	if "d" != u[0] { println("Test Failed, " + FILELINE); }
+	// zero initializer
+	vec<bool> ivec;
+	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
 	
-	vec<string> r = v;
-	if 1 != len(v) { println("Test Failed, " + FILELINE); }
+	// bracket initializer list with redefinition
+	vec<bool> ivec = [false, true, true];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] || !ivec[1] || !ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// bracket assignment
+	vec<bool> ivec;
+	ivec = [false, true, true];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if ivec[0] || !ivec[1] || !ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = false;
+	if ivec[0] || ivec[1] || !ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<bool> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if avec[0] || avec[1] || !avec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<bool> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if bvec[0] || bvec[1] || !bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = true;
+	if bvec[0] || !bvec[1] || !bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = false;
+	if bvec[idx] { println("Test Failed, " + FILELINE); }
+	if bvec[1] { println("Test Failed, " + FILELINE); }
+	
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if bvec[0] || bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if bvec[0] || !bvec[1] || bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer with replicator
+	vec<bool> ivec = [true; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer with replicator and list
+	vec<bool> ivec = [true, false, true;3, false, true];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	
+	// append test
+	vec<bool> tvec = [true, false];
+	vec::append(tvec, true);
+	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
+	if !tvec[0] || tvec[1] || !tvec[2] { println("Test Failed, " + FILELINE); }
+
+	
+	// vec<bool> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	vec<bool> v = vec::fill(true, 5);
+	i32 sum = 0;
+	for i in len(v) {
+		if v[i] { sum = sum + 1; }
+	}
+	if sum != 5 { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
-println("-- basic struct test");
+println("-- fixed vec string test");
 {
-	struct basic_struct_test_s {
-		i32 x;
-		i32 y;
-		f32 z;
-		enum e;
-		bool b;
-		string s;
+	
+	// zero initializer
+	vec<string,1> ivec;
+	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if "" != ivec[0] { println("Test Failed, " + FILELINE); }
+
+	// bracket initializer list with redefinition
+	vec<string,3> ivec = ["a", "bb", "ccc"];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if "a" != ivec[0] || "bb" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// bracket assignment
+	vec<string,3> ivec;
+	ivec = ["a", "bb", "ccc"];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if "a" != ivec[0] || "bb" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = "d";
+	if "a" != ivec[0] || "d" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using assignment
+	vec<string,3> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if "a" != avec[0] || "d" != avec[1] || "ccc" != avec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<string,3> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if "a" != bvec[0] || "d" != bvec[1] || "ccc" != bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = "fff";
+	if "a" != bvec[0] || "fff" != bvec[1] || "ccc" != bvec[2] { println("Test Failed, " + FILELINE); }
+	
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = "g";
+	if bvec[idx] != "g" { println("Test Failed, " + FILELINE); }
+	if "g" != bvec[1] { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if "a" != bvec[0] || "g" != bvec[1] || "d" != bvec[2] { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if "a" != bvec[0] || "ccc" != bvec[1] || "d" != bvec[2] { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer with replicator
+	vec<string,5> ivec = ["h"; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == "h" { sum = sum + 1; }
 	}
-
-	basic_struct_test_s a;
+	if 5 != sum { println("Test Failed, " + FILELINE); }
 	
-	// default initialization tests
-	if 0 != a.x { println("Test Failed, " + FILELINE); }
-	if 0 != a.y { println("Test Failed, " + FILELINE); }
-	if 0 !~ a.z { println("Test Failed, " + FILELINE); }
-	if a.b { println("Test Failed, " + FILELINE); }
+	// bracket initializer with replicator and list
+	vec<string,7> ivec = ["i", "j";5, "k"];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == "j" { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
 	
-	// assignment tests
-	a.x = 5;
-	if 5 != a.x { println("Test Failed, " + FILELINE); }
-	if a.x != 5 { println("Test Failed, " + FILELINE); }
-
-	a.y = 77.3; // implicit conversion from float to int
-	if 77 != a.y { println("Test Failed, " + FILELINE); }
-	if a.y != 77 { println("Test Failed, " + FILELINE); }
-
-	a.z = 1.5;
-	if 1.5 !~ a.z { println("Test Failed, " + FILELINE); }
-
-	a.e = :TEST;
-	if :TEST != a.e { println("Test Failed, " + FILELINE); }
-	if a.e != :TEST { println("Test Failed, " + FILELINE); }
-
-	a.b = true;
-	if !a.b { println("Test Failed, " + FILELINE); }
-	if true != a.b { println("Test Failed, " + FILELINE); }
-	if a.b != true { println("Test Failed, " + FILELINE); }
-	
-	a.s = "test";
-	a.s = a.s + "cat";
-	if "testcat" != a.s { println("Test Failed, " + FILELINE); }
+	// vec<string> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
-println("-- nested struct test");
+println("-- dynamic vec string test");
 {
-	struct nested_struct_test_arf {
-		string s;
+	// zero initializer
+	vec<string> ivec;
+	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer list with redefinition
+	vec<string> ivec = ["a", "bb", "ccc"];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if "a" != ivec[0] || "bb" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+	
+	// bracket assignment
+	vec<string> ivec;
+	ivec = ["a", "bb", "ccc"];
+	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
+	if "a" != ivec[0] || "bb" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+
+	// index assignment
+	ivec[1] = "d";
+	if "a" != ivec[0] || "d" != ivec[1] || "ccc" != ivec[2] { println("Test Failed, " + FILELINE); }
+	
+	// deep copy using assignment
+	vec<string> avec;
+	avec = ivec;
+	if 3 != len(avec) { println("Test Failed, " + FILELINE); }
+	if "a" != avec[0] || "d" != avec[1] || "ccc" != avec[2] { println("Test Failed, " + FILELINE); }
+
+	// deep copy using initializer list
+	vec<string> bvec = avec;
+	if 3 != len(bvec) { println("Test Failed, " + FILELINE); }
+	if "a" != bvec[0] || "d" != bvec[1] || "ccc" != bvec[2] { println("Test Failed, " + FILELINE); }
+
+	// assignment after deep copy
+	bvec[1] = "fff";
+	if "a" != bvec[0] || "fff" != bvec[1] || "ccc" != bvec[2] { println("Test Failed, " + FILELINE); }
+	
+	// index variable test
+	i32 idx = 1;
+	bvec[idx] = "g";
+	if bvec[idx] != "g" { println("Test Failed, " + FILELINE); }
+	if "g" != bvec[1] { println("Test Failed, " + FILELINE); }
+
+	// assignment to index from variable with index
+	i32 i0 = 1;
+	i32 i1 = 2;
+	bvec[i1] = avec[i0];
+	if "a" != bvec[0] || "g" != bvec[1] || "d" != bvec[2] { println("Test Failed, " + FILELINE); }
+	bvec[1] = avec[2];
+	if "a" != bvec[0] || "ccc" != bvec[1] || "d" != bvec[2] { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer with replicator
+	vec<string> ivec = ["h"; 5];
+	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == "h" { sum = sum + 1; }
 	}
-
-	struct nested_struct_test_foo {
-		i32 x;
-		nested_struct_test_arf a;
-		f32 f;
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	
+	// bracket initializer with replicator and list
+	vec<string> ivec = ["i", "j";5, "k"];
+	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
+	i32 sum = 0;
+	for i in len(ivec) {
+		if ivec[i] == "j" { sum = sum + 1; }
 	}
-
-	struct nested_struct_test_bar {
-		i32 b;
-		nested_struct_test_foo y;
-	}
-
-	nested_struct_test_bar z;
-
-	if 0 != z.b { println("Test Failed, " + FILELINE); }
-	if 0 != z.y.x { println("Test Failed, " + FILELINE); }
-	if 0 !~ z.y.f { println("Test Failed, " + FILELINE); }
-	if "" != z.y.a.s { println("Test Failed, " + FILELINE); }
-
-	z.b = 11;
-	z.y.x = 22;
-	z.y.f = 33.3;
-	z.y.a.s = "nested";
-
-	if 11 != z.b { println("Test Failed, " + FILELINE); }
-	if 22 != z.y.x { println("Test Failed, " + FILELINE); }
-	if 33.3 !~ z.y.f { println("Test Failed, " + FILELINE); }
-	if "nested" != z.y.a.s { println("Test Failed, " + FILELINE); }
-}
-
-
-//-----------------------------------------------------------------------------
-println("-- nested struct sub-assignment test");
-{
-	struct nested_sub_assign_ssc {
-		string s;
-	}
-
-	struct nested_sub_assign_ssb {
-		f32 f;
-		nested_sub_assign_ssc c;
-	}
-
-	struct nested_sub_assign_ss {
-		i32 t;
-		nested_sub_assign_ssb u;
-	}
-
-	nested_sub_assign_ss a;
-	nested_sub_assign_ss b;
-	a.u.f = 1.2;
-	b.u.f = 0.8;
-	a.u.f = b.u.f;
-	if 0.8 !~ a.u.f { println("Test Failed, " + FILELINE); }
-
-	nested_sub_assign_ss a;
-	nested_sub_assign_ssb b;
-	b.f = 1.2;
-	b.c.s = "bcs";
-	if "bcs" != b.c.s { println("Test Failed, " + FILELINE); }
-
-	a.u = b;
-	if 1.2 !~ a.u.f { println("Test Failed, " + FILELINE); }
-	if "bcs" != a.u.c.s { println("Test Failed, " + FILELINE); }
-
-	nested_sub_assign_ss a;
-	a.t = 1;
-	a.u.f = 3.3;
-	if 1 != a.t { println("Test Failed, " + FILELINE); }
-	if 3.3 !~ a.u.f { println("Test Failed, " + FILELINE); }
-
-	nested_sub_assign_ss b;
-	b.u.f = 4.4;
-	a = b;
-	if 0 != a.t { println("Test Failed, " + FILELINE); }
-	if 4.4 !~ a.u.f { println("Test Failed, " + FILELINE); }
-
-	nested_sub_assign_ssb c;
-	c.f = 5.5;
-	b.u = c;
-	if 5.5 !~ b.u.f { println("Test Failed, " + FILELINE); }
-
-
-	nested_sub_assign_ss b0;
-	nested_sub_assign_ss b1;
-	b0.t = 1;
-	b0.u.f = 333.3;
-	b1.t = 2;
-	if 1 != b0.t { println("Test Failed, " + FILELINE); }
-
-	b0.t = b1.t;
-	if 2 != b0.t { println("Test Failed, " + FILELINE); }
-
-	if 333.3 !~ b0.u.f { println("Test Failed, " + FILELINE); }
-	b1 = b0;
-	if 333.3 !~ b1.u.f { println("Test Failed, " + FILELINE); }
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	
+	// append test
+	vec<string> tvec = ["m", "n"];
+	vec::append(tvec, "o");
+	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
+	if "m" != tvec[0] || "n" != tvec[1] || "o" != tvec[2] { println("Test Failed, " + FILELINE); }
+	
+	// vec<string> x = [1, 2, 3];
+	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	//vec<string> v = vec::fill("test", 5);
+	//println(v);
 }
 
 
@@ -593,12 +1063,27 @@ println("-- file read/write test");
 {
 	vec<string> a = ["a", "b", "c"];
 	file::writelines("test.out", a);
-
+	
 	vec<string> b = file::readlines("test.out");
 	if 3 != len(b) { println("Test Failed, " + FILELINE); }
 	if "a" != b[0] { println("Test Failed, " + FILELINE); }
 	if b[1] != "b" { println("Test Failed, " + FILELINE); }
 	if "c" != b[2] { println("Test Failed, " + FILELINE); }
+	
+	vec<string,3> a = ["d", "e", "f"];
+	file::writelines("test2.out", a);
+	
+	vec<string> b = file::readlines("test2.out");
+	if 3 != len(b) { println("Test Failed, " + FILELINE); }
+	if "d" != b[0] { println("Test Failed, " + FILELINE); }
+	if b[1] != "e" { println("Test Failed, " + FILELINE); }
+	if "f" != b[2] { println("Test Failed, " + FILELINE); }
+	
+	string a = "test3\ntest4";
+	file::writestring("test3.out", a);
+	
+	string b = file::readstring("test3.out");
+	if b != a { println("Test Failed, " + FILELINE); }
 }
 
 
@@ -627,13 +1112,13 @@ println("-- string operation test");
 
 	string e = str::substr(d, 3);
 	if "--rhs" != e { println("Test Failed, " + FILELINE); }
-
+	
 	string f = str::substr(d, 2, 3);
 	if "s--" != f { println("Test Failed, " + FILELINE); }
-
+	
 	string g = str::substr(d, 0, 4);
 	if g != "lhs-" { println("Test Failed, " + FILELINE); }
-
+	
 	string h = "Ba_Rf";
 	if "BA_RF" != str::toupper(h) { println("Test Failed, " + FILELINE); }
 	if "ba_rf" != str::tolower(h) { println("Test Failed, " + FILELINE); }
@@ -641,11 +1126,32 @@ println("-- string operation test");
 	if "Ba_Rf" != str::ltrim(h) { println("Test Failed, " + FILELINE); }
 	if "Ba_Rf" != str::rtrim(h) { println("Test Failed, " + FILELINE); }
 	if "Ba_Rf" != str::trim(h) { println("Test Failed, " + FILELINE); }
-
+	
 	string i = " aa   ";
 	if "aa   " != str::ltrim(i) { println("Test Failed, " + FILELINE); }
 	if " aa" != str::rtrim(i) { println("Test Failed, " + FILELINE); }
 	if "aa" != str::trim(i) { println("Test Failed, " + FILELINE); }
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- stack overflow test");
+{
+	for i in 10000000 {
+		i32 j;
+		f32 f;
+		enum e;
+		bool b;
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+println("-- memory leak test");
+{
+	for i in 1000000 {
+		string s = rand() as string;
+	}
 }
 
 //

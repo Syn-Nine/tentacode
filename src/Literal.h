@@ -103,7 +103,7 @@ private:
 	EnumLiteral m_enumValue;
 	bool m_boolValue;
 	LiteralTypeEnum m_type;
-	LiteralTypeEnum m_vecType;
+	//LiteralTypeEnum m_vecType;
 	
 };
 

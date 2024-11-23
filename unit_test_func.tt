@@ -1,0 +1,7 @@
+def myfun() {
+	bool x;
+	{ x = true; }
+	println(x);
+}
+
+myfun();

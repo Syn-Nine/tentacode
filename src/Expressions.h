@@ -234,8 +234,8 @@ public:
 	
 
 private:
-	Literal m_literal;
 	Token* m_token;
+	Literal m_literal;
 };
 
 
@@ -319,8 +319,8 @@ public:
 	{
 		if (2 <= Environment::GetDebugLevel()) printf("ReplicateExpr::codegen()\n");
 
-		TValue val = m_left->codegen(builder, module, env);
-		TValue qty = m_left->codegen(builder, module, env);
+		//TValue val = m_left->codegen(builder, module, env);
+		//TValue qty = m_left->codegen(builder, module, env);
 
 		/*AllocaInst* a = entry_builder.CreateAlloca(builder->getInt64Ty(), nullptr, "alloc_vec_ptr");
 		if (LITERAL_TYPE_INTEGER == val.type && LITERAL_TYPE_INTEGER == qty.type)

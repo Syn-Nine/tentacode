@@ -2,7 +2,6 @@
 #include "Statements.h"
 #include "Environment.h"
 
-ErrorHandler* TFunction::m_errorHandler = nullptr;
 llvm::IRBuilder<>* TFunction::m_builder = nullptr;
 llvm::Module* TFunction::m_module = nullptr;
 
@@ -192,6 +191,11 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 	llvm::FunctionType* FT = llvm::FunctionType::get(ret.m_retval.GetTy(), args, false);
 
 	ret.m_llvm_func = llvm::Function::Create(FT, llvm::Function::InternalLinkage, name->Lexeme(), *m_module);
+	if (!ret.m_llvm_func)
+	{
+		Environment::Error(name, "Failed compile function prototype.");
+		return TFunction();
+	}
 	
 	ret.m_valid = true;
 	

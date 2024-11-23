@@ -12,8 +12,10 @@
 #include "Literal.h"
 #include "Token.h"
 #include "TFunction.h"
+#include "TStruct.h"
 #include "TValue.h"
 #include "ErrorHandler.h"
+
 
 class Environment
 {
@@ -35,6 +37,16 @@ private:
 
 		func_struct() {}
 		func_struct(TFunction func, std::string lex) : tfunc(func), lexeme(lex)
+		{}
+	};
+
+	struct struct_struct
+	{
+		TStruct tstruc;
+		std::string lexeme;
+
+		struct_struct() {}
+		struct_struct(TStruct struc, std::string lex) : tstruc(struc), lexeme(lex)
 		{}
 	};
 
@@ -183,7 +195,7 @@ public:
 		m_func[lexeme] = func_struct(func, lexeme);
 	}
 
-	TFunction GetFunction(Token* token, const std::string& func)
+	static TFunction GetFunction(Token* token, const std::string& func)
 	{
 		if (IsFunction(func)) return m_func.at(func).tfunc;
 		Error(token, "Function not found in environment.");
@@ -201,6 +213,29 @@ public:
 	{
 		m_parent_function = GetFunction(token, func);
 	}
+
+
+	//----------------------------------------------------------------------------
+
+	static bool IsStruct(std::string id)
+	{
+		return 0 != m_struc.count(id);
+	}
+
+
+	static void DefineStruct(TStruct struc, std::string lexeme)
+	{
+		m_struc[lexeme] = struct_struct(struc, lexeme);
+	}
+
+	static TStruct GetStruct(Token* token, const std::string& struc)
+	{
+		if (IsStruct(struc)) return m_struc.at(struc).tstruc;
+		Error(token, "Structure not found in environment.");
+		return TStruct();
+	}
+
+
 
 	/*
 
@@ -366,6 +401,8 @@ private:
 
 	TFunction m_parent_function;
 	static std::map<std::string, func_struct> m_func;
+	
+	static std::map<std::string, struct_struct> m_struc;
 
 };
 

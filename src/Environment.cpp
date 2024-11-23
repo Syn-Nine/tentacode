@@ -11,6 +11,8 @@ ErrorHandler* Environment::m_errorHandler = nullptr;
 
 std::map<std::string, Environment::func_struct> Environment::m_func;
 
+std::map<std::string, Environment::struct_struct> Environment::m_struc;
+
 
 
 //-----------------------------------------------------------------------------

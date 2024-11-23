@@ -1,6 +1,7 @@
 #include "TValue.h"
 #include "Environment.h"
 #include "TVec.h"
+#include "TStruct.h"
 
 
 //-----------------------------------------------------------------------------
@@ -38,6 +39,7 @@ TValue TValue::FromLiteral(Token* token, const Literal& literal)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::Construct(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs /* = nullptr */)
 {
@@ -72,12 +74,16 @@ TValue TValue::Construct(Token* token, TokenPtrList* args, std::string lexeme, b
 	case TOKEN_VAR_RENDER_TEXTURE_2D:
 		return Construct_Pointer(token, lexeme, global);
 		
+	case TOKEN_IDENTIFIER:
+		return Construct_Struct(token, lexeme, global);
+
 	default:
 		Error(token, "Invalid type in variable constructor.");
 	}
 
 	return TValue::NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -102,6 +108,7 @@ TValue TValue::Construct_Explicit(
 	ret.m_vec_type = vec_type;
 	return ret;
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -140,6 +147,7 @@ TValue TValue::Construct_Int(Token* token, int bits, std::string lexeme, bool gl
 
 	return NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -183,6 +191,7 @@ TValue TValue::Construct_Float(Token* token, int bits, std::string lexeme, bool 
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Bool(Token* token, std::string lexeme, bool global)
 {
@@ -215,6 +224,7 @@ TValue TValue::Construct_Bool(Token* token, std::string lexeme, bool global)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 {
@@ -245,6 +255,7 @@ TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 
 	return NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -281,6 +292,7 @@ TValue TValue::Construct_Pointer(Token* token, std::string lexeme, bool global)
 
 	return NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -322,6 +334,47 @@ TValue TValue::Construct_String(Token* token, std::string lexeme, bool global)
 }
 
 
+
+TValue TValue::Construct_Struct(Token* token, std::string lexeme, bool global)
+{
+	std::string udtname = token->Lexeme();
+	
+	TStruct struc = Environment::GetStruct(token, udtname);
+	if (!struc.IsValid()) return NullInvalid();
+
+	llvm::Type* defty = struc.GetLLVMStruct();
+	llvm::Value* defval = nullptr;
+	llvm::Constant* nullval = llvm::Constant::getNullValue(defty);
+
+	if (global)
+	{
+		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, nullval, lexeme);
+		if (!defval) Error(token, "Failed to create global variable.");
+	}
+	else
+	{
+		defval = CreateEntryAlloca(m_builder, defty, nullptr, lexeme);
+		if (defval)
+			m_builder->CreateStore(nullval, defval);
+		else
+			Error(token, "Failed to create stack variable.");
+	}
+
+	if (defval)
+	{
+		TValue ret;
+		ret.m_type = LITERAL_TYPE_UDT;
+		ret.m_value = defval;
+		ret.m_ty = defty;
+		ret.m_token = token;
+		return ret;
+	}
+
+	return NullInvalid();
+}
+
+
+
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs)
 {
@@ -344,12 +397,12 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 	// allocate space for the pointer to this vector
 	if (global)
 	{
-		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, "global_vec_tmp");
+		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, lexeme);
 		if (!defval) Error(token, "Failed to create global variable.");
 	}
 	else
 	{
-		defval = CreateEntryAlloca(m_builder, defty, nullptr, "alloc_vec_tmp");
+		defval = CreateEntryAlloca(m_builder, defty, nullptr, lexeme);
 		m_builder->CreateStore(init, defval);
 	}
 
@@ -372,6 +425,7 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 
 	return NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -458,8 +512,34 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
+{
+	TValue ret = Construct_Prototype(token, type, bits);
+	if (ret.IsInvalid()) return ret;
+	
+	if (LITERAL_TYPE_INVALID != type) ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
+
+	return ret;
+}
+
+
+
+//-----------------------------------------------------------------------------
+TValue TValue::Construct_Prototype(Token* token)
+{
+	LiteralTypeEnum type;
+	int bits;
+	llvm::Type* ty;
+	TokenToType(token->GetType(), type, bits, ty);
+	return Construct_Prototype(token, type, bits);
+}
+
+
+
+//-----------------------------------------------------------------------------
+TValue TValue::Construct_Prototype(Token* token, LiteralTypeEnum type, int bits)
 {
 	TValue ret;
 	ret.m_token = token;
@@ -470,14 +550,13 @@ TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
 
 	if (!ret.m_ty)
 	{
-		Error(token, "Invalid type in null constructor.");
+		Error(token, "Invalid variable prototype.");
 		return NullInvalid();
 	}
 
-	if (LITERAL_TYPE_INVALID != type) ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
-
 	return ret;
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -509,6 +588,7 @@ TValue TValue::Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bit
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::MakeBool(Token* token, llvm::Value* value)
 {
@@ -523,6 +603,7 @@ TValue TValue::MakeBool(Token* token, llvm::Value* value)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::MakeEnum(Token* token, llvm::Value* value)
 {
@@ -530,6 +611,7 @@ TValue TValue::MakeEnum(Token* token, llvm::Value* value)
 	ret.m_type = LITERAL_TYPE_ENUM;
 	return ret;
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -552,6 +634,7 @@ TValue TValue::MakeInt(Token* token, int bits, llvm::Value* value)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::MakeFloat(Token* token, int bits, llvm::Value* value)
 {
@@ -572,6 +655,7 @@ TValue TValue::MakeFloat(Token* token, int bits, llvm::Value* value)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::MakeString(Token* token, llvm::Value* value)
 {
@@ -587,6 +671,7 @@ TValue TValue::MakeString(Token* token, llvm::Value* value)
 	Environment::AddToCleanup(ret);
 	return ret;
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -607,6 +692,7 @@ TValue TValue::MakeDynVec(Token* token, llvm::Value* value, LiteralTypeEnum vec_
 }
 
 
+
 //-----------------------------------------------------------------------------
 llvm::Type* TValue::MakeTy(LiteralTypeEnum type, int bits)
 {
@@ -621,6 +707,7 @@ llvm::Type* TValue::MakeTy(LiteralTypeEnum type, int bits)
 
 	return nullptr;
 }
+
 
 
 //-----------------------------------------------------------------------------

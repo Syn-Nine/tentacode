@@ -1,0 +1,153 @@
+//-----------------------------------------------------------------------------
+println("-- basic struct test");
+// make structure
+struct basic_struct_test_s {
+	i32 x;
+	i32 y;
+	f32 z;
+	enum e;
+	bool b;
+	string s;
+}
+// do test
+{
+	basic_struct_test_s a;
+	
+	// default initialization tests
+	if 0 != a.x { println("Test Failed, " + FILELINE); }
+	if 0 != a.y { println("Test Failed, " + FILELINE); }
+	if abs(0 - a.z) > 0.000001 { println("Test Failed, " + FILELINE); }
+	if a.b { println("Test Failed, " + FILELINE); }
+	
+	// assignment tests
+	a.x = 5;
+	if 5 != a.x { println("Test Failed, " + FILELINE); }
+	if a.x != 5 { println("Test Failed, " + FILELINE); }
+
+	a.y = 77.3; // implicit conversion from float to int
+	if 77 != a.y { println("Test Failed, " + FILELINE); }
+	if a.y != 77 { println("Test Failed, " + FILELINE); }
+
+	a.z = 1.5;
+	if abs(1.5 - a.z) > 0.000001 { println("Test Failed, " + FILELINE); }
+
+	a.e = :TEST;
+	if :TEST != a.e { println("Test Failed, " + FILELINE); }
+	if a.e != :TEST { println("Test Failed, " + FILELINE); }
+
+	a.b = true;
+	if !a.b { println("Test Failed, " + FILELINE); }
+	if true != a.b { println("Test Failed, " + FILELINE); }
+	if a.b != true { println("Test Failed, " + FILELINE); }
+	
+	a.s = "test";
+	a.s = a.s + "cat";
+	if "testcat" != a.s { println("Test Failed, " + FILELINE); }
+}
+
+
+
+/*
+//-----------------------------------------------------------------------------
+println("-- nested struct test");
+// make structures
+struct nested_struct_test_arf {
+	string s;
+}
+struct nested_struct_test_foo {
+	i32 x;
+	nested_struct_test_arf a;
+	f32 f;
+}
+struct nested_struct_test_bar {
+	i32 b;
+	nested_struct_test_foo y;
+}
+// do test
+{
+	nested_struct_test_bar z;
+
+	if 0 != z.b { println("Test Failed, " + FILELINE); }
+	if 0 != z.y.x { println("Test Failed, " + FILELINE); }
+	if 0 !~ z.y.f { println("Test Failed, " + FILELINE); }
+	if "" != z.y.a.s { println("Test Failed, " + FILELINE); }
+
+	z.b = 11;
+	z.y.x = 22;
+	z.y.f = 33.3;
+	z.y.a.s = "nested";
+
+	if 11 != z.b { println("Test Failed, " + FILELINE); }
+	if 22 != z.y.x { println("Test Failed, " + FILELINE); }
+	if 33.3 !~ z.y.f { println("Test Failed, " + FILELINE); }
+	if "nested" != z.y.a.s { println("Test Failed, " + FILELINE); }
+}
+
+
+
+//-----------------------------------------------------------------------------
+println("-- nested struct sub-assignment test");
+// make structures
+struct nested_sub_assign_ssc {
+	string s;
+}
+struct nested_sub_assign_ssb {
+	f32 f;
+	nested_sub_assign_ssc c;
+}
+struct nested_sub_assign_ss {
+	i32 t;
+	nested_sub_assign_ssb u;
+}
+// do test
+{
+	nested_sub_assign_ss a;
+	nested_sub_assign_ss b;
+	a.u.f = 1.2;
+	b.u.f = 0.8;
+	a.u.f = b.u.f;
+	if 0.8 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss a;
+	nested_sub_assign_ssb b;
+	b.f = 1.2;
+	b.c.s = "bcs";
+	if "bcs" != b.c.s { println("Test Failed, " + FILELINE); }
+
+	a.u = b;
+	if 1.2 !~ a.u.f { println("Test Failed, " + FILELINE); }
+	if "bcs" != a.u.c.s { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss a;
+	a.t = 1;
+	a.u.f = 3.3;
+	if 1 != a.t { println("Test Failed, " + FILELINE); }
+	if 3.3 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ss b;
+	b.u.f = 4.4;
+	a = b;
+	if 0 != a.t { println("Test Failed, " + FILELINE); }
+	if 4.4 !~ a.u.f { println("Test Failed, " + FILELINE); }
+
+	nested_sub_assign_ssb c;
+	c.f = 5.5;
+	b.u = c;
+	if 5.5 !~ b.u.f { println("Test Failed, " + FILELINE); }
+
+
+	nested_sub_assign_ss b0;
+	nested_sub_assign_ss b1;
+	b0.t = 1;
+	b0.u.f = 333.3;
+	b1.t = 2;
+	if 1 != b0.t { println("Test Failed, " + FILELINE); }
+
+	b0.t = b1.t;
+	if 2 != b0.t { println("Test Failed, " + FILELINE); }
+
+	if 333.3 !~ b0.u.f { println("Test Failed, " + FILELINE); }
+	b1 = b0;
+	if 333.3 !~ b1.u.f { println("Test Failed, " + FILELINE); }
+}
+*/

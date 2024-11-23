@@ -149,7 +149,11 @@ private:
 		if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
 		Token* id = new Token(Previous());
 
-		if (!Consume(TOKEN_LEFT_BRACE, "Expected { for struct definition.")) return nullptr;
+		if (!Consume(TOKEN_LEFT_BRACE, "Expected { for struct definition."))
+		{
+			delete id;
+			return nullptr;
+		}
 
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd() && !m_errorHandler->HasErrors())
@@ -170,12 +174,18 @@ private:
 			else
 			{
 				Error(Previous(), "Invalid variable type inside structure definition.");
+				delete id;
+				delete vars;
 				return nullptr;
 			}
 		}
 
-		if (!Consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct definition.")) return nullptr;
-		//if (!Consume(TOKEN_SEMICOLON, "Expected ';' after struct definition.")) return nullptr;
+		if (!Consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct definition."))
+		{
+			delete id;
+			delete vars;
+			return nullptr;
+		}
 
 		return new StructStmt(id, vars);
 	}
@@ -582,12 +592,12 @@ private:
 	//-----------------------------------------------------------------------------
 	Expr* Comparison()
 	{
-		Expr* expr = Struct();
+		Expr* expr = Range();//Struct();
 
 		while (Match(4, TOKEN_GREATER, TOKEN_GREATER_EQUAL, TOKEN_LESS, TOKEN_LESS_EQUAL))
 		{
 			Token* oper = new Token(Previous());
-			Expr* right = Struct();
+			Expr* right = Range();//Struct();
 			expr = new BinaryExpr(expr, oper, right);
 		}
 
@@ -596,12 +606,12 @@ private:
 
 
 	//-----------------------------------------------------------------------------
-	Expr* Struct()
+	/*Expr* Struct()
 	{
 		Expr* expr = Range();
 
 		return expr;
-	}
+	}*/
 
 
 	//-----------------------------------------------------------------------------
