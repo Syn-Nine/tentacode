@@ -1,8 +1,8 @@
 // Tic-Tac-Toe Game
 // By syn9
 
-global i32 SZ = 9;
-global vec<enum> board = [:EMPTY; 9];
+i32 SZ = 9;
+vec<enum> board = [:EMPTY; 9];
 
 println("Let's play Tic-Tac-Toe!");
 println("-----------------------------------------------------");

@@ -40,12 +40,13 @@ extern "C" DLLEXPORT void println(std::string* p)
 		printf("\n");
 }
 
-/*extern "C" DLLEXPORT void input(char* p)
+extern "C" DLLEXPORT std::string* input()
 {
-	if (p) std::cin.getline(p, 255);
+	char p[256];
+	memset(p, 0, 256);
+	std::cin.getline(p, 255);
+	return new std::string(p);
 }
-*/
-
 
 
 // strings
@@ -153,7 +154,7 @@ extern "C" DLLEXPORT int64_t __rand_range_impl(int64_t lhs, int64_t rhs)
 	// todo - go back and profile
 	static std::random_device rd;
 	static std::mt19937 gen(rd());
-	std::uniform_int_distribution<> dist(lhs, rhs);
+	std::uniform_int_distribution<> dist(lhs, rhs-1);
 	return dist(gen);
 }
 
@@ -986,11 +987,10 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "atan2", *module);
 	}
 	
-	/* {	// void = ftn(int)
-		std::vector<llvm::Type*> args(1, builder->getInt32Ty());
-		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+	{	// ptr = ftn(void)
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), { }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "input", *module);
-	}*/
+	}
 
 	
 	// vectors

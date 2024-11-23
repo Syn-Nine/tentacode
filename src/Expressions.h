@@ -141,6 +141,7 @@ public:
 	
 private:
 
+	// standard library
 	TValue codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	TValue codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	TValue codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);

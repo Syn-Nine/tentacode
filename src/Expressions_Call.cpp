@@ -1,5 +1,4 @@
 #include "Expressions.h"
-#include "Environment.h"
 
 
 //-----------------------------------------------------------------------------
@@ -110,16 +109,11 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			return TValue::NullInvalid();
 		}
 	}
-
-	/*else if (0 == name.compare("input"))
+	else if (0 == name.compare("input"))
 	{
-		llvm::Value* a = CreateEntryAlloca(builder, builder->getInt8Ty(), builder->getInt32(256), "alloctmp");
-		TValue b = TValue::String(builder->CreateGEP(static_cast<llvm::AllocaInst*>(a)->getAllocatedType(), a, builder->getInt8(0), "geptmp"));
-		builder->CreateStore(builder->getInt8(0), b.value);
-		builder->CreateCall(module->getFunction("input"), { b.value }, "calltmp");
-		return b;
-	}*/
-	
+		llvm::Value* s = builder->CreateCall(module->getFunction("input"), {}, "calltmp");
+		return TValue::MakeString(callee, s);
+	}	
 	else
 	{
 		TFunction tfunc = env->GetFunction(callee, name);

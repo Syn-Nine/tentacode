@@ -7,7 +7,7 @@ ray::SetTargetFPS(60);
 ray::rlClearColor(51, 77, 77, 255);
 
 // load the shader for tutorial 2
-i32 program = shader::load("../../assets/textures.vs", "../../assets/textures.fs");
+i32 program = shader::load("textures.vs", "textures.fs");
 
 // create vertices and load them to a vertex buffer object
 vec<f32> verts = [
@@ -44,11 +44,11 @@ ray::rlSetVertexAttribute(2, 2, RL_FLOAT, false, 8 * SZ_FLOAT, 6 * SZ_FLOAT);
 ray::rlEnableVertexAttribute(2);
 
 // texture 1
-ray_texture texture1 = ray::LoadTexture("container.png");
+ray_texture texture1 = ray::LoadTexture("../../assets/container.png");
 i32 texid1 = ray::GetTextureId(texture1);
 
 // texture 2
-ray_image image2 = ray::LoadImage("awesomeface.png");
+ray_image image2 = ray::LoadImage("../../assets/awesomeface.png");
 ray::ImageFlipVertical(image2);
 ray_texture texture2 = ray::LoadTextureFromImage(image2);
 i32 texid2 = ray::GetTextureId(texture2);

@@ -81,26 +81,20 @@ extern "C" DLLEXPORT int32_t ray_ImagePeek(Image* in0, int32_t in1, int32_t in2,
     }
 }
 
-extern "C" DLLEXPORT int32_t ray_rlLoadVertexBuffer(void* vecPtr, bool dynamic)
+extern "C" DLLEXPORT int32_t ray_rlLoadVertexBuffer(TVec* vecPtr, bool dynamic)
 {
-    llvm::SmallVector<double>* src = static_cast<llvm::SmallVector<double>*>(vecPtr);
-    llvm::SmallVector<float> tmp;
-    tmp.reserve(src->size());
-    for (size_t i = 0; i < src->size(); ++i)
-    {
-        tmp.push_back((*src)[i]);
-    }
-    return rlLoadVertexBuffer(tmp.data(), tmp.size() * sizeof(float), dynamic);
+    float* src = static_cast<float*>(vecPtr->Data());
+    return rlLoadVertexBuffer(src, vecPtr->Size() * sizeof(float), dynamic);
 }
 
-extern "C" DLLEXPORT int32_t ray_rlLoadVertexBufferElement(void* vecPtr, bool dynamic)
+extern "C" DLLEXPORT int32_t ray_rlLoadVertexBufferElement(TVec* vecPtr, bool dynamic)
 {
-    llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(vecPtr);
+    int32_t* src = static_cast<int32_t*>(vecPtr->Data());
     llvm::SmallVector<unsigned short> tmp;
-    tmp.reserve(src->size());
-    for (size_t i = 0; i < src->size(); ++i)
+    tmp.reserve(vecPtr->Size());
+    for (size_t i = 0; i < vecPtr->Size(); ++i)
     {
-        tmp.push_back((*src)[i]);
+        tmp.push_back(src[i]);
     }
     return rlLoadVertexBufferElement(tmp.data(), tmp.size() * sizeof(unsigned short), dynamic);
 }
@@ -116,7 +110,7 @@ extern "C" DLLEXPORT void ray_rlDrawVertexArrayElements(int32_t in0, int32_t in1
     rlDrawVertexArrayElements(in0, in1, (void*)in2);
 }
 
-extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, void* in1, int32_t in2)
+extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, TVec* in1, int32_t in2)
 {
     void* ptr = nullptr;
     int sz = 0;
@@ -128,12 +122,12 @@ extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, void* in1, int32_t in2)
     case RL_SHADER_UNIFORM_VEC3:
     case RL_SHADER_UNIFORM_VEC4:
     {
-        llvm::SmallVector<double>* src = static_cast<llvm::SmallVector<double>*>(in1);
+        float* src = static_cast<float*>(in1->Data());
         llvm::SmallVector<float> tmp;
-        tmp.reserve(src->size());
-        for (size_t i = 0; i < src->size(); ++i)
+        tmp.reserve(in1->Size());
+        for (size_t i = 0; i < in1->Size(); ++i)
         {
-            tmp.push_back((*src)[i]);
+            tmp.push_back(src[i]);
         }
         ptr = static_cast<void*>(tmp.data());
         sz = tmp.size();
@@ -145,9 +139,8 @@ extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, void* in1, int32_t in2)
     case RL_SHADER_UNIFORM_IVEC4:
     case RL_SHADER_UNIFORM_SAMPLER2D:
     {
-        llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(in1);
-        ptr = static_cast<void*>(src->data());
-        sz = src->size();
+        ptr = static_cast<void*>(in1->Data());
+        sz = in1->Size();
         break;
     }
     }
@@ -843,7 +836,7 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetTextureId", *module);
-        std::string lexeme = "ray::rlDisableBackfaceCulling";
+        std::string lexeme = "ray::GetTextureId";
         env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INTEGER), lexeme);
     }
     {

@@ -41,6 +41,10 @@ TValue TValue::AsInt(int bits)
 	{
 		return lhs.CastToInt(bits);
 	}
+	else if (LITERAL_TYPE_BOOL == m_type)
+	{
+		return lhs.CastToInt(bits);
+	}
 	else if (LITERAL_TYPE_STRING == m_type)
 	{
 		llvm::Value* v = m_builder->CreateCall(m_module->getFunction("__str_to_int"), { lhs.m_value }, "calltmp");
@@ -54,13 +58,6 @@ TValue TValue::AsInt(int bits)
 	Error(m_token, "Invalid cast operation.");
 	return NullInvalid();
 
-	/*
-
-		else if (lhs.IsBool())
-		{
-			return TValue::Integer(builder->CreateIntCast(lhs.value, builder->getInt32Ty(), false, "int_cast_tmp"));
-		}
-		*/
 }
 
 
@@ -178,22 +175,12 @@ TValue TValue::CastToFloat(int bits)
 	{
 		if (bits == m_bits) return *this; // clone
 		llvm::Value* defval = m_builder->CreateFPCast(m_value, defty, "fp_cast");
-		TValue ret = *this;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		return ret;
+		return MakeFloat(m_token, bits, defval);
 	}
 	else if (LITERAL_TYPE_INTEGER == m_type)
 	{
 		llvm::Value* defval = m_builder->CreateSIToFP(m_value, defty, "int_to_fp");
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_FLOAT;
-		ret.m_token = m_token;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		return ret;
+		return MakeFloat(m_token, bits, defval);
 	}
 
 	Error(m_token, "Failed to cast to float.");
@@ -223,22 +210,17 @@ TValue TValue::CastToInt(int bits)
 	{
 		if (bits == m_bits) return *this; // clone
 		llvm::Value* defval = m_builder->CreateIntCast(m_value, defty, true, "int_cast");
-		TValue ret = *this;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		return ret;
+		return MakeInt(m_token, bits, defval);
+	}
+	else if (LITERAL_TYPE_BOOL == m_type)
+	{
+		llvm::Value* defval = m_builder->CreateIntCast(m_value, defty, true, "int_cast");
+		return MakeInt(m_token, bits, defval);
 	}
 	else if (LITERAL_TYPE_FLOAT == m_type)
 	{
 		llvm::Value* defval = m_builder->CreateFPToSI(m_value, defty, "fp_to_int");
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_INTEGER;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_token = m_token;
-		ret.m_ty = defty;
-		return ret;
+		return MakeInt(m_token, bits, defval);
 	}
 
 	Error(m_token, "Failed to cast to int.");
@@ -311,12 +293,17 @@ TValue TValue::CastFixedToDynVec()
 		Error(m_token, "Fixed vector is empty.");
 		return NullInvalid();
 	}
+	else if (LITERAL_TYPE_INTEGER != m_vec_type && LITERAL_TYPE_FLOAT != m_vec_type)
+	{
+		Error(m_token, "Vector must be float or integer.");
+		return NullInvalid();
+	}
 
 	TValue ret;
 	llvm::Value* defval = nullptr;
 	llvm::Type* defty = m_builder->getPtrTy();
 	defval = CreateEntryAlloca(m_builder, defty, nullptr, "alloc_vec_tmp");
-	llvm::Value* vtype = m_builder->getInt64(LITERAL_TYPE_INTEGER);
+	llvm::Value* vtype = m_builder->getInt64(m_vec_type);
 	llvm::Value* span = m_builder->getInt64(4);
 	llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, span }, "calltmp");
 	ret.m_is_storage = false;
@@ -324,7 +311,7 @@ TValue TValue::CastFixedToDynVec()
 	ret.m_ty = m_builder->getInt32Ty();
 	ret.m_token = m_token;
 	ret.m_type = LITERAL_TYPE_VEC_DYNAMIC;
-	ret.m_vec_type = LITERAL_TYPE_INTEGER;
+	ret.m_vec_type = m_vec_type;
 	ret.m_bits = 32;
 	m_builder->CreateStore(ptr, defval);
 	Environment::AddToCleanup(ret);
