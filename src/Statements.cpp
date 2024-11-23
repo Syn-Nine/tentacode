@@ -14,7 +14,8 @@ TValue BlockStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	for (auto& statement : *m_block)
 	{
 		if (env->HasErrors()) break;
-		if (STATEMENT_FUNCTION != statement->GetType())
+		if (STATEMENT_FUNCTION != statement->GetType() &&
+			STATEMENT_STRUCT != statement->GetType())
 		{
 			statement->codegen(builder, module, sub_env);
 		}
@@ -171,11 +172,11 @@ TValue PrintStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 
 	if (!m_expr) // empty param list
 	{
+		llvm::Value* nullval = llvm::Constant::getNullValue(builder->getPtrTy());
 		if (m_newline)
-			builder->CreateCall(module->getFunction("println"), { llvm::ConstantPointerNull::get(builder->getPtrTy()) }, "calltmp");
+			builder->CreateCall(module->getFunction("println"), { nullval }, "calltmp");
 		else
-			builder->CreateCall(module->getFunction("print"), { llvm::ConstantPointerNull::get(builder->getPtrTy()) }, "calltmp");
-
+			builder->CreateCall(module->getFunction("print"), { nullval }, "calltmp");
 		return TValue::NullInvalid();
 	}
 
@@ -228,25 +229,8 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 
 	llvm::Function* ftn = tfunc.GetLLVMFunc();
 
-	//llvm::Function* ftn = builder->GetInsertBlock()->getParent();
-	//llvm::Type* ret_ty = ftn->getReturnType();
-
-	if (v.isNumeric())
-	{
-		v = v.CastToMatchImplicit(ret);
-	}
-	/*
-	if (retty->isIntegerTy() && v.IsDouble())
-	{
-		// convert rhs to int
-		v = TValue::Integer(builder->CreateFPToSI(v.value, builder->getInt32Ty(), "int_cast_tmp"));
-	}
-	else if (retty->isDoubleTy() && v.IsInteger())
-	{
-		// convert rhs to double
-		v = TValue::Double(builder->CreateSIToFP(v.value, builder->getDoubleTy(), "cast_to_dbl"));
-	}
-	*/
+	if (v.isNumeric()) v = v.CastToMatchImplicit(ret);
+	
 	builder->CreateRet(v.Value());
 
 	llvm::BasicBlock* tail = llvm::BasicBlock::Create(builder->getContext(), "rettail", ftn);
@@ -419,11 +403,6 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	TokenTypeEnum varType = m_type->GetType();
 	LiteralTypeEnum vecType = m_vecType;
 
-	llvm::Value* defval = nullptr;
-	llvm::Type* defty = nullptr;
-
-	bool global = !env->HasParent();
-
 	else if (TOKEN_IDENTIFIER == varType)
 	{
 		std::string udtname = "struct." + m_type->Lexeme();
@@ -450,18 +429,7 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 			env->Error(m_type, "Invalid identifier type.");
 		}
 	}
-	else
-	{
-		env->Error(m_type, "Unrecognized variable type token.");
-	}
-
-	if (defval && m_expr && EXPRESSION_ASSIGN == m_expr->GetType())
-	{
-		// run assignment expression
-		m_expr->codegen(builder, module, env);
-	}
-
-	return TValue::NullInvalid();*/
+	*/
 }
 
 

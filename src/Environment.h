@@ -204,18 +204,6 @@ public:
 
 	/*
 
-	void DefineFunction(std::string id, llvm::Function* ftn, std::vector<LiteralTypeEnum> types, std::vector<std::string> names, std::vector<llvm::Type*> args, std::vector<Token*> tokens, LiteralTypeEnum rettype)
-	{
-		m_ftns[id] = ftn;
-		m_arity[id] = types.size();
-		m_param_types[id] = types;
-		m_param_tokens[id] = tokens;
-		m_param_names[id] = names;
-		m_rettypes[id] = rettype;
-		m_ftn_argty[id] = args;
-		if (2 <= Environment::GetDebugLevel()) printf("DefineFunction(%s)\n", id.c_str());
-	}
-
 	void DefineUdt(std::string id, llvm::StructType* stype, std::vector<Token*> tokens, std::vector<std::string> names, std::vector<llvm::Type*> ty, std::vector<LiteralTypeEnum> vecTypes, std::vector<std::string> vecTypeIds)
 	{
 		m_udts[id] = stype;
@@ -234,61 +222,6 @@ public:
 
 		if (2 <= Environment::GetDebugLevel()) printf("DefineUdt(%s)\n", id.c_str());
 	}
-
-	llvm::Function* GetFunction(std::string id)
-	{
-		if (0 != m_ftns.count(id)) return m_ftns.at(id);
-		if (m_parent) return m_parent->GetFunction(id);
-		//printf("Error - unable to find function `%s` in environment!\n", id.c_str());
-		return nullptr;
-	}
-
-	int GetFunctionArity(std::string id)
-	{
-		if (0 != m_ftns.count(id)) return m_arity.at(id);
-		if (m_parent) return m_parent->GetFunctionArity(id);
-		return 0;
-	}
-
-	std::vector<LiteralTypeEnum> GetFunctionParamTypes(std::string id)
-	{
-		if (0 != m_ftns.count(id)) return m_param_types.at(id);
-		if (m_parent) return m_parent->GetFunctionParamTypes(id);
-		std::vector<LiteralTypeEnum> ret;
-		return ret;
-	}
-
-	std::vector<Token*> GetFunctionParamTokens(std::string id)
-	{
-		if (0 != m_param_tokens.count(id)) return m_param_tokens.at(id);
-		if (m_parent) return m_parent->GetFunctionParamTokens(id);
-		std::vector<Token*> ret;
-		return ret;
-	}
-
-	std::vector<std::string> GetFunctionParamNames(std::string id)
-	{
-		if (0 != m_param_names.count(id)) return m_param_names.at(id);
-		if (m_parent) return m_parent->GetFunctionParamNames(id);
-		std::vector<std::string> ret;
-		return ret;
-	}
-
-	std::vector<llvm::Type*> GetFunctionArgTy(std::string id)
-	{
-		if (0 != m_ftn_argty.count(id)) return m_ftn_argty.at(id);
-		if (m_parent) return m_parent->GetFunctionArgTy(id);
-		std::vector<llvm::Type*> ret;
-		return ret;
-	}
-
-	LiteralTypeEnum GetFunctionReturnType(std::string id)
-	{
-		if (0 != m_rettypes.count(id)) return m_rettypes.at(id);
-		if (m_parent) return m_parent->GetFunctionReturnType(id);
-		return LITERAL_TYPE_INVALID;
-	}
-
 
 	llvm::StructType* GetUdt(std::string id)
 	{
@@ -375,25 +308,7 @@ public:
 		return ret;
 	}
 
-	
-
-	
-
-	
-
 private:
-
-	std::map<std::string, llvm::Value*> m_vars;
-	std::map<std::string, llvm::Type*> m_ty;
-	std::map<std::string, Token*> m_var_tokens;
-	std::map<std::string, LiteralTypeEnum> m_types;
-	std::map<std::string, LiteralTypeEnum> m_vecTypes;
-	std::map<std::string, int> m_arity;
-	std::map<std::string, std::vector<LiteralTypeEnum> > m_param_types;
-	std::map<std::string, std::vector<Token*> > m_param_tokens;
-	std::map<std::string, std::vector<std::string> > m_param_names;
-	std::map<std::string, LiteralTypeEnum> m_rettypes;
-	std::map<std::string, std::vector<llvm::Type*> > m_ftn_argty;
 
 	std::map<std::string, llvm::StructType*> m_udts;
 	std::map<std::string, std::vector<Token*> > m_udt_tokens;
@@ -430,8 +345,6 @@ private:
 		return 0 != m_vars.count(var);
 	}
 
-
-	//std::vector<TValue> GetCleanup() { return m_cleanup; }
 
 	Environment* m_parent;
 

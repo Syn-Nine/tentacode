@@ -13,6 +13,7 @@ std::map<std::string, Environment::func_struct> Environment::m_func;
 
 
 
+//-----------------------------------------------------------------------------
 void Environment::AssignToVariable(const std::string& var, TValue rhs)
 {
 	TValue tval = GetVariable(rhs.GetToken(), var);
@@ -32,6 +33,7 @@ void Environment::AssignToVariable(const std::string& var, TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 void Environment::AssignToVariableVectorIndex(const std::string& var, TValue idx, TValue rhs)
 {
 	TValue tval = GetVariable(rhs.GetToken(), var);

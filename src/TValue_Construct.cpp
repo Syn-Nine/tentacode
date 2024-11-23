@@ -2,69 +2,43 @@
 #include "Environment.h"
 #include "TVec.h"
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::FromLiteral(Token* token, const Literal& literal)
 {
-	TValue ret;
-	ret.m_token = token;
-
-	LiteralTypeEnum type = literal.GetType();
-
-	switch (type)
+	switch (literal.GetType())
 	{
 	case LITERAL_TYPE_INTEGER:
-		ret.m_type = type;
-		ret.m_bits = 32;
-		ret.m_value = m_builder->getInt32(literal.IntValue());
-		ret.m_ty = m_builder->getInt32Ty();
-		break;
+		return MakeInt(token, 32, m_builder->getInt32(literal.IntValue()));
 
 	case LITERAL_TYPE_FLOAT:
-		ret.m_type = type;
-		ret.m_bits = 64;
-		ret.m_value = llvm::ConstantFP::get(m_builder->getContext(), llvm::APFloat(literal.DoubleValue()));
-		ret.m_ty = m_builder->getDoubleTy();
-		break;
+		return MakeFloat(token, 64, llvm::ConstantFP::get(m_builder->getContext(), llvm::APFloat(literal.DoubleValue())));
 
 	case LITERAL_TYPE_ENUM:
-		ret.m_type = type;
-		ret.m_bits = 32;
-		ret.m_value = m_builder->getInt32(Environment::GetEnumAsInt(literal.EnumValue().enumValue));
-		ret.m_ty = m_builder->getInt32Ty();
-		break;
+		return MakeEnum(token, m_builder->getInt32(Environment::GetEnumAsInt(literal.EnumValue().enumValue)));
 
 	case LITERAL_TYPE_BOOL:
-		ret.m_type = type;
-		ret.m_bits = 1;
 		if (literal.BoolValue())
-			ret.m_value = m_builder->getTrue();
+			return MakeBool(token, m_builder->getTrue());
 		else
-			ret.m_value = m_builder->getFalse();
-
-		ret.m_ty = m_builder->getInt1Ty();
-		break;
+			return MakeBool(token, m_builder->getFalse());
 
 	case LITERAL_TYPE_STRING:
 	{
-		ret.m_type = type;
 		llvm::Value* g = m_builder->CreateGlobalStringPtr(literal.StringValue(), "str_literal");
-		llvm::Value* p = m_builder->CreateCall(m_module->getFunction("__new_string_from_literal"), { g }, "strptr");
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		m_builder->CreateStore(p, a);
-		ret.m_value = a;
-		ret.m_is_storage = true;
-		ret.m_ty = m_builder->getPtrTy();
-		Environment::AddToCleanup(ret);
-		break;
+		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_from_literal"), { g }, "strptr");
+		return MakeString(token, s);
 	}
 
 	default:
 		Error(token, "Invalid type in literal constructor.");
 	}
 
-	return ret;
+	return NullInvalid();
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs /* = nullptr */)
 {
 	switch (token->GetType())
@@ -106,6 +80,31 @@ TValue TValue::Construct(Token* token, TokenPtrList* args, std::string lexeme, b
 }
 
 
+//-----------------------------------------------------------------------------
+TValue TValue::Construct_Explicit(
+	Token* token,
+	LiteralTypeEnum type,
+	llvm::Value* value,
+	llvm::Type* ty,
+	int bits,
+	bool is_storage,
+	int fixed_vec_len,
+	LiteralTypeEnum vec_type)
+{
+	TValue ret;
+	ret.m_token = token;
+	ret.m_type = type;
+	ret.m_value = value;
+	ret.m_ty = ty;
+	ret.m_bits = bits;
+	ret.m_is_storage = is_storage;
+	ret.m_fixed_vec_len = fixed_vec_len;
+	ret.m_vec_type = vec_type;
+	return ret;
+}
+
+
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Int(Token* token, int bits, std::string lexeme, bool global)
 {
 	if (16 != bits && 32 != bits && 64 != bits)
@@ -134,12 +133,7 @@ TValue TValue::Construct_Int(Token* token, int bits, std::string lexeme, bool gl
 
 	if (defval)
 	{
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_INTEGER;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		ret.m_token = token;
+		TValue ret = MakeInt(token, bits, defval);
 		ret.m_is_storage = true;
 		return ret;
 	}
@@ -148,6 +142,7 @@ TValue TValue::Construct_Int(Token* token, int bits, std::string lexeme, bool gl
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Float(Token* token, int bits, std::string lexeme, bool global)
 {
 	if (32 != bits && 64 != bits)
@@ -179,12 +174,7 @@ TValue TValue::Construct_Float(Token* token, int bits, std::string lexeme, bool 
 
 	if (defval)
 	{
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_FLOAT;
-		ret.m_bits = bits;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		ret.m_token = token;
+		TValue ret = MakeFloat(token, bits, defval);
 		ret.m_is_storage = true;
 		return ret;
 	}
@@ -193,6 +183,7 @@ TValue TValue::Construct_Float(Token* token, int bits, std::string lexeme, bool 
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Bool(Token* token, std::string lexeme, bool global)
 {
 	llvm::Type* defty = m_builder->getInt1Ty();
@@ -215,11 +206,7 @@ TValue TValue::Construct_Bool(Token* token, std::string lexeme, bool global)
 
 	if (defval)
 	{
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_BOOL;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		ret.m_token = token;
+		TValue ret = MakeBool(token, defval);
 		ret.m_is_storage = true;
 		return ret;
 	}
@@ -228,6 +215,7 @@ TValue TValue::Construct_Bool(Token* token, std::string lexeme, bool global)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 {
 	llvm::Type* defty = m_builder->getInt32Ty();
@@ -250,11 +238,7 @@ TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 
 	if (defval)
 	{
-		TValue ret;
-		ret.m_type = LITERAL_TYPE_ENUM;
-		ret.m_value = defval;
-		ret.m_ty = defty;
-		ret.m_token = token;
+		TValue ret = MakeEnum(token, defval);
 		ret.m_is_storage = true;
 		return ret;
 	}
@@ -263,6 +247,7 @@ TValue TValue::Construct_Enum(Token* token, std::string lexeme, bool global)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Pointer(Token* token, std::string lexeme, bool global)
 {
 	llvm::Type* defty = m_builder->getPtrTy();
@@ -298,6 +283,7 @@ TValue TValue::Construct_Pointer(Token* token, std::string lexeme, bool global)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_String(Token* token, std::string lexeme, bool global)
 {
 	llvm::Type* defty = m_builder->getPtrTy();
@@ -336,6 +322,7 @@ TValue TValue::Construct_String(Token* token, std::string lexeme, bool global)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs)
 {
 	TValue ret;
@@ -344,100 +331,50 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 
 	llvm::Type* ty = nullptr;
 
-	switch (vtype)
+	if (!TokenToType(vtype, ret.m_vec_type, ret.m_bits, ty))
 	{
-	case TOKEN_VAR_I16:
-		ret.m_bits = 16;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_I32:
-		ret.m_bits = 32;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_I64:
-		ret.m_bits = 64;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_F32:
-		ret.m_bits = 32;
-		ty = m_builder->getFloatTy();
-		ret.m_vec_type = LITERAL_TYPE_FLOAT;
-		break;
-
-	case TOKEN_VAR_F64:
-		ret.m_bits = 64;
-		ty = m_builder->getDoubleTy();
-		ret.m_vec_type = LITERAL_TYPE_FLOAT;
-		break;
-
-	case TOKEN_VAR_ENUM:
-		ret.m_bits = 32;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_ENUM;
-		break;
-
-	case TOKEN_VAR_BOOL:
-		ret.m_bits = 1;
-		ty = m_builder->getIntNTy(1);
-		ret.m_vec_type = LITERAL_TYPE_BOOL;
-		break;
-
-	case TOKEN_VAR_STRING:
-		ret.m_bits = 64;
-		ty = m_builder->getPtrTy();
-		ret.m_vec_type = LITERAL_TYPE_STRING;
-		break;
-
-	default:
 		Error(token, "Invalid vector type.");
 		return NullInvalid();
 	}
 
-	if (ty)
+	llvm::Value* defval = nullptr;
+	llvm::Type* defty = m_builder->getPtrTy();
+	llvm::Constant* init = llvm::Constant::getNullValue(defty);
+
+	// allocate space for the pointer to this vector
+	if (global)
 	{
-		llvm::Value* defval = nullptr;
-		llvm::Type* defty = m_builder->getPtrTy();
-		llvm::Constant* init = llvm::Constant::getNullValue(defty);
+		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, "global_vec_tmp");
+		if (!defval) Error(token, "Failed to create global variable.");
+	}
+	else
+	{
+		defval = CreateEntryAlloca(m_builder, defty, nullptr, "alloc_vec_tmp");
+		m_builder->CreateStore(init, defval);
+	}
 
-		// allocate space for the pointer to this vector
-		if (global)
-		{
-			defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, "global_vec_tmp");
-			if (!defval) Error(token, "Failed to create global variable.");
-		}
-		else
-		{
-			defval = CreateEntryAlloca(m_builder, defty, nullptr, "alloc_vec_tmp");
-			m_builder->CreateStore(init, defval);
-		}
-
-		if (defval)
-		{
-			// get a pointer to an empty vector
-			llvm::Value* vtype = m_builder->getInt64(ret.m_vec_type);
-			int nbytes = std::max(1, ret.m_bits / 8);
-			llvm::Value* span = m_builder->getInt64(nbytes);
-			llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, span }, "calltmp");
-			ret.m_is_storage = false;
-			ret.m_value = defval;
-			ret.m_ty = ty;
-			ret.m_token = token;
-			ret.m_type = LITERAL_TYPE_VEC_DYNAMIC;
-			m_builder->CreateStore(ptr, defval);
-			Environment::AddToCleanup(ret);
-			return ret;
-		}
+	if (defval)
+	{
+		// get a pointer to an empty vector
+		llvm::Value* vtype = m_builder->getInt64(ret.m_vec_type);
+		int nbytes = std::max(1, ret.m_bits / 8);
+		llvm::Value* span = m_builder->getInt64(nbytes);
+		llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, span }, "calltmp");
+		ret.m_is_storage = false;
+		ret.m_value = defval;
+		ret.m_ty = ty;
+		ret.m_token = token;
+		ret.m_type = LITERAL_TYPE_VEC_DYNAMIC;
+		m_builder->CreateStore(ptr, defval);
+		Environment::AddToCleanup(ret);
+		return ret;
 	}
 
 	return NullInvalid();
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs)
 {
 	TValue ret;
@@ -459,119 +396,69 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 	llvm::Value* count = m_builder->getInt64(vsize);
 
 	llvm::Type* ty = nullptr;
-	switch (vtype)
+
+	if (!TokenToType(vtype, ret.m_vec_type, ret.m_bits, ty))
 	{
-	case TOKEN_VAR_I16:
-		ret.m_bits = 16;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_I32:
-		ret.m_bits = 32;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_I64:
-		ret.m_bits = 64;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_INTEGER;
-		break;
-
-	case TOKEN_VAR_F32:
-		ret.m_bits = 32;
-		ty = m_builder->getFloatTy();
-		ret.m_vec_type = LITERAL_TYPE_FLOAT;
-		break;
-
-	case TOKEN_VAR_F64:
-		ret.m_bits = 64;
-		ty = m_builder->getDoubleTy();
-		ret.m_vec_type = LITERAL_TYPE_FLOAT;
-		break;
-
-	case TOKEN_VAR_ENUM:
-		ret.m_bits = 32;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_ENUM;
-		break;
-
-	case TOKEN_VAR_BOOL:
-		ret.m_bits = 1;
-		ty = m_builder->getIntNTy(ret.m_bits);
-		ret.m_vec_type = LITERAL_TYPE_BOOL;
-		break;
-
-	case TOKEN_VAR_STRING:
-		ret.m_bits = 64;
-		ty = m_builder->getPtrTy();
-		ret.m_vec_type = LITERAL_TYPE_STRING;
-		break;
-
-	default:
 		Error(token, "Invalid vector type.");
 		return NullInvalid();
 	}
 
-	if (ty)
-	{
-		llvm::Value* defval = nullptr;
-		llvm::ArrayType* defty = llvm::ArrayType::get(ty, vsize);
-		llvm::Constant* init = llvm::Constant::getNullValue(defty);
+	llvm::Value* defval = nullptr;
+	llvm::ArrayType* defty = llvm::ArrayType::get(ty, vsize);
+	llvm::Constant* init = llvm::Constant::getNullValue(defty);
 
-		if (global)
+	if (global)
+	{
+		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, "global_vec_tmp");
+		if (!defval) Error(token, "Failed to create global variable.");
+	}
+	else
+	{
+		defval = CreateEntryAlloca(m_builder, ty, count, "alloc_vec_tmp");
+		m_builder->CreateStore(init, defval);
+	}
+
+	if (defval)
+	{
+		ret.m_value = defval;
+		ret.m_is_storage = false;
+		ret.m_type = LITERAL_TYPE_VEC_FIXED;
+		ret.m_ty = ty;
+		ret.m_token = token;
+		ret.m_fixed_vec_len = vsize;
+
+		if (targs)
 		{
-			defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, init, "global_vec_tmp");
-			if (!defval) Error(token, "Failed to create global variable.");
+			// initializer list provided
+			for (size_t i = 0; i < targs->size(); ++i)
+			{
+				llvm::Value* gep = m_builder->CreateGEP(ty, defval, m_builder->getInt32(i), "geptmp");
+				m_builder->CreateStore(targs->at(i).m_value, gep);
+			}
 		}
 		else
 		{
-			defval = CreateEntryAlloca(m_builder, ty, count, "alloc_vec_tmp");
-			m_builder->CreateStore(init, defval);
-		}
-
-		if (defval)
-		{
-			ret.m_value = defval;
-			ret.m_is_storage = false;
-			ret.m_type = LITERAL_TYPE_VEC_FIXED;
-			ret.m_ty = ty;
-			ret.m_token = token;
-			ret.m_fixed_vec_len = vsize;
-
-			if (targs)
+			// default construction for vector of strings
+			if (LITERAL_TYPE_STRING == ret.m_vec_type)
 			{
-				// initializer list provided
-				for (size_t i = 0; i < targs->size(); ++i)
+				// initialize strings
+				for (size_t i = 0; i < vsize; ++i)
 				{
 					llvm::Value* gep = m_builder->CreateGEP(ty, defval, m_builder->getInt32(i), "geptmp");
-					m_builder->CreateStore(targs->at(i).m_value, gep);
+					llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), {}, "calltmp");
+					m_builder->CreateStore(s, gep);
+					// to do - figure out how to clean up this string allocation
 				}
 			}
-			else
-			{
-				// default construction for vector of strings
-				if (LITERAL_TYPE_STRING == ret.m_vec_type)
-				{
-					// initialize strings
-					for (size_t i = 0; i < vsize; ++i)
-					{
-						llvm::Value* gep = m_builder->CreateGEP(ty, defval, m_builder->getInt32(i), "geptmp");
-						llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), {}, "calltmp");
-						m_builder->CreateStore(s, gep);
-						// to do - figure out how to clean up this string allocation
-					}
-				}
-			}
-			return ret;
 		}
+		return ret;
 	}
 
 	return NullInvalid();
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
 {
 	TValue ret;
@@ -593,6 +480,7 @@ TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bits, llvm::Value* value)
 {
 	TValue ret;
@@ -621,6 +509,7 @@ TValue TValue::Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bit
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::MakeBool(Token* token, llvm::Value* value)
 {
 	TValue ret;
@@ -633,42 +522,57 @@ TValue TValue::MakeBool(Token* token, llvm::Value* value)
 	return ret;
 }
 
-TValue TValue::MakeInt32(Token* token, llvm::Value* value)
+
+//-----------------------------------------------------------------------------
+TValue TValue::MakeEnum(Token* token, llvm::Value* value)
 {
+	TValue ret = MakeInt(token, 32, value);
+	ret.m_type = LITERAL_TYPE_ENUM;
+	return ret;
+}
+
+
+//-----------------------------------------------------------------------------
+TValue TValue::MakeInt(Token* token, int bits, llvm::Value* value)
+{
+	if (bits != 16 && bits != 32 && bits != 64)
+	{
+		Error(token, "Invalid bitsize for integer type.");
+		return NullInvalid();
+	}
+
 	TValue ret;
 	ret.m_type = LITERAL_TYPE_INTEGER;
-	ret.m_ty = m_builder->getInt32Ty();
+	ret.m_ty = MakeIntTy(bits);
 	ret.m_token = token;
 	ret.m_value = value;
-	ret.m_bits = 32;
+	ret.m_bits = bits;
 	ret.m_is_storage = false;
 	return ret;
 }
 
-TValue TValue::MakeInt64(Token* token, llvm::Value* value)
-{
-	TValue ret;
-	ret.m_type = LITERAL_TYPE_INTEGER;
-	ret.m_ty = m_builder->getInt64Ty();
-	ret.m_token = token;
-	ret.m_value = value;
-	ret.m_bits = 64;
-	ret.m_is_storage = false;
-	return ret;
-}
 
-TValue TValue::MakeFloat64(Token* token, llvm::Value* value)
+//-----------------------------------------------------------------------------
+TValue TValue::MakeFloat(Token* token, int bits, llvm::Value* value)
 {
+	if (bits != 32 && bits != 64)
+	{
+		Error(token, "Invalid bitsize for float type.");
+		return NullInvalid();
+	}
+
 	TValue ret;
 	ret.m_type = LITERAL_TYPE_FLOAT;
-	ret.m_ty = m_builder->getDoubleTy();
+	ret.m_ty = MakeFloatTy(bits);
 	ret.m_token = token;
 	ret.m_value = value;
-	ret.m_bits = 64;
+	ret.m_bits = bits;
 	ret.m_is_storage = false;
 	return ret;
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::MakeString(Token* token, llvm::Value* value)
 {
 	TValue ret;
@@ -684,6 +588,8 @@ TValue TValue::MakeString(Token* token, llvm::Value* value)
 	return ret;
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::MakeDynVec(Token* token, llvm::Value* value, LiteralTypeEnum vec_type, int vec_bits)
 {
 	TValue ret;
@@ -701,21 +607,34 @@ TValue TValue::MakeDynVec(Token* token, llvm::Value* value, LiteralTypeEnum vec_
 }
 
 
+//-----------------------------------------------------------------------------
 llvm::Type* TValue::MakeTy(LiteralTypeEnum type, int bits)
 {
-	if (LITERAL_TYPE_INTEGER == type)          return m_builder->getIntNTy(bits);
-	else if (LITERAL_TYPE_FLOAT == type)
-	{
-		if (32 == bits)                        return m_builder->getFloatTy();
-		else if (64 == bits)                   return m_builder->getDoubleTy();
-	}
-	else if (LITERAL_TYPE_ENUM == type)        return m_builder->getInt32Ty();
-	else if (LITERAL_TYPE_BOOL == type)        return m_builder->getInt1Ty();
-	else if (LITERAL_TYPE_STRING == type)      return m_builder->getPtrTy();
-	else if (LITERAL_TYPE_VEC_DYNAMIC == type) return m_builder->getPtrTy();
-	else if (LITERAL_TYPE_POINTER == type)     return m_builder->getPtrTy();
-	else if (LITERAL_TYPE_INVALID == type)     return m_builder->getVoidTy();
+	if (LITERAL_TYPE_INTEGER == type)          return MakeIntTy(bits);
+	else if (LITERAL_TYPE_FLOAT == type)       return MakeFloatTy(bits);
+	else if (LITERAL_TYPE_ENUM == type)        return MakeIntTy(32);
+	else if (LITERAL_TYPE_BOOL == type)        return MakeIntTy(1);
+	else if (LITERAL_TYPE_STRING == type)      return MakePointerTy();
+	else if (LITERAL_TYPE_VEC_DYNAMIC == type) return MakePointerTy();
+	else if (LITERAL_TYPE_POINTER == type)     return MakePointerTy();
+	else if (LITERAL_TYPE_INVALID == type)     return MakeVoidTy();
 
 	return nullptr;
+}
+
+
+//-----------------------------------------------------------------------------
+llvm::Type* TValue::MakeFloatTy(int bits)
+{
+	if (32 != bits && 64 != bits)
+	{
+		Error(nullptr, "Invalid float type.");
+		return nullptr;
+	}
+
+	if (32 == bits)
+		return m_builder->getFloatTy();
+	else
+		return m_builder->getDoubleTy();
 }
 

@@ -7,7 +7,7 @@ llvm::IRBuilder<>* TFunction::m_builder = nullptr;
 llvm::Module* TFunction::m_module = nullptr;
 
 
-
+//-----------------------------------------------------------------------------
 TFunction TFunction::Construct_Internal(
 	std::string lexeme,
 	llvm::Function* ftn,
@@ -70,6 +70,7 @@ TFunction TFunction::Construct_Internal(
 }
 
 
+//-----------------------------------------------------------------------------
 TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, void* bodyPtr)
 {
 	TFunction ret;
@@ -198,6 +199,7 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 }
 
 
+//-----------------------------------------------------------------------------
 void TFunction::Construct_Body()
 {
 	llvm::Function* ftn = m_llvm_func;

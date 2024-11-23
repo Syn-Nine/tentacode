@@ -2,6 +2,7 @@
 #include "Environment.h"
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Add(TValue rhs)
 {
 	TValue lhs = *this;	// clone
@@ -13,37 +14,26 @@ TValue TValue::Add(TValue rhs)
 	// type specific addition
 	if (LITERAL_TYPE_STRING == lhs.m_type && matched)
 	{
-		TValue ret;
-		ret.m_type = lhs.m_type;
-		ret.m_token = lhs.m_token;
-		ret.m_ty = lhs.m_ty;
 		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__string_cat"), { lhs.m_value, rhs.m_value }, "calltmp");
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		m_builder->CreateStore(s, a);
-		ret.m_value = a;
-		ret.m_is_storage = true;
-		Environment::AddToCleanup(ret);
-		return ret;
+		return MakeString(lhs.m_token, s);
 	}
 	else if (LITERAL_TYPE_INTEGER == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateAdd(lhs.m_value, rhs.m_value, "addtmp");
+			return lhs;
 		}
-		return lhs;
 	}
 	else if (LITERAL_TYPE_FLOAT == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateFAdd(lhs.m_value, rhs.m_value, "addtmp");
+			return lhs;
 		}
-		return lhs;
 	}
 
 	Error(m_token, "Failed to add values.");
@@ -51,6 +41,7 @@ TValue TValue::Add(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Divide(TValue rhs)
 {
 	TValue lhs = *this;	// clone
@@ -62,12 +53,11 @@ TValue TValue::Divide(TValue rhs)
 	if (LITERAL_TYPE_FLOAT == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateFDiv(lhs.m_value, rhs.m_value, "divtmp");
+			return lhs;
 		}
-		return lhs;
 	}
 
 	Error(m_token, "Failed to divide values.");
@@ -75,6 +65,7 @@ TValue TValue::Divide(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Modulus(TValue rhs)
 {
 	TValue lhs = *this;	// clone
@@ -92,8 +83,8 @@ TValue TValue::Modulus(TValue rhs)
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateCall(m_module->getFunction("__mod_impl"), { lhs.m_value, rhs.m_value }, "calltmp");
+			return lhs;
 		}
-		return lhs;
 	}
 
 	Error(m_token, "Failed to take modulus.");
@@ -101,6 +92,7 @@ TValue TValue::Modulus(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Multiply(TValue rhs)
 {
 	TValue lhs = *this;	// clone
@@ -113,22 +105,20 @@ TValue TValue::Multiply(TValue rhs)
 	if (LITERAL_TYPE_INTEGER == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateMul(lhs.m_value, rhs.m_value, "multmp");
+			return lhs;
 		}
-		return lhs;
 	}
 	else if (LITERAL_TYPE_FLOAT == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateFMul(lhs.m_value, rhs.m_value, "multmp");
+			return lhs;
 		}
-		return lhs;
 	}
 
 	Error(m_token, "Failed to multiply values.");
@@ -136,6 +126,7 @@ TValue TValue::Multiply(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Subtract(TValue rhs)
 {
 	TValue lhs = *this; // clone
@@ -148,22 +139,20 @@ TValue TValue::Subtract(TValue rhs)
 	if (LITERAL_TYPE_INTEGER == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateSub(lhs.m_value, rhs.m_value, "subtmp");
+			return lhs;
 		}
-		return lhs;
 	}
 	else if (LITERAL_TYPE_FLOAT == lhs.m_type && matched)
 	{
 		CastToMaxBits(lhs, rhs);
-
 		if (!lhs.IsInvalid() && !rhs.IsInvalid())
 		{
 			lhs.m_value = m_builder->CreateFSub(lhs.m_value, rhs.m_value, "subtmp");
+			return lhs;
 		}
-		return lhs;
 	}
 
 	Error(m_token, "Failed to subtract values.");
@@ -171,6 +160,7 @@ TValue TValue::Subtract(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::IsNotEqual(TValue rhs)
 {
 	TValue lhs = *this;
@@ -219,6 +209,7 @@ TValue TValue::IsNotEqual(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::IsEqual(TValue rhs)
 {
 	TValue lhs = *this;
@@ -267,6 +258,7 @@ TValue TValue::IsEqual(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::IsGreaterThan(TValue rhs, bool or_equal)
 {
 	TValue lhs = *this;
@@ -304,7 +296,7 @@ TValue TValue::IsGreaterThan(TValue rhs, bool or_equal)
 }
 
 
-
+//-----------------------------------------------------------------------------
 TValue TValue::IsLessThan(TValue rhs, bool or_equal)
 {
 	TValue lhs = *this;
@@ -342,6 +334,7 @@ TValue TValue::IsLessThan(TValue rhs, bool or_equal)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Negate()
 {
 	TValue ret = GetFromStorage();
@@ -362,6 +355,7 @@ TValue TValue::Negate()
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::Not()
 {
 	TValue ret = GetFromStorage();

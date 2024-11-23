@@ -99,9 +99,9 @@ public:
 	void StoreAtIndex(TValue idx, TValue rhs);
 
 	static TValue MakeBool(Token* token, llvm::Value* value);
-	static TValue MakeInt32(Token* token, llvm::Value* value);
-	static TValue MakeInt64(Token* token, llvm::Value* value);
-	static TValue MakeFloat64(Token* token, llvm::Value* value);
+	static TValue MakeEnum(Token* token, llvm::Value* value);
+	static TValue MakeInt(Token* token, int bits, llvm::Value* value);
+	static TValue MakeFloat(Token* token, int bits, llvm::Value* value);
 	static TValue MakeString(Token* token, llvm::Value* value);
 	static TValue MakeDynVec(Token* token, llvm::Value* value, LiteralTypeEnum vectype, int bits);
 
@@ -180,31 +180,17 @@ private:
 	static TValue Construct_String(Token* type, std::string lexeme, bool global);
 	static TValue Construct_Vec_Dynamic(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
 	static TValue Construct_Vec_Fixed(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
-	static TValue Construct_Explicit(
-		Token* token,
-		LiteralTypeEnum type,
-		llvm::Value* value,
-		llvm::Type* ty,
-		int bits,
-		bool is_storage,
-		int fixed_vec_len,
-		LiteralTypeEnum vec_type)
-	{
-		TValue ret;
-		ret.m_token = token;
-		ret.m_type = type;
-		ret.m_value = value;
-		ret.m_ty = ty;
-		ret.m_bits = bits;
-		ret.m_is_storage = is_storage;
-		ret.m_fixed_vec_len = fixed_vec_len;
-		ret.m_vec_type = vec_type;
-		return ret;
-	}
+	static TValue Construct_Explicit(Token* token, LiteralTypeEnum type, llvm::Value* value, llvm::Type* ty, int bits, bool is_storage, int fixed_vec_len, LiteralTypeEnum vec_type);
 
 	void GetFromStorage(TValue& lhs, TValue& rhs);
 
 	static llvm::Type* MakeTy(LiteralTypeEnum type, int bits);
+	static llvm::Type* MakeFloatTy(int bits);
+	static inline llvm::Type* MakeIntTy(int bits) { return m_builder->getIntNTy(bits); }
+	static inline llvm::Type* MakePointerTy() { return m_builder->getPtrTy(); }
+	static inline llvm::Type* MakeVoidTy() { return m_builder->getVoidTy(); }
+	
+	static bool TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& bits, llvm::Type*& ty);
 
 	static ErrorHandler* m_errorHandler;
 	static llvm::IRBuilder<>* m_builder;

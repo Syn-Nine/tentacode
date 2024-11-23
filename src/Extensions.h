@@ -828,12 +828,6 @@ extern "C" DLLEXPORT std::string* __str_trim(std::string* src)
 //-----------------------------------------------------------------------------
 // vector
 /*
-extern "C" DLLEXPORT bool __vec_contains_i32(void* srcPtr, int32_t val)
-{
-	llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
-	return std::find(src->begin(), src->end(), val) != src->end();
-}
-
 extern "C" DLLEXPORT void __vec_append_udt(int dstType, void* dstPtr, void* val)
 {
 	if (LITERAL_TYPE_UDT == dstType)

@@ -6,6 +6,7 @@ llvm::IRBuilder<>* TValue::m_builder = nullptr;
 llvm::Module* TValue::m_module = nullptr;
 
 
+//-----------------------------------------------------------------------------
 void TValue::Cleanup()
 {
 	// get from storage
@@ -22,6 +23,8 @@ void TValue::Cleanup()
 	}
 }
 
+
+//-----------------------------------------------------------------------------
 void TValue::EmitAppend(TValue rhs)
 {
 	if (LITERAL_TYPE_VEC_DYNAMIC != m_type)
@@ -114,6 +117,8 @@ void TValue::EmitAppend(TValue rhs)
 	
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::EmitContains(TValue rhs)
 {
 	if (LITERAL_TYPE_VEC_DYNAMIC != m_type)
@@ -189,6 +194,8 @@ TValue TValue::EmitContains(TValue rhs)
 	return ret;
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::EmitLen()
 {
 	TValue ret;
@@ -216,6 +223,7 @@ TValue TValue::EmitLen()
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::GetFromStorage()
 {
 	TValue ret = *this; // prototype
@@ -225,6 +233,7 @@ TValue TValue::GetFromStorage()
 }
 
 
+//-----------------------------------------------------------------------------
 void TValue::GetFromStorage(TValue& lhs, TValue& rhs)
 {
 	if (lhs.m_is_storage)
@@ -240,7 +249,7 @@ void TValue::GetFromStorage(TValue& lhs, TValue& rhs)
 }
 
 
-
+//-----------------------------------------------------------------------------
 TValue TValue::GetAtVectorIndex(TValue idx)
 {
 	TValue ret;
@@ -277,6 +286,7 @@ TValue TValue::GetAtVectorIndex(TValue idx)
 }
 
 
+//-----------------------------------------------------------------------------
 void TValue::Store(TValue rhs)
 {
 	if (rhs.IsInvalid())
@@ -465,6 +475,7 @@ void TValue::Store(TValue rhs)
 }
 
 
+//-----------------------------------------------------------------------------
 void TValue::StoreAtIndex(TValue idx, TValue rhs)
 {
 	if (!IsVecAny())
@@ -513,4 +524,66 @@ void TValue::StoreAtIndex(TValue idx, TValue rhs)
 		Error(m_token, "Failed to store into vector index.");
 	}
 
+}
+
+
+//-----------------------------------------------------------------------------
+bool TValue::TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& bits, llvm::Type*& ty)
+{
+	switch (token_type)
+	{
+	case TOKEN_VAR_I16:
+		bits = 16;
+		ty = m_builder->getIntNTy(bits);
+		type = LITERAL_TYPE_INTEGER;
+		break;
+
+	case TOKEN_VAR_I32:
+		bits = 32;
+		ty = m_builder->getIntNTy(bits);
+		type = LITERAL_TYPE_INTEGER;
+		break;
+
+	case TOKEN_VAR_I64:
+		bits = 64;
+		ty = m_builder->getIntNTy(bits);
+		type = LITERAL_TYPE_INTEGER;
+		break;
+
+	case TOKEN_VAR_F32:
+		bits = 32;
+		ty = m_builder->getFloatTy();
+		type = LITERAL_TYPE_FLOAT;
+		break;
+
+	case TOKEN_VAR_F64:
+		bits = 64;
+		ty = m_builder->getDoubleTy();
+		type = LITERAL_TYPE_FLOAT;
+		break;
+
+	case TOKEN_VAR_ENUM:
+		bits = 32;
+		ty = m_builder->getIntNTy(bits);
+		type = LITERAL_TYPE_ENUM;
+		break;
+
+	case TOKEN_VAR_BOOL:
+		bits = 1;
+		ty = m_builder->getIntNTy(1);
+		type = LITERAL_TYPE_BOOL;
+		break;
+
+	case TOKEN_VAR_STRING:
+		bits = 64;
+		ty = m_builder->getPtrTy();
+		type = LITERAL_TYPE_STRING;
+		break;
+
+	default:
+
+		return false;
+	}
+
+	return true;
 }

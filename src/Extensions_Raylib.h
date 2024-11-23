@@ -42,9 +42,6 @@ extern "C" DLLEXPORT void ray_DrawTextureTileMap(Texture2D* in0, int32_t xx, int
 {
     Texture2D tex = *in0;
     int32_t* tiles = static_cast<int32_t*>(srcPtr->Data());
-
-    //llvm::SmallVector<int32_t>* src = static_cast<llvm::SmallVector<int32_t>*>(srcPtr);
-    //llvm::SmallVector<int32_t>& tiles = *src;
     double rot = 0;
     int32_t height = srcPtr->Size() / width;
     int32_t tw = (tex.width / w);
@@ -898,9 +895,8 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
 
         for (size_t i = 0; i < vals.size(); ++i)
         {
-            llvm::Type* defty = builder->getInt32Ty();
-            llvm::Value* defval = new llvm::GlobalVariable(*module, defty, false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
-            TValue v = TValue::MakeInt32(nullptr, defval);
+            llvm::Value* defval = new llvm::GlobalVariable(*module, builder->getInt32Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
+            TValue v = TValue::MakeInt(nullptr, 32, defval);
             v.SetStorage(true);
             env->DefineVariable(v, names[i]);
         }

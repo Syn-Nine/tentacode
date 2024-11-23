@@ -17,6 +17,11 @@
 #include "llvm/IR/IRBuilder.h"
 
 
+#define PI 3.1415926535897932384626433832795028841971693993751058
+#define RAD2DEG (180.0 / PI)
+#define DEG2RAD (1 / RAD2DEG)
+
+
 class Expr
 {
 public:
@@ -135,6 +140,9 @@ public:
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
+
+	bool CheckArgSize(int count);
+	
 	Expr* m_callee;
 	Token* m_token;
 	ArgList m_arguments;

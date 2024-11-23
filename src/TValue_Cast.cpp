@@ -2,6 +2,7 @@
 #include "Environment.h"
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::As(TokenTypeEnum newType)
 {
 	switch (newType)
@@ -20,6 +21,7 @@ TValue TValue::As(TokenTypeEnum newType)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::AsInt(int bits)
 {
 	if (16 != bits && 32 != bits && 64 != bits)
@@ -61,6 +63,8 @@ TValue TValue::AsInt(int bits)
 		*/
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::AsFloat(int bits)
 {
 	if (32 != bits && 64 != bits)
@@ -95,68 +99,42 @@ TValue TValue::AsFloat(int bits)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::AsString()
 {
 	if (LITERAL_TYPE_STRING == m_type) return *this; // clone
 
 	TValue lhs = GetFromStorage();
 
+	llvm::Value* s = nullptr;
+	
 	switch (m_type)
 	{
 	case LITERAL_TYPE_INTEGER:
 	{
 		lhs = lhs.CastToInt(64); // upcast
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_STRING, a);
-		ret.m_ty = m_builder->getPtrTy();
-		ret.m_is_storage = true;
-		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__int_to_string"), { lhs.m_value }, "calltmp");
-		m_builder->CreateStore(s, ret.m_value);
-		Environment::AddToCleanup(ret);
-		return ret;
+		s = m_builder->CreateCall(m_module->getFunction("__int_to_string"), { lhs.m_value }, "calltmp");
+		break;
 	}
 	case LITERAL_TYPE_FLOAT:
 	{
 		lhs = lhs.CastToFloat(64); // upcast
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_STRING, a);
-		ret.m_ty = m_builder->getPtrTy();
-		ret.m_is_storage = true;
-		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__float_to_string"), { lhs.m_value }, "calltmp");
-		m_builder->CreateStore(s, ret.m_value);
-		Environment::AddToCleanup(ret);
-		return ret;
+		s = m_builder->CreateCall(m_module->getFunction("__float_to_string"), { lhs.m_value }, "calltmp");
+		break;
 	}
 	case LITERAL_TYPE_BOOL:
 	{
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_STRING, a);
-		ret.m_ty = m_builder->getPtrTy();
-		ret.m_is_storage = true;
-		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__bool_to_string"), { lhs.m_value }, "calltmp");
-		m_builder->CreateStore(s, ret.m_value);
-		Environment::AddToCleanup(ret);
-		return ret;
+		s = m_builder->CreateCall(m_module->getFunction("__bool_to_string"), { lhs.m_value }, "calltmp");
+		break;
 	}
 	case LITERAL_TYPE_VEC_DYNAMIC:
 	{
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_STRING, a);
-		ret.m_ty = m_builder->getPtrTy();
-		ret.m_is_storage = true;
-
 		llvm::Value* srcPtr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "loadtmp");
-		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__dyn_vec_to_string"), { srcPtr }, "calltmp");
-		m_builder->CreateStore(s, ret.m_value);
-		Environment::AddToCleanup(ret);
-		return ret;
+		s = m_builder->CreateCall(m_module->getFunction("__dyn_vec_to_string"), { srcPtr }, "calltmp");
+		break;
 	}
 	case LITERAL_TYPE_VEC_FIXED:
 	{
-		llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_STRING, a);
-		ret.m_ty = m_builder->getPtrTy();
-		ret.m_is_storage = true;
 		llvm::Value* srcType = m_builder->getInt32(lhs.m_vec_type);
 		llvm::Value* srcBits = m_builder->getInt32(lhs.m_bits);
 		llvm::Value* srcLen = m_builder->getInt64(lhs.m_fixed_vec_len);
@@ -165,19 +143,19 @@ TValue TValue::AsString()
 		{
 			srcPtr = m_builder->CreateGEP(m_builder->getPtrTy(), m_value, m_builder->getInt32(0), "geptmp");
 		}
-		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__fixed_vec_to_string"), { srcType, srcBits, srcPtr, srcLen }, "calltmp");
-		m_builder->CreateStore(s, ret.m_value);
-		Environment::AddToCleanup(ret);
-		return ret;
+		s = m_builder->CreateCall(m_module->getFunction("__fixed_vec_to_string"), { srcType, srcBits, srcPtr, srcLen }, "calltmp");
+		break;
 	}
 	default:
 		Error(m_token, "Failed to cast to string.");
+		return NullInvalid();
 	}
 
-	return NullInvalid();
+	return MakeString(m_token, s);
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::CastToFloat(int bits)
 {
 	llvm::Type* defty = nullptr;
@@ -223,6 +201,7 @@ TValue TValue::CastToFloat(int bits)
 }
 
 
+//-----------------------------------------------------------------------------
 TValue TValue::CastToInt(int bits)
 {
 	llvm::Type* defty = nullptr;
@@ -266,6 +245,8 @@ TValue TValue::CastToInt(int bits)
 	return NullInvalid();
 }
 
+
+//-----------------------------------------------------------------------------
 void TValue::CastToMaxBits(TValue& lhs, TValue& rhs)
 {
 	if (lhs.m_type != rhs.m_type)
@@ -285,6 +266,8 @@ void TValue::CastToMaxBits(TValue& lhs, TValue& rhs)
 	}
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::CastToMatchImplicit(TValue src)
 {
 	LiteralTypeEnum srcType = src.m_type;
@@ -314,6 +297,8 @@ TValue TValue::CastToMatchImplicit(TValue src)
 	return NullInvalid();
 }
 
+
+//-----------------------------------------------------------------------------
 TValue TValue::CastFixedToDynVec()
 {
 	if (LITERAL_TYPE_VEC_FIXED != m_type)
