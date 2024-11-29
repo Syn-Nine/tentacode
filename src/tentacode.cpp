@@ -138,14 +138,6 @@ bool Run(const char* buf, const char* filename)
 	return true;
 }
 
-void RunInternal()
-{
-	char* cmd = "println(\"a\");\n{ if 1 < 2 { println(\"c\"); } }\nprintln(\"b\");";
-	
-	printf("%s\n", cmd);	
-	Run(cmd, "Internal");
-}
-
 void RunFile(const char* filename)
 {
 	std::ifstream f;
@@ -154,7 +146,6 @@ void RunFile(const char* filename)
 	if (!f.is_open())
 	{
 		printf("Failed to open file: %s\n", filename);
-		RunInternal();
 		return;
 	}
 
@@ -181,7 +172,7 @@ int main(int nargs, char* argsv[])
 	const char* version = "0.2.1";
 	printf("Launching Tentacode JIT Compiler v%s\n", version);
 
-	Environment::SetDebugLevel(1);
+	Environment::SetDebugLevel(0);
 
 	errorHandler = new ErrorHandler();
 
@@ -202,13 +193,20 @@ int main(int nargs, char* argsv[])
 		}
 		else
 		{
-			RunInternal();
+			printf("Failed to open autoplay.tt\n");
+			return 0;
 		}
 	}
 	else if (2 == nargs)
 	{
 		printf("Run File: %s\n", argsv[1]);
 		RunFile(argsv[1]);
+	}
+	else if (3 == nargs)
+	{
+		if (0 == std::string(argsv[1]).compare("-d")) Environment::SetDebugLevel(1);
+		printf("Run File: %s\n", argsv[2]);
+		RunFile(argsv[2]);
 	}
 	else
 	{

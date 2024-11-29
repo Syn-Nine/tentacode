@@ -53,7 +53,10 @@ extern "C" DLLEXPORT std::string* input()
 //-----------------------------------------------------------------------------
 extern "C" DLLEXPORT void __del_string(std::string* str)
 {
-	delete str;
+	if (!str)
+		printf("Attempted to delete null string pointer.\n");
+	else
+		delete str;
 }
 
 extern "C" DLLEXPORT std::string* __new_string_from_literal(char* str)
@@ -309,6 +312,11 @@ extern "C" DLLEXPORT void* __fixed_vec_to_string(int32_t vecType, int32_t srcBit
 			}
 		}
 	}
+	else if (LITERAL_TYPE_UDT == vt)
+	{
+		vtype = "UDT";
+	}
+
 
 	std::string ret = "<FixedVec," + vtype + ",Size:" + std::to_string(sz) + ">[" + array + "]";
 
@@ -402,7 +410,10 @@ extern "C" DLLEXPORT void* __dyn_vec_data_ptr(TVec* vec)
 
 extern "C" DLLEXPORT void __dyn_vec_delete(TVec* dstPtr)
 {
-	delete dstPtr;
+	if (!dstPtr)
+		printf("Attempted to delete null vec pointer.\n");
+	else
+		delete dstPtr;
 }
 
 extern "C" DLLEXPORT void __dyn_vec_replace(TVec* dstVec, TVec* srcVec)
@@ -586,6 +597,10 @@ extern "C" DLLEXPORT void* __dyn_vec_to_string(TVec* srcPtr)
 				array.append(", " + *src);
 			}
 		}
+	}
+	else if (LITERAL_TYPE_UDT == vt)
+	{
+		vtype = "UDT,Span:" + std::to_string(srcPtr->Span());
 	}
 
 	std::string ret = "<DynVec," + vtype + ",Size:" + std::to_string(sz) + ">[" + array + "]";

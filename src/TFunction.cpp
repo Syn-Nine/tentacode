@@ -18,15 +18,59 @@ TFunction TFunction::Construct_Internal(
 	ret.m_name = new Token(TOKEN_IDENTIFIER, lexeme, -1, "");
 	ret.m_body = nullptr;
 	ret.m_llvm_func = ftn;
+	ret.m_internal = true;
 
 	int bits = 0;
-	if (LITERAL_TYPE_INTEGER == rettype) bits = 32;
-	else if (LITERAL_TYPE_FLOAT == rettype) bits = 64;
-	
-	ret.m_retval = TValue::Construct_Null(ret.m_name, rettype, bits);
+	llvm::Type* ty;
+	// construct null
+	switch (rettype)
+	{
+	case LITERAL_TYPE_ENUM: // intentional fall-through
+	case LITERAL_TYPE_INTEGER:
+		bits = 32;
+		ty = m_builder->getInt32Ty();
+		break;
 
+	case LITERAL_TYPE_FLOAT:
+		bits = 64;
+		ty = m_builder->getDoubleTy();
+		break;
+
+	case LITERAL_TYPE_BOOL:
+		bits = 1;
+		ty = m_builder->getIntNTy(1);
+		break;
+
+	case LITERAL_TYPE_POINTER: // intentional fallthrough
+	case LITERAL_TYPE_STRING:
+		bits = 64;
+		ty = m_builder->getPtrTy();
+		break;
+
+	case LITERAL_TYPE_INVALID:
+		break;
+
+	default:
+		Environment::Error(ret.m_name, "Unable to determine return type of internal function.");
+		return TFunction();
+	}
+
+	if (LITERAL_TYPE_INVALID != rettype)
+	{
+		ret.m_retval = TValue::Construct_Explicit(
+			ret.m_name,
+			rettype,
+			llvm::Constant::getNullValue(ty),
+			ty,
+			bits,
+			false,
+			0,
+			LITERAL_TYPE_INVALID
+		);
+	}
+		
+		
 	// figure out parameter types
-	int v_bits;
 	LiteralTypeEnum v_type;
 	TValue v;
 
@@ -35,27 +79,44 @@ TFunction TFunction::Construct_Internal(
 		v_type = types[i];
 		switch (v_type)
 		{
-		case LITERAL_TYPE_ENUM:
+		case LITERAL_TYPE_ENUM: // intentional fall-through
 		case LITERAL_TYPE_INTEGER:
-			v_bits = 32;
+			bits = 32;
+			ty = m_builder->getInt32Ty();
 			break;
+
 		case LITERAL_TYPE_FLOAT:
-			v_bits = 64;
+			bits = 64;
+			ty = m_builder->getDoubleTy();
 			break;
+
 		case LITERAL_TYPE_BOOL:
-			v_bits = 1;
+			bits = 1;
+			ty = m_builder->getIntNTy(1);
 			break;
+
+		case LITERAL_TYPE_POINTER: // intentional fallthrough
 		case LITERAL_TYPE_STRING:
-			v_bits = 64;
+			bits = 64;
+			ty = m_builder->getPtrTy();
 			break;
-		case LITERAL_TYPE_POINTER:
-			v_bits = 64;
-			break;
+
 		default:
-			Environment::Error(ret.m_name, "Failed to set parameter type when constructing internal function.");
+			Environment::Error(ret.m_name, "Unable to determine parameter type of internal function.");
 			return TFunction();
 		}
-		v = TValue::Construct_Null(ret.m_name, v_type, v_bits);
+
+		v = TValue::Construct_Explicit(
+			ret.m_name,
+			v_type,
+			llvm::Constant::getNullValue(ty),
+			ty,
+			bits,
+			false,
+			0,
+			LITERAL_TYPE_INVALID
+		);
+
 		ret.m_param_names.push_back("");
 		ret.m_param_types.push_back(v);
 
@@ -76,14 +137,14 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 	ret.m_name = name;
 	ret.m_body = bodyPtr;
 
-	int ret_bits;
+	int ret_bits = 0;
 	LiteralTypeEnum ret_type;
+	TValue ret_param;
 
 	// figure out return type	
 	if (!rettype)
 	{
 		ret_type = LITERAL_TYPE_INVALID;
-		ret_bits = 0;
 	}
 	else
 	{
@@ -125,13 +186,25 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 			ret_type = LITERAL_TYPE_VEC_DYNAMIC;
 			ret_bits = 64;
 			break;
+		case TOKEN_IDENTIFIER:
+			ret_type = LITERAL_TYPE_UDT;
+			ret_bits = 64;
+			break;
+
 		default:
 			Environment::Error(name, "Failed to set return type.");
 			return TFunction();
 		}
-	}
 
-	ret.m_retval = TValue::Construct_Null(rettype, ret_type, ret_bits);
+		Token* rettype_clone = new Token(*rettype); // need to clone because going to hold on to pointer after this function
+		ret_param = TValue::Construct_Null(rettype_clone, ret_type, ret_bits);
+		ret.m_has_return_ref = true;
+		if (ret_param.IsInvalid())
+		{
+			Environment::Error(name, "Invalid return type.");
+			return TFunction();
+		}
+	}
 
 
 	// figure out parameter types
@@ -139,6 +212,13 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 	int v_bits;
 	LiteralTypeEnum v_type;
 	TValue v;
+
+	if (ret.m_has_return_ref)
+	{
+		args.push_back(llvm::PointerType::get(ret_param.GetTy(), 0));
+		ret.m_param_names.push_back("__ret_ref");
+		ret.m_param_types.push_back(ret_param);
+	}
 
 	for (size_t i = 0; i < params.size(); ++i)
 	{
@@ -176,19 +256,33 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 			v_type = LITERAL_TYPE_STRING;
 			v_bits = 64;
 			break;
+		case TOKEN_IDENTIFIER:
+			v_type = LITERAL_TYPE_UDT;
+			v_bits = 64;
+			break;
+
 		default:
 			Environment::Error(name, "Failed to set parameter type.");
 			return TFunction();
 		}
-		v = TValue::Construct_Null(rettype, v_type, v_bits);
-		args.push_back(v.GetTy());
+
+		Token* type_clone = new Token(types[i]); // need to clone because going to hold on to pointer after this function
+		v = TValue::Construct_Null(type_clone, v_type, v_bits);
+		if (LITERAL_TYPE_UDT == v_type)
+		{
+			args.push_back(llvm::PointerType::get(v.GetTy(), 0));
+		}
+		else
+		{
+			args.push_back(v.GetTy());
+		}
 		ret.m_param_names.push_back(params[i].Lexeme());
 		ret.m_param_types.push_back(v);
 
 	}
 
 	// create type definition and link
-	llvm::FunctionType* FT = llvm::FunctionType::get(ret.m_retval.GetTy(), args, false);
+	llvm::FunctionType* FT = llvm::FunctionType::get(m_builder->getVoidTy(), args, false);
 
 	ret.m_llvm_func = llvm::Function::Create(FT, llvm::Function::InternalLinkage, name->Lexeme(), *m_module);
 	if (!ret.m_llvm_func)
@@ -218,12 +312,37 @@ void TFunction::Construct_Body()
 	int i = 0;
 	for (auto& arg : ftn->args())
 	{
-		llvm::Type* defty = arg.getType();
-		llvm::Value* defval = CreateEntryAlloca(m_builder, defty);
-		m_builder->CreateStore(&arg, defval);
 		TValue v = m_param_types[i];
-		v.SetValue(defval);
-		v.SetStorage(true);
+		if (v.IsUDT() && (!m_has_return_ref || 0 < i))
+		{
+			llvm::Type* defty = v.GetTy();
+			llvm::Value* defval = CreateEntryAlloca(m_builder, defty, nullptr, m_param_names[i]);
+
+			TStruct tstruc = Environment::GetStruct(v.GetToken(), v.GetToken()->Lexeme());
+
+			std::vector<std::string>& member_names = tstruc.GetMemberNames();
+			std::vector<TValue>& members = tstruc.GetMemberVec();
+
+			llvm::Value* gep_zero = m_builder->getInt32(0);
+
+			for (size_t i = 0; i < members.size(); ++i)
+			{
+				llvm::Value* lhs_gep = m_builder->CreateGEP(v.GetTy(), defval, { gep_zero, m_builder->getInt32(i) }, member_names[i]);
+				llvm::Value* rhs_gep = m_builder->CreateGEP(v.GetTy(), &arg, { gep_zero, m_builder->getInt32(i) }, member_names[i]);
+				llvm::Value* tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
+				// shallow copy
+				m_builder->CreateStore(tmp, lhs_gep);
+			}
+			v.SetValue(defval);
+		}
+		else
+		{
+			llvm::Type* defty = arg.getType();
+			llvm::Value* defval = CreateEntryAlloca(m_builder, defty, nullptr, m_param_names[i]);
+			m_builder->CreateStore(&arg, defval);
+			v.SetValue(defval);
+			v.SetStorage(true);
+		}
 		sub_env->DefineVariable(v, m_param_names[i]);
 		i = i + 1;
 	}
@@ -245,14 +364,7 @@ void TFunction::Construct_Body()
 	m_builder->CreateBr(tail);
 	m_builder->SetInsertPoint(tail);
 	
-	if (m_retval.IsInvalid())
-	{
-		m_builder->CreateRetVoid();
-	}
-	else
-	{
-		m_builder->CreateRet(llvm::Constant::getNullValue(m_retval.GetTy()));
-	}
-	
+	m_builder->CreateRetVoid();
+
 	verifyFunction(*ftn);
 }

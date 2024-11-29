@@ -220,20 +220,62 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ReturnStmt::codegen()\n");
 
-	TValue v = m_value->codegen(builder, module, env).GetFromStorage();
-
 	TFunction tfunc = env->GetParentFunction();
-	TValue ret = tfunc.GetReturn();
-	if (ret.IsInvalid())
+	llvm::Function* ftn = tfunc.GetLLVMFunc();
+	TValue ret = tfunc.GetReturnRef();
+	
+	if (m_value)
 	{
-		env->Error(ret.GetToken(), "Function does not have a return type declared.");
+		TValue v = m_value->codegen(builder, module, env).GetFromStorage();
+		if (v.IsInvalid()) return v;
+
+		if (ret.IsInvalid())
+		{
+			env->Error(v.GetToken(), "Function does not have a return type.");
+			return TValue::NullInvalid();
+		}
+
+		TValue retptr = env->GetVariable(v.GetToken(), "__ret_ref");
+		retptr.SetTy(llvm::PointerType::get(retptr.GetTy(), 0));
+		retptr = retptr.GetFromStorage();
+		retptr.SetValue(builder->CreateBitCast(retptr.Value(), retptr.GetTy(), "bitcast"));
+		
+		if (v.IsUDT())
+		{	
+			TStruct tstruc = env->GetStruct(v.GetToken(), v.GetToken()->Lexeme());
+
+			std::vector<std::string>& member_names = tstruc.GetMemberNames();
+			std::vector<TValue>& members = tstruc.GetMemberVec();
+
+			llvm::Value* gep_zero = builder->getInt32(0);
+
+			for (size_t i = 0; i < members.size(); ++i)
+			{
+				llvm::Value* lhs_gep = builder->CreateGEP(v.GetTy(), retptr.Value(), { gep_zero, builder->getInt32(i) }, member_names[i]);
+				llvm::Value* rhs_gep = builder->CreateGEP(v.GetTy(), v.Value(), { gep_zero, builder->getInt32(i) }, member_names[i]);
+				llvm::Value* tmp = builder->CreateLoad(members[i].GetTy(), rhs_gep);
+				// shallow copy
+				builder->CreateStore(tmp, lhs_gep);
+			}
+		}
+		else
+		{
+			if (v.isNumeric()) v = v.CastToMatchImplicit(ret);
+			builder->CreateStore(v.Value(), retptr.Value());
+		}
+	}
+	else
+	{
+		if (!ret.IsInvalid())
+		{
+			env->Error(ret.GetToken(), "Expected return value.");
+			return TValue::NullInvalid();
+		}
 	}
 
-	llvm::Function* ftn = tfunc.GetLLVMFunc();
+	env->EmitReturnCleanup();
 
-	if (v.isNumeric()) v = v.CastToMatchImplicit(ret);
-	
-	builder->CreateRet(v.Value());
+	builder->CreateRetVoid();
 
 	llvm::BasicBlock* tail = llvm::BasicBlock::Create(builder->getContext(), "rettail", ftn);
 	builder->SetInsertPoint(tail);

@@ -116,7 +116,7 @@ public:
 		case TOKEN_RETURN: type = "TOKEN_RETURN"; break;
 		case TOKEN_STRUCT: type = "TOKEN_STRUCT"; break;
 		case TOKEN_INCLUDE: type = "TOKEN_INCLUDE"; break;
-		case TOKEN_INTERNAL: type = "TOKEN_INTERNAL"; break;
+		//case TOKEN_INTERNAL: type = "TOKEN_INTERNAL"; break;
 		//case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
 		case TOKEN_FILELINE: type = "TOKEN_FILELINE"; break;
 		case TOKEN_PI: type = "TOKEN_PI"; break;

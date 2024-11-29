@@ -42,6 +42,9 @@ public:
 
 	TValue GetMember(Token* token, const std::string& lex);
 	llvm::Value* GetGEPLoc(Token* token, const std::string& lex);
+	
+	std::vector<std::string>& GetMemberNames() { return m_member_names; }
+	std::vector<TValue>& GetMemberVec() { return m_member_types; }
 
 	bool IsValid() const { return m_valid; }
 

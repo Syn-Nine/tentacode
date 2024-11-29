@@ -1,0 +1,604 @@
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+struct vec2 {
+	f32 x;
+	f32 y;
+}
+
+def vec2 vec2_new(f32 x, f32 y) {
+	vec2 ret;
+	ret.x = x;
+	ret.y = y;
+	return ret;
+}
+
+def vec2_print(vec2 v) {
+	println("vec2<" + v.x as string + ", " + v.y as string + ">");
+}
+
+def vec2 vec2_addf(vec2 lhs, f32 rhs) {
+	lhs.x = lhs.x + rhs;
+	lhs.y = lhs.y + rhs;
+	return lhs;
+}
+
+def vec2 vec2_addv(vec2 lhs, vec2 rhs) {
+	lhs.x = lhs.x + rhs.x;
+	lhs.y = lhs.y + rhs.y;
+	return lhs;
+}
+
+def vec2 vec2_negate(vec2 lhs) {
+	lhs.x = lhs.x * -1;
+	lhs.y = lhs.y * -1;
+	return lhs;
+}
+
+def vec2 vec2_subf(vec2 lhs, f32 rhs) {
+	lhs.x = lhs.x - rhs;
+	lhs.y = lhs.y - rhs;
+	return lhs;
+}
+
+def vec2 vec2_subv(vec2 lhs, vec2 rhs) {
+	lhs.x = lhs.x - rhs.x;
+	lhs.y = lhs.y - rhs.y;
+	return lhs;
+}
+
+def f32 vec2_len(vec2 lhs) {
+	return sqrt(lhs.x * lhs.x + lhs.y * lhs.y);
+}
+
+def f32 vec2_dot(vec2 lhs, vec2 rhs) {
+	return lhs.x * rhs.x + lhs.y * rhs.y;
+}
+
+def vec2 vec2_norm(vec2 lhs) {
+	f32 mag = vec2_len(lhs);
+	if abs(0 - mag) < 0.000001 { return vec2_new(0, 0); }
+	lhs.x = lhs.x / mag;
+	lhs.y = lhs.y / mag;
+	return lhs;
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+struct vec3 {
+	f32 x;
+	f32 y;
+	f32 z;
+}
+
+def vec3 vec3_new(f32 x, f32 y, f32 z) {
+	vec3 ret;
+	ret.x = x;
+	ret.y = y;
+	ret.z = z;
+	return ret;
+}
+
+def vec3_print(vec3 v) {
+	println("vec3<" + v.x as string + ", " + v.y as string + ", " + v.z as string + ">");
+}
+
+def vec3 vec3_addf(vec3 lhs, f32 rhs) {
+	lhs.x = lhs.x + rhs;
+	lhs.y = lhs.y + rhs;
+	lhs.z = lhs.z + rhs;
+	return lhs;
+}
+
+def vec3 vec3_addv(vec3 lhs, vec3 rhs) {
+	lhs.x = lhs.x + rhs.x;
+	lhs.y = lhs.y + rhs.y;
+	lhs.z = lhs.z + rhs.z;
+	return lhs;
+}
+
+def vec3 vec3_negate(vec3 lhs) {
+	lhs.x = lhs.x * -1;
+	lhs.y = lhs.y * -1;
+	lhs.z = lhs.z * -1;
+	return lhs;
+}
+
+def vec3 vec3_subf(vec3 lhs, f32 rhs) {
+	lhs.x = lhs.x - rhs;
+	lhs.y = lhs.y - rhs;
+	lhs.z = lhs.z - rhs;
+	return lhs;
+}
+
+def vec3 vec3_subv(vec3 lhs, vec3 rhs) {
+	lhs.x = lhs.x - rhs.x;
+	lhs.y = lhs.y - rhs.y;
+	lhs.z = lhs.z - rhs.z;
+	return lhs;
+}
+
+def f32 vec3_len(vec3 lhs) {
+	return sqrt(lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z);
+}
+
+def f32 vec3_dot(vec3 lhs, vec3 rhs) {
+	return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+}
+
+def vec3 vec3_norm(vec3 lhs) {
+	f32 mag = vec3_len(lhs);
+	if abs(0 - mag) < 0.000001 { return vec3_new(0, 0, 0); }
+	lhs.x = lhs.x / mag;
+	lhs.y = lhs.y / mag;
+	lhs.z = lhs.z / mag;
+	return lhs;
+}
+
+def vec3 vec3_cross(vec3 lhs, vec3 rhs) {
+	vec3 ret;
+	ret.x = lhs.y * rhs.z - lhs.z * rhs.y;
+	ret.y = lhs.z * rhs.x - lhs.x * rhs.z;
+	ret.z = lhs.x * rhs.y - lhs.y * rhs.x;
+	return ret;
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+struct vec4 {
+	f32 x;
+	f32 y;
+	f32 z;
+	f32 w;
+}
+
+def vec4 vec4_new(f32 x, f32 y, f32 z, f32 w) {
+	vec4 ret;
+	ret.x = x;
+	ret.y = y;
+	ret.z = z;
+	ret.w = w;
+	return ret;
+}
+
+def vec4_print(vec4 v) {
+	println("vec4<" + v.x as string + ", " + v.y as string + ", " + v.z as string + ", " + v.w as string + ">");
+}
+
+def vec4 vec4_addf(vec4 lhs, f32 rhs) {
+	lhs.x = lhs.x + rhs;
+	lhs.y = lhs.y + rhs;
+	lhs.z = lhs.z + rhs;
+	lhs.w = lhs.w + rhs;
+	return lhs;
+}
+
+def vec4 vec4_addv(vec4 lhs, vec4 rhs) {
+	lhs.x = lhs.x + rhs.x;
+	lhs.y = lhs.y + rhs.y;
+	lhs.z = lhs.z + rhs.z;
+	lhs.w = lhs.w + rhs.w;
+	return lhs;
+}
+
+def vec4 vec4_negate(vec4 lhs) {
+	lhs.x = lhs.x * -1;
+	lhs.y = lhs.y * -1;
+	lhs.z = lhs.z * -1;
+	lhs.w = lhs.w * -1;
+	return lhs;
+}
+
+def vec4 vec4_subf(vec4 lhs, f32 rhs) {
+	lhs.x = lhs.x - rhs;
+	lhs.y = lhs.y - rhs;
+	lhs.z = lhs.z - rhs;
+	lhs.w = lhs.w - rhs;
+	return lhs;
+}
+
+def vec4 vec4_subv(vec4 lhs, vec4 rhs) {
+	lhs.x = lhs.x - rhs.x;
+	lhs.y = lhs.y - rhs.y;
+	lhs.z = lhs.z - rhs.z;
+	lhs.w = lhs.w - rhs.w;
+	return lhs;
+}
+
+def f32 vec4_len(vec4 lhs) {
+	return sqrt(lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z + lhs.w * lhs.w);
+}
+
+def f32 vec4_dot(vec4 lhs, vec4 rhs) {
+	return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w;
+}
+
+def vec4 vec4_norm(vec4 lhs) {
+	f32 mag = vec4_len(lhs);
+	if abs(0 - mag) < 0.000001 { return vec4_new(0, 0, 0, 0); }
+	lhs.x = lhs.x / mag;
+	lhs.y = lhs.y / mag;
+	lhs.z = lhs.z / mag;
+	lhs.w = lhs.w / mag;
+	return lhs;
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+struct mat4 {
+	f32 m0;
+	f32 m1;
+	f32 m2;
+	f32 m3;
+	f32 m4;
+	f32 m5;
+	f32 m6;
+	f32 m7;
+	f32 m8;
+	f32 m9;
+	f32 m10;
+	f32 m11;
+	f32 m12;
+	f32 m13;
+	f32 m14;
+	f32 m15;
+}
+
+def mat4 mat4_new(f32 m0, f32 m1, f32 m2, f32 m3, f32 m4, f32 m5, f32 m6, f32 m7, f32 m8, f32 m9, f32 m10, f32 m11, f32 m12, f32 m13, f32 m14, f32 m15) {
+	mat4 ret;
+	ret.m0 =  m0;
+	ret.m1 =  m1;
+	ret.m2 =  m2;
+	ret.m3 =  m3;
+	ret.m4 =  m4;
+	ret.m5 =  m5;
+	ret.m6 =  m6;
+	ret.m7 =  m7;
+	ret.m8 =  m8;
+	ret.m9 =  m9;
+	ret.m10 =  m10;
+	ret.m11 =  m11;
+	ret.m12 =  m12;
+	ret.m13 =  m13;
+	ret.m14 =  m14;
+	ret.m15 =  m15;
+	return ret;
+}
+
+def mat4 mat4_identity() {
+	mat4 ret;
+	ret.m0 = 1;
+	ret.m5 = 1;
+	ret.m10 = 1;
+	ret.m15 = 1;
+	return ret;
+}
+
+def mat4 mat4_scale1f(f32 s) {
+	mat4 ret;
+	ret.m0 = s;
+	ret.m5 = s;
+	ret.m10 = s;
+	ret.m15 = 1;
+	return ret;
+}
+
+def mat4 mat4_scale3f(f32 sx, f32 sy, f32 sz) {
+	mat4 ret;
+	ret.m0 = sx;
+	ret.m5 = sy;
+	ret.m10 = sz;
+	ret.m15 = 1;
+	return ret;
+}
+
+def mat4 mat4_scalev(vec3 v) {
+	mat4 ret;
+	ret.m0 = v.x;
+	ret.m5 = v.y;
+	ret.m10 = v.z;
+	ret.m15 = 1;
+	return ret;
+}
+
+
+
+def mat4 mat4_translate(f32 tx, f32 ty, f32 tz) {
+	mat4 ret;
+	ret.m0 = 1;
+	ret.m5 = 1;
+	ret.m10 = 1;
+	ret.m12 = tx;
+	ret.m13 = ty;
+	ret.m14 = tz;
+	ret.m15 = 1;
+	return ret;
+}
+
+
+def mat4 mat4_rotate(f32 angle_rad, vec3 axis) {
+	f32 cc = cos(angle_rad);
+	f32 cinv = 1 - cc;
+	f32 ss = sin(angle_rad);
+	f32 rx = axis.x;
+	f32 ry = axis.y;
+	f32 rz = axis.z;
+	
+	mat4 ret;
+	ret.m0 = cc + rx * rx * cinv;
+	ret.m1 = ry * rx * cinv + rz * ss;
+	ret.m2 = rz * rx * cinv - ry * ss;
+	
+	ret.m4 = rx * ry * cinv - rz * ss;
+	ret.m5 = cc + ry * ry * cinv;
+	ret.m6 = rz * ry * cinv + rx * ss;
+	
+	ret.m8 = rx * rz * cinv + ry * ss;
+	ret.m9 = ry * rz * cinv - rx * ss;
+	ret.m10 = cc + rz * rz * cinv;
+	
+	ret.m15 = 1;
+	return ret;
+}
+
+def mat4_print(mat4 m) {
+	println("mat4<");
+	println("  " + m.m0 as string + ", " + m.m4 as string + ", " + m.m8 as string + ", " + m.m12 as string + ",");
+	println("  " + m.m1 as string + ", " + m.m5 as string + ", " + m.m9 as string + ", " + m.m13 as string + ",");
+	println("  " + m.m2 as string + ", " + m.m6 as string + ", " + m.m10 as string + ", " + m.m14 as string + ",");
+	println("  " + m.m3 as string + ", " + m.m7 as string + ", " + m.m11 as string + ", " + m.m15 as string);
+	println(">");
+}
+
+
+def mat4 mat4_addf(mat4 lhs, f32 rhs) {
+	lhs.m0 = lhs.m0 + rhs;
+	lhs.m1 = lhs.m1 + rhs;
+	lhs.m2 = lhs.m2 + rhs;
+	lhs.m3 = lhs.m3 + rhs;
+	lhs.m4 = lhs.m4 + rhs;
+	lhs.m5 = lhs.m5 + rhs;
+	lhs.m6 = lhs.m6 + rhs;
+	lhs.m7 = lhs.m7 + rhs;
+	lhs.m8 = lhs.m8 + rhs;
+	lhs.m9 = lhs.m9 + rhs;
+	lhs.m10 = lhs.m10 + rhs;
+	lhs.m11 = lhs.m11 + rhs;
+	lhs.m12 = lhs.m12 + rhs;
+	lhs.m13 = lhs.m13 + rhs;
+	lhs.m14 = lhs.m14 + rhs;
+	lhs.m15 = lhs.m15 + rhs;
+	return lhs;
+}
+
+def mat4 mat4_addm(mat4 lhs, mat4 rhs) {
+	lhs.m0 = lhs.m0 + rhs.m0;
+	lhs.m1 = lhs.m1 + rhs.m1;
+	lhs.m2 = lhs.m2 + rhs.m2;
+	lhs.m3 = lhs.m3 + rhs.m3;
+	lhs.m4 = lhs.m4 + rhs.m4;
+	lhs.m5 = lhs.m5 + rhs.m5;
+	lhs.m6 = lhs.m6 + rhs.m6;
+	lhs.m7 = lhs.m7 + rhs.m7;
+	lhs.m8 = lhs.m8 + rhs.m8;
+	lhs.m9 = lhs.m9 + rhs.m9;
+	lhs.m10 = lhs.m10 + rhs.m10;
+	lhs.m11 = lhs.m11 + rhs.m11;
+	lhs.m12 = lhs.m12 + rhs.m12;
+	lhs.m13 = lhs.m13 + rhs.m13;
+	lhs.m14 = lhs.m14 + rhs.m14;
+	lhs.m15 = lhs.m15 + rhs.m15;
+	return lhs;
+}
+
+def mat4 mat4_negate(mat4 lhs) {
+	lhs.m0 = lhs.m0 * -1;
+	lhs.m1 = lhs.m1 * -1;
+	lhs.m2 = lhs.m2 * -1;
+	lhs.m3 = lhs.m3 * -1;
+	lhs.m4 = lhs.m4 * -1;
+	lhs.m5 = lhs.m5 * -1;
+	lhs.m6 = lhs.m6 * -1;
+	lhs.m7 = lhs.m7 * -1;
+	lhs.m8 = lhs.m8 * -1;
+	lhs.m9 = lhs.m9 * -1;
+	lhs.m10 = lhs.m10 * -1;
+	lhs.m11 = lhs.m11 * -1;
+	lhs.m12 = lhs.m12 * -1;
+	lhs.m13 = lhs.m13 * -1;
+	lhs.m14 = lhs.m14 * -1;
+	lhs.m15 = lhs.m15 * -1;
+	return lhs;
+}
+
+def mat4 mat4_subf(mat4 lhs, f32 rhs) {
+	lhs.m0 = lhs.m0 - rhs;
+	lhs.m1 = lhs.m1 - rhs;
+	lhs.m2 = lhs.m2 - rhs;
+	lhs.m3 = lhs.m3 - rhs;
+	lhs.m4 = lhs.m4 - rhs;
+	lhs.m5 = lhs.m5 - rhs;
+	lhs.m6 = lhs.m6 - rhs;
+	lhs.m7 = lhs.m7 - rhs;
+	lhs.m8 = lhs.m8 - rhs;
+	lhs.m9 = lhs.m9 - rhs;
+	lhs.m10 = lhs.m10 - rhs;
+	lhs.m11 = lhs.m11 - rhs;
+	lhs.m12 = lhs.m12 - rhs;
+	lhs.m13 = lhs.m13 - rhs;
+	lhs.m14 = lhs.m14 - rhs;
+	lhs.m15 = lhs.m15 - rhs;
+	return lhs;
+}
+
+def mat4 mat4_subm(mat4 lhs, mat4 rhs) {
+	lhs.m0 = lhs.m0 - rhs.m0;
+	lhs.m1 = lhs.m1 - rhs.m1;
+	lhs.m2 = lhs.m2 - rhs.m2;
+	lhs.m3 = lhs.m3 - rhs.m3;
+	lhs.m4 = lhs.m4 - rhs.m4;
+	lhs.m5 = lhs.m5 - rhs.m5;
+	lhs.m6 = lhs.m6 - rhs.m6;
+	lhs.m7 = lhs.m7 - rhs.m7;
+	lhs.m8 = lhs.m8 - rhs.m8;
+	lhs.m9 = lhs.m9 - rhs.m9;
+	lhs.m10 = lhs.m10 - rhs.m10;
+	lhs.m11 = lhs.m11 - rhs.m11;
+	lhs.m12 = lhs.m12 - rhs.m12;
+	lhs.m13 = lhs.m13 - rhs.m13;
+	lhs.m14 = lhs.m14 - rhs.m14;
+	lhs.m15 = lhs.m15 - rhs.m15;
+	return lhs;
+}
+
+def mat4 mat4_multf(mat4 lhs, f32 rhs) {
+	lhs.m0 = lhs.m0 * rhs;
+	lhs.m1 = lhs.m1 * rhs;
+	lhs.m2 = lhs.m2 * rhs;
+	lhs.m3 = lhs.m3 * rhs;
+	lhs.m4 = lhs.m4 * rhs;
+	lhs.m5 = lhs.m5 * rhs;
+	lhs.m6 = lhs.m6 * rhs;
+	lhs.m7 = lhs.m7 * rhs;
+	lhs.m8 = lhs.m8 * rhs;
+	lhs.m9 = lhs.m9 * rhs;
+	lhs.m10 = lhs.m10 * rhs;
+	lhs.m11 = lhs.m11 * rhs;
+	lhs.m12 = lhs.m12 * rhs;
+	lhs.m13 = lhs.m13 * rhs;
+	lhs.m14 = lhs.m14 * rhs;
+	lhs.m15 = lhs.m15 * rhs;
+	return lhs;
+}
+
+def mat4 mat4_divf(mat4 lhs, f32 rhs) {
+	lhs.m0 = lhs.m0 / rhs;
+	lhs.m1 = lhs.m1 / rhs;
+	lhs.m2 = lhs.m2 / rhs;
+	lhs.m3 = lhs.m3 / rhs;
+	lhs.m4 = lhs.m4 / rhs;
+	lhs.m5 = lhs.m5 / rhs;
+	lhs.m6 = lhs.m6 / rhs;
+	lhs.m7 = lhs.m7 / rhs;
+	lhs.m8 = lhs.m8 / rhs;
+	lhs.m9 = lhs.m9 / rhs;
+	lhs.m10 = lhs.m10 / rhs;
+	lhs.m11 = lhs.m11 / rhs;
+	lhs.m12 = lhs.m12 / rhs;
+	lhs.m13 = lhs.m13 / rhs;
+	lhs.m14 = lhs.m14 / rhs;
+	lhs.m15 = lhs.m15 / rhs;
+	return lhs;
+}
+
+def mat4 mat4_multm(mat4 lhs, mat4 rhs) {
+	mat4 ret;
+	ret.m0  = rhs.m0  * lhs.m0 + rhs.m1  * lhs.m4 + rhs.m2  * lhs.m8  + rhs.m3  * lhs.m12;
+	ret.m1  = rhs.m0  * lhs.m1 + rhs.m1  * lhs.m5 + rhs.m2  * lhs.m9  + rhs.m3  * lhs.m13;
+	ret.m2  = rhs.m0  * lhs.m2 + rhs.m1  * lhs.m6 + rhs.m2  * lhs.m10 + rhs.m3  * lhs.m14;
+	ret.m3  = rhs.m0  * lhs.m3 + rhs.m1  * lhs.m7 + rhs.m2  * lhs.m11 + rhs.m3  * lhs.m15;
+			 																   
+	ret.m4  = rhs.m4  * lhs.m0 + rhs.m5  * lhs.m4 + rhs.m6  * lhs.m8  + rhs.m7  * lhs.m12;
+	ret.m5  = rhs.m4  * lhs.m1 + rhs.m5  * lhs.m5 + rhs.m6  * lhs.m9  + rhs.m7  * lhs.m13;
+	ret.m6  = rhs.m4  * lhs.m2 + rhs.m5  * lhs.m6 + rhs.m6  * lhs.m10 + rhs.m7  * lhs.m14;
+	ret.m7  = rhs.m4  * lhs.m3 + rhs.m5  * lhs.m7 + rhs.m6  * lhs.m11 + rhs.m7  * lhs.m15;
+									    
+	ret.m8  = rhs.m8  * lhs.m0 + rhs.m9  * lhs.m4 + rhs.m10 * lhs.m8  + rhs.m11 * lhs.m12;
+	ret.m9  = rhs.m8  * lhs.m1 + rhs.m9  * lhs.m5 + rhs.m10 * lhs.m9  + rhs.m11 * lhs.m13;
+	ret.m10 = rhs.m8  * lhs.m2 + rhs.m9  * lhs.m6 + rhs.m10 * lhs.m10 + rhs.m11 * lhs.m14;
+	ret.m11 = rhs.m8  * lhs.m3 + rhs.m9  * lhs.m7 + rhs.m10 * lhs.m11 + rhs.m11 * lhs.m15;
+	
+	ret.m12 = rhs.m12 * lhs.m0 + rhs.m13 * lhs.m4 + rhs.m14 * lhs.m8  + rhs.m15 * lhs.m12;
+	ret.m13 = rhs.m12 * lhs.m1 + rhs.m13 * lhs.m5 + rhs.m14 * lhs.m9  + rhs.m15 * lhs.m13;
+	ret.m14 = rhs.m12 * lhs.m2 + rhs.m13 * lhs.m6 + rhs.m14 * lhs.m10 + rhs.m15 * lhs.m14;
+	ret.m15 = rhs.m12 * lhs.m3 + rhs.m13 * lhs.m7 + rhs.m14 * lhs.m11 + rhs.m15 * lhs.m15;
+	
+	return ret;
+}
+
+def vec4 mat4_multv(mat4 lhs, vec4 rhs) {
+	vec4 ret;
+	ret.x  = rhs.x * lhs.m0 + rhs.y * lhs.m4 + rhs.z * lhs.m8  + rhs.w * lhs.m12;
+	ret.y  = rhs.x * lhs.m1 + rhs.y * lhs.m5 + rhs.z * lhs.m9  + rhs.w * lhs.m13;
+	ret.z  = rhs.x * lhs.m2 + rhs.y * lhs.m6 + rhs.z * lhs.m10 + rhs.w * lhs.m14;
+	ret.w  = rhs.x * lhs.m3 + rhs.y * lhs.m7 + rhs.z * lhs.m11 + rhs.w * lhs.m15;
+	return ret;
+}
+
+// from GLM
+def mat4 mat4_orthoz(f32 left, f32 right, f32 top, f32 bottom, f32 znear, f32 zfar) {
+	mat4 ret;
+	ret.m0 = 2 / (right - left);
+	ret.m5 = 2 / (top - bottom);
+	ret.m10 = -2 / (zfar - znear);
+	ret.m12 = -(right + left) / (right - left);
+	ret.m13 = -(top + bottom) / (top - bottom);
+	ret.m14 = -(zfar + znear) / (zfar - znear);
+	ret.m15 = 1;
+	return ret;
+}
+
+// from GLM
+def mat4 mat4_ortho(f32 left, f32 right, f32 top, f32 bottom) {
+	mat4 ret;
+	ret.m0 = 2 / (right - left);
+	ret.m5 = 2 / (top - bottom);
+	ret.m10 = 1;
+	ret.m12 = -(right + left) / (right - left);
+	ret.m13 = -(top + bottom) / (top - bottom);
+	ret.m15 = 1;
+	return ret;
+}
+
+// from GLM
+def mat4 mat4_perspective(f32 fovy_rad, f32 aspect, f32 znear, f32 zfar) {
+	f32 range = tan(fovy_rad / 2) * znear;
+	f32 left = -range * aspect;
+	f32 right = range * aspect;
+	f32 bottom = -range;
+	f32 top = range;
+	
+	mat4 ret;
+	ret.m0 = (2 * znear) / (right - left);
+	ret.m5 = (2 * znear) / (top - bottom);
+	ret.m10 = -(zfar + znear) / (zfar - znear);
+	ret.m11 = -1;
+	ret.m14 = -(2 * zfar * znear) / (zfar - znear);
+	return ret;
+}
+
+// from GLM
+def mat4 mat4_lookat(vec3 position, vec3 target, vec3 up) {
+	vec3 f = vec3_norm(vec3_subv(target, position));
+	vec3 u = vec3_norm(up);
+	vec3 s = vec3_norm(vec3_cross(f, u));
+	u = vec3_cross(s, f);
+	
+	mat4 ret;
+	ret.m0 = s.x;
+	ret.m1 = s.y;
+	ret.m2 = s.z;
+	
+	ret.m4 = u.x;
+	ret.m5 = u.y;
+	ret.m6 = u.z;
+	
+	ret.m8 = -f.x;
+	ret.m9 = -f.y;
+	ret.m10 = -f.z;
+	
+	ret.m12 = -vec3_dot(s, position);
+	ret.m13 = -vec3_dot(u, position);
+	ret.m14 = vec3_dot(f, position);
+	
+	ret.m15 = 1;
+	return ret;
+}
+

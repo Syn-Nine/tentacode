@@ -10,16 +10,17 @@ llvm::Module* TValue::m_module = nullptr;
 void TValue::Cleanup()
 {
 	// get from storage
-	if (m_is_storage) m_value = m_builder->CreateLoad(m_ty, m_value, "tmp_load");
-
 	if (LITERAL_TYPE_STRING == m_type)
 	{
-		m_builder->CreateCall(m_module->getFunction("__del_string"), { m_value }, "delstr");
+		llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "tmpload");
+		m_builder->CreateCall(m_module->getFunction("__del_string"), { ptr }, "delstr");
+		m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
 	}
 	else if (LITERAL_TYPE_VEC_DYNAMIC == m_type)
 	{
 		llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "tmpload");
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_delete"), { ptr }, "delvec");
+		m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
 	}
 }
 
@@ -256,13 +257,28 @@ TValue TValue::GetAtVectorIndex(TValue idx)
 
 	if (LITERAL_TYPE_VEC_FIXED == m_type)
 	{
-		llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value }, "geptmp");
-		ret.m_value = m_builder->CreateLoad(m_ty, gep);
-		ret.m_ty = m_ty;
-		ret.m_bits = m_bits;
-		ret.m_is_storage = false;
-		ret.m_type = m_vec_type;
-		ret.m_token = idx.m_token;
+		if (LITERAL_TYPE_UDT == m_vec_type)
+		{
+			llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value }, "geptmp");
+			ret.m_value = gep;
+			ret.m_ty = m_ty;
+			ret.m_bits = m_bits;
+			ret.m_is_storage = false;
+			ret.m_type = m_vec_type;
+			ret.m_token = idx.m_token;
+			ret.m_vec_type_name = m_vec_type_name;
+		}
+		else
+		{
+			llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value }, "geptmp");
+			ret.m_value = m_builder->CreateLoad(m_ty, gep);
+			ret.m_ty = m_ty;
+			ret.m_bits = m_bits;
+			ret.m_is_storage = false;
+			ret.m_type = m_vec_type;
+			ret.m_token = idx.m_token;
+			ret.m_vec_type_name = m_vec_type_name;
+		}
 	}
 	else if (LITERAL_TYPE_VEC_DYNAMIC == m_type)
 	{
@@ -276,6 +292,7 @@ TValue TValue::GetAtVectorIndex(TValue idx)
 		ret.m_is_storage = false;
 		ret.m_type = m_vec_type;
 		ret.m_token = idx.m_token;
+		ret.m_vec_type_name = m_vec_type_name;
 	}
 	else
 	{
@@ -286,93 +303,29 @@ TValue TValue::GetAtVectorIndex(TValue idx)
 }
 
 
-TValue TValue::GetStructVariable(const std::string& name)
+TValue TValue::GetStructVariable(Token* token, llvm::Value* vec_idx, const std::string& name)
 {
 	if (IsInvalid()) return NullInvalid();
 
+	llvm::Value* vidx = vec_idx;
+	if (!vidx) vidx = m_builder->getInt32(0);
+
 	std::string udt_name = m_token->Lexeme();
+	if (IsVecAny()) udt_name = m_vec_type_name;
+	
 	TStruct struc = Environment::GetStruct(m_token, udt_name);
 	if (!struc.IsValid()) return TValue::NullInvalid();
 
-	TValue ret = struc.GetMember(m_token, name);
+	TValue ret = struc.GetMember(token, name);
 	if (ret.IsInvalid()) return TValue::NullInvalid();
 
-	llvm::Value* gep_loc = struc.GetGEPLoc(m_token, name);
+	llvm::Value* gep_loc = struc.GetGEPLoc(token, name);
 	if (!gep_loc) return TValue::NullInvalid();
 
-	llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { m_builder->getInt32(0), gep_loc }, name);
+	llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { vidx, gep_loc }, name);
 	ret.SetValue(gep);
 
 	return ret;
-
-
-
-
-	/*
-	// need the root defval and defty
-	// need to build arg path
-
-	std::vector<std::string> names;
-
-	Expr* expr = this;
-
-	while (EXPRESSION_GET == expr->GetType())
-	{
-		GetExpr* ge = static_cast<GetExpr*>(expr);
-		names.insert(names.begin(), ge->Operator()->Lexeme());
-		expr = ge->Object();
-	}
-
-	VariableExpr* vs = static_cast<VariableExpr*>(expr);
-	std::string var_name = vs->Operator()->Lexeme();
-
-	llvm::Value* defval = env->GetVariable(var_name);
-	llvm::Type* defty = env->GetVariableTy(var_name);
-
-	std::string udt_name = "struct." + env->GetVariableToken(var_name)->Lexeme();
-
-	std::vector<llvm::Value*> args(1, builder->getInt32(0));
-
-	for (size_t i = 0; i < names.size(); ++i)
-	{
-		int idx = env->GetUdtMemberIndex(udt_name, names[i]);
-		if (-1 == idx)
-		{
-			env->Error(env->GetVariableToken(var_name), "Error parsing UDT members");
-			return TValue::NullInvalid();
-		}
-
-		args.push_back(builder->getInt32(idx));
-
-		Token* token = env->GetUdtMemberTokenAt(udt_name, idx);
-		if (!token)
-		{
-			env->Error(env->GetVariableToken(var_name), "Invalid UDT member token");
-			return TValue::NullInvalid();
-		}
-
-		TokenTypeEnum ttype = token->GetType();
-		if (TOKEN_IDENTIFIER == ttype)
-		{
-			udt_name = "struct." + token->Lexeme();
-			ret = TValue::UDT(udt_name, defty, defval, args);
-		}
-		else
-		{
-			llvm::Value* gep = builder->CreateGEP(defty, defval, args, "get_member");
-			if (TOKEN_VAR_I32 == ttype) ret = TValue::Integer(gep);
-			else if (TOKEN_VAR_ENUM == ttype) ret = TValue::Enum(gep);
-			else if (TOKEN_VAR_BOOL == ttype) ret = TValue::Bool(gep);
-			else if (TOKEN_VAR_F32 == ttype) ret = TValue::Double(gep);
-			else if (TOKEN_VAR_STRING == ttype) ret = TValue::String(gep);
-			else if (TOKEN_VAR_VEC == ttype)
-			{
-				ret = TValue::Vec(gep, env->GetUdtMemberVecTypeAt(udt_name, idx), env->GetUdtMemberVecTypeIdAt(udt_name, idx));
-			}
-		}
-	}
-
-	return ret;*/
 }
 
 
@@ -402,6 +355,8 @@ void TValue::Store(TValue rhs)
 		}
 		else
 		{
+			m_ty->print(llvm::errs());
+			rhs.m_ty->print(llvm::errs());
 			Error(rhs.GetToken(), "Cannot store mismatched type.");
 			return;
 		}
@@ -559,6 +514,26 @@ void TValue::Store(TValue rhs)
 		
 		break;
 	}
+	case LITERAL_TYPE_UDT:
+	{
+		TStruct tstruc = Environment::GetStruct(m_token, m_token->Lexeme());
+
+		std::vector<std::string>& member_names = tstruc.GetMemberNames();
+		std::vector<TValue>& members = tstruc.GetMemberVec();
+
+		llvm::Value* gep_zero = m_builder->getInt32(0);
+
+		for (size_t i = 0; i < members.size(); ++i)
+		{
+			llvm::Value* lhs_gep = m_builder->CreateGEP(m_ty, m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_lhs");
+			llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ty, rhs.m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_rhs");
+			llvm::Value* tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
+
+			// shallow copy
+			m_builder->CreateStore(tmp, lhs_gep);
+		}
+		break;
+	}
 	default:
 		Error(rhs.GetToken(), "Failed to store value.");
 	}
@@ -591,8 +566,28 @@ void TValue::StoreAtIndex(TValue idx, TValue rhs)
 
 	if (LITERAL_TYPE_VEC_FIXED == m_type)
 	{
-		llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value }, "geptmp");
-		m_builder->CreateStore(rhs.m_value, gep);
+		if (LITERAL_TYPE_UDT != m_vec_type)
+		{
+			llvm::Value* gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value }, "geptmp");
+			m_builder->CreateStore(rhs.m_value, gep);
+		}
+		else
+		{
+			TStruct tstruc = Environment::GetStruct(m_token, m_vec_type_name);
+
+			std::vector<std::string>& member_names = tstruc.GetMemberNames();
+			std::vector<TValue>& members = tstruc.GetMemberVec();
+
+			for (size_t i = 0; i < members.size(); ++i)
+			{
+				llvm::Value* lhs_gep = m_builder->CreateGEP(m_ty, m_value, { idx.m_value, m_builder->getInt32(i) }, member_names[i] + "_lhs");
+				llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ty, rhs.m_value, { m_builder->getInt32(0), m_builder->getInt32(i) }, member_names[i] + "_rhs");
+				llvm::Value* tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
+
+				// shallow copy
+				m_builder->CreateStore(tmp, lhs_gep);
+			}
+		}
 	}
 	else if (LITERAL_TYPE_VEC_DYNAMIC == m_type)
 	{
@@ -618,54 +613,64 @@ void TValue::StoreAtIndex(TValue idx, TValue rhs)
 
 
 //-----------------------------------------------------------------------------
-bool TValue::TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& bits, llvm::Type*& ty)
+bool TValue::TokenToType(Token* token, LiteralTypeEnum& type, int& bits, llvm::Value*& sz_bytes, llvm::Type*& ty)
 {
+	TokenTypeEnum token_type = token->GetType();
+
 	switch (token_type)
 	{
 	case TOKEN_VAR_I16:
 		bits = 16;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getIntNTy(bits);
 		type = LITERAL_TYPE_INTEGER;
 		break;
 
 	case TOKEN_VAR_I32:
 		bits = 32;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getIntNTy(bits);
 		type = LITERAL_TYPE_INTEGER;
 		break;
 
 	case TOKEN_VAR_I64:
 		bits = 64;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getIntNTy(bits);
 		type = LITERAL_TYPE_INTEGER;
 		break;
 
 	case TOKEN_VAR_F32:
 		bits = 32;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getFloatTy();
 		type = LITERAL_TYPE_FLOAT;
 		break;
 
 	case TOKEN_VAR_F64:
 		bits = 64;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getDoubleTy();
 		type = LITERAL_TYPE_FLOAT;
 		break;
 
 	case TOKEN_VAR_ENUM:
 		bits = 32;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getIntNTy(bits);
 		type = LITERAL_TYPE_ENUM;
 		break;
 
 	case TOKEN_VAR_BOOL:
 		bits = 1;
+		sz_bytes = m_builder->getInt32(1);
 		ty = m_builder->getIntNTy(1);
 		type = LITERAL_TYPE_BOOL;
 		break;
 
 	case TOKEN_VAR_STRING:
 		bits = 64;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getPtrTy();
 		type = LITERAL_TYPE_STRING;
 		break;
@@ -677,9 +682,25 @@ bool TValue::TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& b
 	case TOKEN_VAR_SHADER:
 	case TOKEN_VAR_RENDER_TEXTURE_2D:
 		bits = 64;
+		sz_bytes = m_builder->getInt32(bits / 8);
 		ty = m_builder->getPtrTy();
 		type = LITERAL_TYPE_POINTER;
 		break;
+
+	case TOKEN_IDENTIFIER:
+	{
+		TStruct tstruc = Environment::GetStruct(token, token->Lexeme());
+		if (!tstruc.IsValid())
+		{
+			return false;
+		}
+		bits = 64;
+		ty = tstruc.GetLLVMStruct();
+		sz_bytes = llvm::ConstantExpr::getSizeOf(ty);
+		type = LITERAL_TYPE_UDT;
+		break;
+	}
+
 
 	default:
 

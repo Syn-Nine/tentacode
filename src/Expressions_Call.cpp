@@ -123,17 +123,29 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 
 			std::vector<TValue> params = tfunc.GetParams();
 			TValue ret = tfunc.GetReturn();
+			TValue retref = tfunc.GetReturnRef();
 
-			if (!CheckArgSize(params.size())) return TValue::NullInvalid();
-			
 			std::vector<llvm::Value*> args;
+
+			int refofs = 0;
+			if (!retref.IsInvalid())
+			{
+				llvm::Value* v = CreateEntryAlloca(builder, retref.GetTy(), nullptr, "call_ret_ref");
+				retref.SetValue(v);
+				if (!retref.IsUDT()) retref.SetStorage(true);
+				args.push_back(v);
+				refofs = 1;
+			}
+			
+			if (!CheckArgSize(params.size() - refofs)) return TValue::NullInvalid();
+						
 			for (size_t i = 0; i < m_arguments.size(); ++i)
 			{
 				TValue v = m_arguments[i]->codegen(builder, module, env).GetFromStorage();
 
-				if (params[i].isNumeric())
+				if (params[i + refofs].isNumeric())
 				{
-					v = v.CastToMatchImplicit(params[i]);
+					v = v.CastToMatchImplicit(params[i + refofs]);
 				}
 				else if (v.IsVecDynamic())
 				{
@@ -144,10 +156,33 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 					v = v.CastFixedToDynVec();
 					v.SetValue(builder->CreateLoad(builder->getPtrTy(), v.Value(), "tmp_load"));
 				}
+				else if (v.IsUDT())
+				{
+					if (0 != v.GetToken()->Lexeme().compare(params[i + refofs].GetToken()->Lexeme()))
+					{
+						if (!tfunc.IsInternal())
+						{
+							env->Error(callee, "Parameter type mismatch in function call.");
+							return TValue::NullInvalid();
+						}
+						else
+						{
+							v.Value()->print(llvm::errs());
+							v.SetValue(builder->CreateGEP(v.GetTy(), v.Value(), { builder->getInt32(0), builder->getInt32(0) }, "tmp_gep"));
+							v.Value()->print(llvm::errs());
+						}
+					}
+				}
 				args.push_back(v.Value());
 			}
 			llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
 			ret.SetValue(rval);
+
+			if (!retref.IsInvalid())
+			{
+				ret = retref.GetFromStorage();
+			}
+
 			return ret;
 		}
 		else

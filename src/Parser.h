@@ -1,6 +1,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <fstream>
+#include <set>
+
 #include "Token.h"
 #include "Expressions.h"
 #include "ErrorHandler.h"
@@ -16,6 +19,10 @@ public:
 		m_tokenList = tokenList;
 		m_current = 0;
 		m_errorHandler = errorHandler;
+		//m_internal = false;
+		//m_global = false;
+		//m_namespace.push_back("global");
+		//UpdateFQNS();
 	}
 
 	StmtList Parse()
@@ -38,6 +45,14 @@ public:
 		return list;
 	}
 
+	/*void UpdateFQNS()
+	{
+		m_fqns = "";
+		for (auto& s : m_namespace)
+		{
+			m_fqns.append(s + "::");
+		}
+	}*/
 
 private:
 
@@ -45,6 +60,44 @@ private:
 	//-----------------------------------------------------------------------------
 	Stmt* Declaration()
 	{
+		bool keep_going = true;
+		while (keep_going)
+		{
+			keep_going = false;
+			if (Match(1, TOKEN_INCLUDE))
+			{
+				Include();
+				keep_going = true;
+			}
+
+			if (Match(1, TOKEN_NAMESPACE_PUSH))
+			{
+				//m_namespace.push_back(Previous().Lexeme());
+				//UpdateFQNS();
+				keep_going = true;
+			}
+
+			if (Match(1, TOKEN_NAMESPACE_POP))
+			{
+				/*if (m_namespace.empty())
+				{
+					Error(Previous(), "Attempting to pop from empty namespace stack.");
+					return nullptr;
+				}
+				if (Previous().Lexeme() != m_namespace.back())
+				{
+					Error(Previous(), "Attempting to pop invalid namespace: " + Previous().Lexeme());
+					return nullptr;
+				}
+				m_namespace.pop_back();
+				UpdateFQNS();*/
+				keep_going = true;
+			}
+		}
+
+		//m_internal = false;
+		//if (Match(1, TOKEN_INTERNAL)) m_internal = true;
+
 		//m_global = false;
 		//if (Match(1, TOKEN_GLOBAL)) m_global = true;
 		
@@ -86,6 +139,7 @@ private:
 		return ExpressionStatement();
 	}
 
+	void Include();
 
 	//-----------------------------------------------------------------------------
 	Stmt* Function(std::string kind)
@@ -100,7 +154,8 @@ private:
 			Check(TOKEN_VAR_F32) ||
 			Check(TOKEN_VAR_F64) ||
 			Check(TOKEN_VAR_BOOL) ||
-			Check(TOKEN_VAR_STRING))
+			Check(TOKEN_VAR_STRING) ||
+			(Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_IDENTIFIER)))
 		{
 			rettype = new Token(Advance());
 		}
@@ -117,7 +172,7 @@ private:
 		{
 			do
 			{
-				if (Check(TOKEN_IDENTIFIER)) Error(Peek(), "Expected 'type' before identifier.");
+				if (Check(TOKEN_IDENTIFIER) && !CheckNext(TOKEN_IDENTIFIER)) Error(Peek(), "Expected 'type' before identifier.");
 				if (Check(TOKEN_VAR_I16) ||
 					Check(TOKEN_VAR_I32) ||
 					Check(TOKEN_VAR_I64) ||
@@ -125,7 +180,8 @@ private:
 					Check(TOKEN_VAR_F64) ||
 					Check(TOKEN_VAR_BOOL) ||
 					Check(TOKEN_VAR_ENUM) ||
-					Check(TOKEN_VAR_STRING))
+					Check(TOKEN_VAR_STRING) ||
+					(Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_IDENTIFIER)))
 				{
 					types.push_back(Advance());
 					if (Consume(TOKEN_IDENTIFIER, "Expect parameter name."))
@@ -877,6 +933,12 @@ private:
 	ErrorHandler* m_errorHandler;
 	TokenList m_tokenList;
 	int m_current;
+
+	//std::vector<std::string> m_namespace;
+	//std::string m_fqns;
+
+	static std::set<std::string> m_includes;
+	//bool m_internal;
 	//bool m_global;
 	
 };

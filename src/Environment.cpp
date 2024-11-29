@@ -16,12 +16,12 @@ std::map<std::string, Environment::struct_struct> Environment::m_struc;
 
 
 //-----------------------------------------------------------------------------
-void Environment::AssignToVariable(const std::string& var, TValue rhs)
+void Environment::AssignToVariable(Token* token, const std::string& var, TValue rhs)
 {
 	TValue tval = GetVariable(rhs.GetToken(), var);
 	if (tval.IsInvalid())
 	{
-		Error(rhs.GetToken(), "Variable not found in environment.");
+		Error(token, "Variable not found in environment.");
 		return;
 	}
 	
@@ -36,12 +36,12 @@ void Environment::AssignToVariable(const std::string& var, TValue rhs)
 
 
 //-----------------------------------------------------------------------------
-void Environment::AssignToVariableVectorIndex(const std::string& var, TValue idx, TValue rhs)
+void Environment::AssignToVariableVectorIndex(Token* token, const std::string& var, TValue idx, TValue rhs)
 {
 	TValue tval = GetVariable(rhs.GetToken(), var);
 	if (tval.IsInvalid())
 	{
-		Error(rhs.GetToken(), "Variable not found in environment.");
+		Error(token, "Variable not found in environment.");
 		return;
 	}
 

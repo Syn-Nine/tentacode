@@ -82,11 +82,11 @@ TValue AssignExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		}
 
 		vidx = vidx.GetFromStorage();
-		env->AssignToVariableVectorIndex(var, vidx, rhs);
+		env->AssignToVariableVectorIndex(m_token, var, vidx, rhs);
 	}
 	else
 	{
-		env->AssignToVariable(var, rhs);
+		env->AssignToVariable(m_token, var, rhs);
 	}
 
 	/*
@@ -324,9 +324,14 @@ TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	VariableExpr* vs = static_cast<VariableExpr*>(m_object); // parent object
 	
 	std::string var_name = vs->Operator()->Lexeme();
-	std::string mem_name = m_token->Lexeme();	
-	
-	return env->GetVariable(m_token, var_name).GetStructVariable(mem_name);
+	std::string mem_name = m_token->Lexeme();
+
+	TValue vidx;
+	Expr* temp = vs->VecIndex();
+	if (temp) vidx = temp->codegen(builder, module, env).GetFromStorage();
+
+	TValue obj = env->GetVariable(m_token, var_name);
+	return obj.GetStructVariable(m_token, vidx.Value(), mem_name);
 }
 
 

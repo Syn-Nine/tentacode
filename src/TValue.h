@@ -39,9 +39,9 @@ public:
 	static TValue Construct(Token* token, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs = nullptr);
 	static TValue Construct_Null(Token* token, LiteralTypeEnum type, int bits);
 	static TValue Construct_Prototype(Token* token);
-	static TValue Construct_Prototype(Token* token, LiteralTypeEnum type, int bits);
 	static TValue Construct_ReturnValue(Token* token, LiteralTypeEnum type, int bits, llvm::Value* a);
-	
+	static TValue Construct_Explicit(Token* token, LiteralTypeEnum type, llvm::Value* value, llvm::Type* ty, int bits, bool is_storage, int fixed_vec_len, LiteralTypeEnum vec_type);
+
 
 	size_t FixedVecLen() const { return m_fixed_vec_len; }
 	static TValue FromLiteral(Token* token, const Literal& literal);
@@ -58,8 +58,8 @@ public:
 	bool IsString()     { return m_type == LITERAL_TYPE_STRING; }
 	bool IsEnum()       { return m_type == LITERAL_TYPE_ENUM; }
 	bool isNumeric()    { return m_type == LITERAL_TYPE_FLOAT || m_type == LITERAL_TYPE_INTEGER; }
+	bool IsUDT()        { return m_type == LITERAL_TYPE_UDT; }
 	//bool IsPointer()    { return m_type == LITERAL_TYPE_POINTER; }
-	//bool IsUDT()        { return m_type == LITERAL_TYPE_UDT; }
 
 	bool IsVecAny()     { return m_type == LITERAL_TYPE_VEC_DYNAMIC || m_type == LITERAL_TYPE_VEC_FIXED; }
 	bool IsVecDynamic() { return m_type == LITERAL_TYPE_VEC_DYNAMIC; }
@@ -83,7 +83,8 @@ public:
 	Token* GetToken() { return m_token; }
 	llvm::Type* GetTy() { return m_ty; }
 	LiteralTypeEnum GetVecType() { return m_vec_type; }
-	TValue GetStructVariable(const std::string& name);
+	std::string GetVecTypeName() { return m_vec_type_name; }
+	TValue GetStructVariable(Token* token, llvm::Value* vec_idx, const std::string& name);
 
 	bool IsInvalid() { return m_type == LITERAL_TYPE_INVALID; }
 
@@ -117,6 +118,7 @@ public:
 
 	int NumBits() const { return m_bits; }
 
+	void SetTy(llvm::Type* ty) { m_ty = ty; }
 	void SetValue(llvm::Value* val) { m_value = val; }
 	void SetStorage(bool val) { m_is_storage = val; }
 	
@@ -169,8 +171,7 @@ private:
 	static TValue Construct_Vec_Dynamic(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
 	static TValue Construct_Vec_Fixed(Token* type, TokenPtrList* args, std::string lexeme, bool global, TValueList* targs);
 	static TValue Construct_Struct(Token* type, std::string lexeme, bool global);
-	static TValue Construct_Explicit(Token* token, LiteralTypeEnum type, llvm::Value* value, llvm::Type* ty, int bits, bool is_storage, int fixed_vec_len, LiteralTypeEnum vec_type);
-
+	
 	void GetFromStorage(TValue& lhs, TValue& rhs);
 
 	static llvm::Type* MakeTy(LiteralTypeEnum type, int bits);
@@ -179,7 +180,7 @@ private:
 	static inline llvm::Type* MakePointerTy() { return m_builder->getPtrTy(); }
 	static inline llvm::Type* MakeVoidTy() { return m_builder->getVoidTy(); }
 	
-	static bool TokenToType(TokenTypeEnum token_type, LiteralTypeEnum& type, int& bits, llvm::Type*& ty);
+	static bool TokenToType(Token* token, LiteralTypeEnum& type, int& bits, llvm::Value*& sz_bytes, llvm::Type*& ty);
 
 	static ErrorHandler* m_errorHandler;
 	static llvm::IRBuilder<>* m_builder;
@@ -193,6 +194,7 @@ private:
 	bool m_is_storage;
 	int m_fixed_vec_len;
 	LiteralTypeEnum m_vec_type;
+	std::string m_vec_type_name;
 };
 
 

@@ -79,7 +79,6 @@ extern "C" DLLEXPORT int32_t ray_ImagePeek(Image* in0, int32_t in1, int32_t in2,
     {
         return raw[(y * img.width + x) * 4 + ofs];
     }
-    return 0;
 }
 
 extern "C" DLLEXPORT int32_t ray_rlLoadVertexBuffer(TVec* vecPtr, bool dynamic)
@@ -150,14 +149,38 @@ extern "C" DLLEXPORT void ray_rlSetUniform(int32_t in0, TVec* in1, int32_t in2)
 }
 
 
+extern "C" DLLEXPORT void ray_rlSetUniformMatrix(int32_t in0, void* in1)
+{
+    float* src = static_cast<float*>(in1);
+    Matrix mat;
+    mat.m0 = src[0];
+    mat.m1 = src[1];
+    mat.m2 = src[2];
+    mat.m3 = src[3];
+    mat.m4 = src[4];
+    mat.m5 = src[5];
+    mat.m6 = src[6];
+    mat.m7 = src[7];
+    mat.m8 = src[8];
+    mat.m9 = src[9];
+    mat.m10 = src[10];
+    mat.m11 = src[11];
+    mat.m12 = src[12];
+    mat.m13 = src[13];
+    mat.m14 = src[14];
+    mat.m15 = src[15];
+    rlSetUniformMatrix(in0, mat);
+}
+
+
 extern "C" DLLEXPORT int32_t ray_GetTextureId(Texture2D* texPtr)
 {
-    return texPtr->id;
+	return texPtr->id;
 }
 
 extern "C" DLLEXPORT void ray_test()
 {
-
+    
 }
 
 
@@ -173,25 +196,34 @@ extern "C" DLLEXPORT void ray_DrawRectangle(int32_t in0, int32_t in1, int32_t in
 extern "C" DLLEXPORT void ray_DrawText(std::string* in0, int32_t in1, int32_t in2, int32_t in3, int32_t in4) { DrawText(in0->c_str(), in1, in2, in3, StringToColor(rayenv->GetEnumAsString(in4))); }
 extern "C" DLLEXPORT void ray_EndDrawing() { EndDrawing(); }
 extern "C" DLLEXPORT void ray_InitWindow(int32_t in0, int32_t in1, std::string* in2) { InitWindow(in0, in1, in2->c_str()); }
+extern "C" DLLEXPORT bool ray_IsKeyPressed(int32_t in0) { return IsKeyPressed(StringToKey(rayenv->GetEnumAsString(in0))); }
+extern "C" DLLEXPORT bool ray_IsKeyPressedRepeat(int32_t in0) { return IsKeyPressedRepeat(StringToKey(rayenv->GetEnumAsString(in0))); }
 extern "C" DLLEXPORT bool ray_IsKeyDown(int32_t in0) { return IsKeyDown(StringToKey(rayenv->GetEnumAsString(in0))); }
+extern "C" DLLEXPORT bool ray_IsKeyReleased(int32_t in0) { return IsKeyReleased(StringToKey(rayenv->GetEnumAsString(in0))); }
+extern "C" DLLEXPORT bool ray_IsKeyUp(int32_t in0) { return IsKeyUp(StringToKey(rayenv->GetEnumAsString(in0))); }
+extern "C" DLLEXPORT bool ray_IsMouseButtonReleased(int32_t in0) { return IsMouseButtonReleased(StringToKey(rayenv->GetEnumAsString(in0))); }
 extern "C" DLLEXPORT int32_t ray_GetMouseX() { return GetMouseX(); }
 extern "C" DLLEXPORT int32_t ray_GetMouseY() { return GetMouseY(); }
 extern "C" DLLEXPORT void ray_SetTargetFPS(int32_t in0) { SetTargetFPS(in0); }
 extern "C" DLLEXPORT bool ray_WindowShouldClose() { return WindowShouldClose(); }
 extern "C" DLLEXPORT Texture2D* ray_LoadTexture(std::string* in0) { return new Texture2D(LoadTexture(in0->c_str())); }
 extern "C" DLLEXPORT void ray_DrawTexture(Texture2D* in0, int32_t in1, int32_t in2, int32_t in3) { DrawTexture(*in0, in1, in2, StringToColor(rayenv->GetEnumAsString(in3))); }
-extern "C" DLLEXPORT void ray_DrawTextureV(Texture2D* in0, double in1a, double in1b, int32_t in2) { DrawTextureV(*in0, { float(in1a), float(in1b) }, StringToColor(rayenv->GetEnumAsString(in2))); }
-extern "C" DLLEXPORT void ray_DrawTextureEx(Texture2D* in0, double in1a, double in1b, double in2, double in3, int32_t in4) { DrawTextureEx(*in0, { float(in1a), float(in1b) }, in2, in3, StringToColor(rayenv->GetEnumAsString(in4))); }
-extern "C" DLLEXPORT void ray_DrawTexturePro(Texture2D* in0, double in1a, double in1b, double in1c, double in1d, double in2a, double in2b, double in2c, double in2d, double in3a, double in3b, double in4, int32_t in5) { DrawTexturePro(*in0, { float(in1a), float(in1b), float(in1c), float(in1d) }, { float(in2a), float(in2b), float(in2c), float(in2d) }, { float(in3a), float(in3b) }, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
+extern "C" DLLEXPORT void ray_DrawTextureV(Texture2D* in0, double in1a, double in1b, int32_t in2) { DrawTextureV(*in0, { float(in1a), float(in1b)}, StringToColor(rayenv->GetEnumAsString(in2))); }
+extern "C" DLLEXPORT void ray_DrawTextureEx(Texture2D* in0, double in1a, double in1b, double in2, double in3, int32_t in4) { DrawTextureEx(*in0, { float(in1a), float(in1b)}, in2, in3, StringToColor(rayenv->GetEnumAsString(in4))); }
+extern "C" DLLEXPORT void ray_DrawTexturePro(Texture2D* in0, double in1a, double in1b, double in1c, double in1d, double in2a, double in2b, double in2c, double in2d, double in3a, double in3b, double in4, int32_t in5) { DrawTexturePro(*in0, { float(in1a), float(in1b), float(in1c), float(in1d)}, { float(in2a), float(in2b), float(in2c), float(in2d)}, { float(in3a), float(in3b)}, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
 extern "C" DLLEXPORT bool ray_IsGamepadAvailable(int32_t in0) { return IsGamepadAvailable(in0); }
 extern "C" DLLEXPORT double ray_GetGamepadAxisMovement(int32_t in0, int32_t in1) { return GetGamepadAxisMovement(in0, StringToGamepadAxis(rayenv->GetEnumAsString(in1))); }
 extern "C" DLLEXPORT bool ray_IsGamepadButtonDown(int32_t in0, int32_t in1) { return IsGamepadButtonDown(in0, StringToGamepadButton(rayenv->GetEnumAsString(in1))); }
+extern "C" DLLEXPORT bool ray_IsGamepadButtonPressed(int32_t in0, int32_t in1) { return IsGamepadButtonPressed(in0, StringToGamepadButton(rayenv->GetEnumAsString(in1))); }
+extern "C" DLLEXPORT bool ray_IsGamepadButtonReleased(int32_t in0, int32_t in1) { return IsGamepadButtonReleased(in0, StringToGamepadButton(rayenv->GetEnumAsString(in1))); }
+extern "C" DLLEXPORT bool ray_IsGamepadButtonUp(int32_t in0, int32_t in1) { return IsGamepadButtonUp(in0, StringToGamepadButton(rayenv->GetEnumAsString(in1))); }
 extern "C" DLLEXPORT Sound* ray_LoadSound(std::string* in0) { return new Sound(LoadSound(in0->c_str())); }
 extern "C" DLLEXPORT void ray_UnloadSound(Sound* in0) { UnloadSound(*in0); }
 extern "C" DLLEXPORT void ray_PlaySound(Sound* in0) { PlaySound(*in0); }
 extern "C" DLLEXPORT void ray_InitAudioDevice() { InitAudioDevice(); }
+extern "C" DLLEXPORT void ray_CloseAudioDevice() { CloseAudioDevice(); }
 extern "C" DLLEXPORT Font* ray_LoadFont(std::string* in0) { return new Font(LoadFont(in0->c_str())); }
-extern "C" DLLEXPORT void ray_DrawTextEx(Font* in0, std::string* in1, double in2a, double in2b, double in3, double in4, int32_t in5) { DrawTextEx(*in0, in1->c_str(), { float(in2a), float(in2b) }, in3, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
+extern "C" DLLEXPORT void ray_DrawTextEx(Font* in0, std::string* in1, double in2a, double in2b, double in3, double in4, int32_t in5) { DrawTextEx(*in0, in1->c_str(), { float(in2a), float(in2b)}, in3, in4, StringToColor(rayenv->GetEnumAsString(in5))); }
 extern "C" DLLEXPORT Image* ray_LoadImage(std::string* in0) { return new Image(LoadImage(in0->c_str())); }
 extern "C" DLLEXPORT void ray_UnloadImage(Image* in0) { UnloadImage(*in0); }
 extern "C" DLLEXPORT Texture2D* ray_LoadTextureFromImage(Image* in0) { return new Texture2D(LoadTextureFromImage(*in0)); }
@@ -225,13 +257,20 @@ extern "C" DLLEXPORT void ray_rlEnableTexture(int32_t in0) { rlEnableTexture(in0
 extern "C" DLLEXPORT void ray_rlDisableTexture() { rlDisableTexture(); }
 extern "C" DLLEXPORT void ray_rlCheckErrors() { rlCheckErrors(); }
 extern "C" DLLEXPORT void ray_rlActiveTextureSlot(int32_t in0) { rlActiveTextureSlot(in0); }
+extern "C" DLLEXPORT void ray_rlEnableColorBlend() { rlEnableColorBlend(); }
+extern "C" DLLEXPORT void ray_rlDisableColorBlend() { rlDisableColorBlend(); }
+extern "C" DLLEXPORT void ray_rlEnableDepthTest() { rlEnableDepthTest(); }
+extern "C" DLLEXPORT void ray_rlDisableDepthTest() { rlDisableDepthTest(); }
+extern "C" DLLEXPORT void ray_rlEnableDepthMask() { rlEnableDepthMask(); }
+extern "C" DLLEXPORT void ray_rlDisableDepthMask() { rlDisableDepthMask(); }
+extern "C" DLLEXPORT void ray_rlEnableBackfaceCulling() { rlEnableBackfaceCulling(); }
 extern "C" DLLEXPORT void ray_rlDisableBackfaceCulling() { rlDisableBackfaceCulling(); }
 
 //
 
 static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
-    rayenv = env;
+	rayenv = env;
 
     {
         std::vector<llvm::Type*> args;
@@ -323,8 +362,48 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyPressed", *module);
+        std::string lexeme = "ray::IsKeyPressed";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyPressedRepeat", *module);
+        std::string lexeme = "ray::IsKeyPressedRepeat";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyDown", *module);
         std::string lexeme = "ray::IsKeyDown";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyReleased", *module);
+        std::string lexeme = "ray::IsKeyReleased";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsKeyUp", *module);
+        std::string lexeme = "ray::IsKeyUp";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsMouseButtonReleased", *module);
+        std::string lexeme = "ray::IsMouseButtonReleased";
         env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
     }
     {
@@ -438,6 +517,33 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
     }
     {
         std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsGamepadButtonPressed", *module);
+        std::string lexeme = "ray::IsGamepadButtonPressed";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsGamepadButtonReleased", *module);
+        std::string lexeme = "ray::IsGamepadButtonReleased";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_IsGamepadButtonUp", *module);
+        std::string lexeme = "ray::IsGamepadButtonUp";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_ENUM }, args, LITERAL_TYPE_BOOL), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_LoadSound", *module);
@@ -465,6 +571,13 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_InitAudioDevice", *module);
         std::string lexeme = "ray::InitAudioDevice";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_CloseAudioDevice", *module);
+        std::string lexeme = "ray::CloseAudioDevice";
         env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
     {
@@ -753,13 +866,62 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
     {
         std::vector<llvm::Type*> args;
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableColorBlend", *module);
+        std::string lexeme = "ray::rlEnableColorBlend";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableColorBlend", *module);
+        std::string lexeme = "ray::rlDisableColorBlend";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableDepthTest", *module);
+        std::string lexeme = "ray::rlEnableDepthTest";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableDepthTest", *module);
+        std::string lexeme = "ray::rlDisableDepthTest";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableDepthMask", *module);
+        std::string lexeme = "ray::rlEnableDepthMask";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableDepthMask", *module);
+        std::string lexeme = "ray::rlDisableDepthMask";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlEnableBackfaceCulling", *module);
+        std::string lexeme = "ray::rlEnableBackfaceCulling";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+    {
+        std::vector<llvm::Type*> args;
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDisableBackfaceCulling", *module);
         std::string lexeme = "ray::rlDisableBackfaceCulling";
         env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {  }, args, LITERAL_TYPE_INVALID), lexeme);
     }
 
-    //-------------------------------------------------------------------------
-    // manual functions
+	//-------------------------------------------------------------------------
+	// manual functions
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getPtrTy());
@@ -773,24 +935,24 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         args.push_back(builder->getInt32Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureTileMap", *module);
-        std::string lexeme = "ray::DrawTextureTileMap";
+		std::string lexeme = "ray::DrawTextureTileMap";
         env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, {
             LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER,
             LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_POINTER,
             LITERAL_TYPE_ENUM
             }, args, LITERAL_TYPE_INVALID), lexeme);
     }
-    {
-        std::vector<llvm::Type*> args;
-        args.push_back(builder->getPtrTy());
-        args.push_back(builder->getInt32Ty());
-        args.push_back(builder->getInt32Ty());
-        args.push_back(builder->getInt32Ty());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImagePeek", *module);
-        std::string lexeme = "ray::ImagePeek";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INTEGER), lexeme);
-    }
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt32Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_ImagePeek", *module);
+		std::string lexeme = "ray::ImagePeek";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INTEGER), lexeme);
+	}
     {
         std::vector<llvm::Type*> args;
         args.push_back(builder->getInt32Ty());
@@ -802,227 +964,237 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
         llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetVertexAttribute", *module);
         std::string lexeme = "ray::rlSetVertexAttribute";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_BOOL, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_BOOL, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
-    {
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt1Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBuffer", *module);
+		std::string lexeme = "ray::rlLoadVertexBuffer";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt1Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBufferElement", *module);
+		std::string lexeme = "ray::rlLoadVertexBufferElement";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt32Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetUniform", *module);
+		std::string lexeme = "ray::rlSetUniform";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
+	}
+	{
         std::vector<llvm::Type*> args;
+        args.push_back(builder->getInt32Ty());
         args.push_back(builder->getPtrTy());
-        args.push_back(builder->getInt1Ty());
         llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBuffer", *module);
-        std::string lexeme = "ray::rlLoadVertexBuffer";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetUniformMatrix", *module);
+        std::string lexeme = "ray::rlSetUniformMatrix";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INVALID), lexeme);
     }
-    {
-        std::vector<llvm::Type*> args;
-        args.push_back(builder->getPtrTy());
-        args.push_back(builder->getInt1Ty());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlLoadVertexBufferElement", *module);
-        std::string lexeme = "ray::rlLoadVertexBufferElement";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_BOOL }, args, LITERAL_TYPE_INTEGER), lexeme);
-    }
-    {
-        std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt32Ty());
-        args.push_back(builder->getPtrTy());
-        args.push_back(builder->getInt32Ty());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlSetUniform", *module);
-        std::string lexeme = "ray::rlSetUniform";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_POINTER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
-    }
-    {
-        std::vector<llvm::Type*> args;
-        args.push_back(builder->getPtrTy());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetTextureId", *module);
-        std::string lexeme = "ray::GetTextureId";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INTEGER), lexeme);
-    }
-    {
-        std::vector<llvm::Type*> args;
-        args.push_back(builder->getInt32Ty());
-        args.push_back(builder->getInt32Ty());
-        args.push_back(builder->getInt32Ty());
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDrawVertexArrayElements", *module);
-        std::string lexeme = "ray::rlDrawVertexArrayElements";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
-    }
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_GetTextureId", *module);
+		std::string lexeme = "ray::GetTextureId";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER }, args, LITERAL_TYPE_INTEGER), lexeme);
+	}
+	{
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt32Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_rlDrawVertexArrayElements", *module);
+		std::string lexeme = "ray::rlDrawVertexArrayElements";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
+	}
+	
+	{
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
+		llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_test", *module);
+		std::string lexeme = "ray::test";
+		env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { }, {}, LITERAL_TYPE_INVALID), lexeme);
+	}
+	
+	
+	// Inject enums into environment
+	{
+		std::vector<int> vals = {
+			RL_FLOAT,
+			RL_SHADER_UNIFORM_FLOAT,
+			RL_SHADER_UNIFORM_VEC2,
+			RL_SHADER_UNIFORM_VEC3,
+			RL_SHADER_UNIFORM_VEC4,
+			RL_SHADER_UNIFORM_INT,
+			RL_SHADER_UNIFORM_IVEC2,
+			RL_SHADER_UNIFORM_IVEC3,
+			RL_SHADER_UNIFORM_IVEC4,
+			RL_SHADER_UNIFORM_SAMPLER2D
+		};
 
-    {
-        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
-        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_test", *module);
-        std::string lexeme = "ray::test";
-        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { }, {}, LITERAL_TYPE_INVALID), lexeme);
-    }
+		std::vector<std::string> names = {
+			"RL_FLOAT",
+			"RL_SHADER_UNIFORM_FLOAT",
+			"RL_SHADER_UNIFORM_VEC2",
+			"RL_SHADER_UNIFORM_VEC3",
+			"RL_SHADER_UNIFORM_VEC4",
+			"RL_SHADER_UNIFORM_INT",
+			"RL_SHADER_UNIFORM_IVEC2",
+			"RL_SHADER_UNIFORM_IVEC3",
+			"RL_SHADER_UNIFORM_IVEC4",
+			"RL_SHADER_UNIFORM_SAMPLER2D"
+		};
 
-
-    // Inject enums into environment
-    {
-        std::vector<int> vals = {
-            RL_FLOAT,
-            RL_SHADER_UNIFORM_FLOAT,
-            RL_SHADER_UNIFORM_VEC2,
-            RL_SHADER_UNIFORM_VEC3,
-            RL_SHADER_UNIFORM_VEC4,
-            RL_SHADER_UNIFORM_INT,
-            RL_SHADER_UNIFORM_IVEC2,
-            RL_SHADER_UNIFORM_IVEC3,
-            RL_SHADER_UNIFORM_IVEC4,
-            RL_SHADER_UNIFORM_SAMPLER2D
-        };
-
-        std::vector<std::string> names = {
-            "RL_FLOAT",
-            "RL_SHADER_UNIFORM_FLOAT",
-            "RL_SHADER_UNIFORM_VEC2",
-            "RL_SHADER_UNIFORM_VEC3",
-            "RL_SHADER_UNIFORM_VEC4",
-            "RL_SHADER_UNIFORM_INT",
-            "RL_SHADER_UNIFORM_IVEC2",
-            "RL_SHADER_UNIFORM_IVEC3",
-            "RL_SHADER_UNIFORM_IVEC4",
-            "RL_SHADER_UNIFORM_SAMPLER2D"
-        };
-
-        for (size_t i = 0; i < vals.size(); ++i)
-        {
-            llvm::Value* defval = new llvm::GlobalVariable(*module, builder->getInt32Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
-            TValue v = TValue::MakeInt(nullptr, 32, defval);
-            v.SetStorage(true);
-            env->DefineVariable(v, names[i]);
-        }
-    }
+		for (size_t i = 0; i < vals.size(); ++i)
+		{
+			llvm::Value* defval = new llvm::GlobalVariable(*module, builder->getInt32Ty(), false, llvm::GlobalValue::InternalLinkage, builder->getInt32(vals[i]), names[i]);
+			TValue v = TValue::MakeInt(nullptr, 32, defval);
+			v.SetStorage(true);
+			env->DefineVariable(v, names[i]);
+		}
+	}
 }
 
 static Color StringToColor(const std::string& s)
 {
-    static bool first = true;
-    static std::map<std::string, Color> enumMap;
-    if (first)
-    {
-        first = false;
-        enumMap.insert(std::make_pair(":LIGHTGRAY", LIGHTGRAY));
-        enumMap.insert(std::make_pair(":GRAY", GRAY));
-        enumMap.insert(std::make_pair(":DARKGRAY", Color{ 60, 60, 60, 255 }));
-        enumMap.insert(std::make_pair(":DARKDARKGRAY", Color{ 20, 20, 20, 255 }));
-        enumMap.insert(std::make_pair(":YELLOW", YELLOW));
-        enumMap.insert(std::make_pair(":GOLD", GOLD));
-        enumMap.insert(std::make_pair(":ORANGE", ORANGE));
-        enumMap.insert(std::make_pair(":PINK", PINK));
-        enumMap.insert(std::make_pair(":RED", RED));
-        enumMap.insert(std::make_pair(":DARKRED", Color{ 128, 20, 25, 255 }));
-        enumMap.insert(std::make_pair(":MAROON", MAROON));
-        enumMap.insert(std::make_pair(":GREEN", GREEN));
-        enumMap.insert(std::make_pair(":LIME", LIME));
-        enumMap.insert(std::make_pair(":DARKGREEN", DARKGREEN));
-        enumMap.insert(std::make_pair(":SKYBLUE", SKYBLUE));
-        enumMap.insert(std::make_pair(":BLUE", BLUE));
-        enumMap.insert(std::make_pair(":DARKBLUE", DARKBLUE));
-        enumMap.insert(std::make_pair(":PURPLE", PURPLE));
-        enumMap.insert(std::make_pair(":VIOLET", VIOLET));
-        enumMap.insert(std::make_pair(":DARKPURPLE", DARKPURPLE));
-        enumMap.insert(std::make_pair(":BEIGE", BEIGE));
-        enumMap.insert(std::make_pair(":BROWN", BROWN));
-        enumMap.insert(std::make_pair(":DARKBROWN", DARKBROWN));
-        enumMap.insert(std::make_pair(":WHITE", WHITE));
-        enumMap.insert(std::make_pair(":BLACK", BLACK));
-        enumMap.insert(std::make_pair(":BLANK", BLANK));
-        enumMap.insert(std::make_pair(":MAGENTA", MAGENTA));
-        enumMap.insert(std::make_pair(":RAYWHITE", RAYWHITE));
-        enumMap.insert(std::make_pair(":SHARKGRAY", Color{ 34, 32, 39, 255 }));
-        enumMap.insert(std::make_pair(":SLATEGRAY", Color{ 140, 173, 181, 255 }));
-        enumMap.insert(std::make_pair(":DARKSLATEGRAY", Color{ 67, 99, 107, 255 }));
+	static bool first = true;
+	static std::map<std::string, Color> enumMap;
+	if (first)
+	{
+		first = false;
+		enumMap.insert(std::make_pair(":LIGHTGRAY", LIGHTGRAY));
+		enumMap.insert(std::make_pair(":GRAY", GRAY));
+		enumMap.insert(std::make_pair(":DARKGRAY", Color{ 60, 60, 60, 255 }));
+		enumMap.insert(std::make_pair(":DARKDARKGRAY", Color{ 20, 20, 20, 255 }));
+		enumMap.insert(std::make_pair(":YELLOW", YELLOW));
+		enumMap.insert(std::make_pair(":GOLD", GOLD));
+		enumMap.insert(std::make_pair(":ORANGE", ORANGE));
+		enumMap.insert(std::make_pair(":PINK", PINK));
+		enumMap.insert(std::make_pair(":RED", RED));
+		enumMap.insert(std::make_pair(":DARKRED", Color{ 128, 20, 25, 255 }));
+		enumMap.insert(std::make_pair(":MAROON", MAROON));
+		enumMap.insert(std::make_pair(":GREEN", GREEN));
+		enumMap.insert(std::make_pair(":LIME", LIME));
+		enumMap.insert(std::make_pair(":DARKGREEN", DARKGREEN));
+		enumMap.insert(std::make_pair(":SKYBLUE", SKYBLUE));
+		enumMap.insert(std::make_pair(":BLUE", BLUE));
+		enumMap.insert(std::make_pair(":DARKBLUE", DARKBLUE));
+		enumMap.insert(std::make_pair(":PURPLE", PURPLE));
+		enumMap.insert(std::make_pair(":VIOLET", VIOLET));
+		enumMap.insert(std::make_pair(":DARKPURPLE", DARKPURPLE));
+		enumMap.insert(std::make_pair(":BEIGE", BEIGE));
+		enumMap.insert(std::make_pair(":BROWN", BROWN));
+		enumMap.insert(std::make_pair(":DARKBROWN", DARKBROWN));
+		enumMap.insert(std::make_pair(":WHITE", WHITE));
+		enumMap.insert(std::make_pair(":BLACK", BLACK));
+		enumMap.insert(std::make_pair(":BLANK", BLANK));
+		enumMap.insert(std::make_pair(":MAGENTA", MAGENTA));
+		enumMap.insert(std::make_pair(":RAYWHITE", RAYWHITE));
+		enumMap.insert(std::make_pair(":SHARKGRAY", Color{ 34, 32, 39, 255 }));
+		enumMap.insert(std::make_pair(":SLATEGRAY", Color{ 140, 173, 181, 255 }));
+		enumMap.insert(std::make_pair(":DARKSLATEGRAY", Color{ 67, 99, 107, 255 }));
 
-    }
-    if (0 != enumMap.count(s)) return enumMap.at(s);
-    return MAROON;
+	}
+	if (0 != enumMap.count(s)) return enumMap.at(s);
+	return MAROON;
 }
 
 static int StringToKey(const std::string& s)
 {
-    static bool first = true;
-    static std::map<std::string, int> enumMap;
-    if (first)
-    {
-        first = false;
-        enumMap.insert(std::make_pair(":KEY_UP", KEY_UP));
-        enumMap.insert(std::make_pair(":KEY_DOWN", KEY_DOWN));
-        enumMap.insert(std::make_pair(":KEY_LEFT", KEY_LEFT));
-        enumMap.insert(std::make_pair(":KEY_RIGHT", KEY_RIGHT));
-        enumMap.insert(std::make_pair(":KEY_SPACE", KEY_SPACE));
-        enumMap.insert(std::make_pair(":KEY_ENTER", KEY_ENTER));
-        enumMap.insert(std::make_pair(":KEY_BACKSPACE", KEY_BACKSPACE));
-        //
-        enumMap.insert(std::make_pair(":KEY_A", KEY_A));
-        enumMap.insert(std::make_pair(":KEY_B", KEY_B));
-        enumMap.insert(std::make_pair(":KEY_C", KEY_C));
-        enumMap.insert(std::make_pair(":KEY_D", KEY_D));
-        enumMap.insert(std::make_pair(":KEY_E", KEY_E));
-        enumMap.insert(std::make_pair(":KEY_F", KEY_F));
-        enumMap.insert(std::make_pair(":KEY_G", KEY_G));
-        enumMap.insert(std::make_pair(":KEY_H", KEY_H));
-        enumMap.insert(std::make_pair(":KEY_I", KEY_I));
-        enumMap.insert(std::make_pair(":KEY_J", KEY_J));
-        enumMap.insert(std::make_pair(":KEY_K", KEY_K));
-        enumMap.insert(std::make_pair(":KEY_L", KEY_L));
-        enumMap.insert(std::make_pair(":KEY_M", KEY_M));
-        enumMap.insert(std::make_pair(":KEY_N", KEY_N));
-        enumMap.insert(std::make_pair(":KEY_O", KEY_O));
-        enumMap.insert(std::make_pair(":KEY_P", KEY_P));
-        enumMap.insert(std::make_pair(":KEY_Q", KEY_Q));
-        enumMap.insert(std::make_pair(":KEY_R", KEY_R));
-        enumMap.insert(std::make_pair(":KEY_S", KEY_S));
-        enumMap.insert(std::make_pair(":KEY_T", KEY_T));
-        enumMap.insert(std::make_pair(":KEY_U", KEY_U));
-        enumMap.insert(std::make_pair(":KEY_V", KEY_V));
-        enumMap.insert(std::make_pair(":KEY_W", KEY_W));
-        enumMap.insert(std::make_pair(":KEY_X", KEY_X));
-        enumMap.insert(std::make_pair(":KEY_Y", KEY_Y));
-        enumMap.insert(std::make_pair(":KEY_Z", KEY_Z));
-        //
-        enumMap.insert(std::make_pair(":MOUSE_BUTTON_LEFT", MOUSE_BUTTON_LEFT));
-        enumMap.insert(std::make_pair(":MOUSE_BUTTON_RIGHT", MOUSE_BUTTON_RIGHT));
-        enumMap.insert(std::make_pair(":MOUSE_BUTTON_MIDDLE", MOUSE_BUTTON_MIDDLE));
+	static bool first = true;
+	static std::map<std::string, int> enumMap;
+	if (first)
+	{
+		first = false;
+		enumMap.insert(std::make_pair(":KEY_UP", KEY_UP));
+		enumMap.insert(std::make_pair(":KEY_DOWN", KEY_DOWN));
+		enumMap.insert(std::make_pair(":KEY_LEFT", KEY_LEFT));
+		enumMap.insert(std::make_pair(":KEY_RIGHT", KEY_RIGHT));
+		enumMap.insert(std::make_pair(":KEY_SPACE", KEY_SPACE));
+		enumMap.insert(std::make_pair(":KEY_ENTER", KEY_ENTER));
+		enumMap.insert(std::make_pair(":KEY_BACKSPACE", KEY_BACKSPACE));
+		enumMap.insert(std::make_pair(":KEY_TAB", KEY_TAB));
+		//
+		enumMap.insert(std::make_pair(":KEY_A", KEY_A));
+		enumMap.insert(std::make_pair(":KEY_B", KEY_B));
+		enumMap.insert(std::make_pair(":KEY_C", KEY_C));
+		enumMap.insert(std::make_pair(":KEY_D", KEY_D));
+		enumMap.insert(std::make_pair(":KEY_E", KEY_E));
+		enumMap.insert(std::make_pair(":KEY_F", KEY_F));
+		enumMap.insert(std::make_pair(":KEY_G", KEY_G));
+		enumMap.insert(std::make_pair(":KEY_H", KEY_H));
+		enumMap.insert(std::make_pair(":KEY_I", KEY_I));
+		enumMap.insert(std::make_pair(":KEY_J", KEY_J));
+		enumMap.insert(std::make_pair(":KEY_K", KEY_K));
+		enumMap.insert(std::make_pair(":KEY_L", KEY_L));
+		enumMap.insert(std::make_pair(":KEY_M", KEY_M));
+		enumMap.insert(std::make_pair(":KEY_N", KEY_N));
+		enumMap.insert(std::make_pair(":KEY_O", KEY_O));
+		enumMap.insert(std::make_pair(":KEY_P", KEY_P));
+		enumMap.insert(std::make_pair(":KEY_Q", KEY_Q));
+		enumMap.insert(std::make_pair(":KEY_R", KEY_R));
+		enumMap.insert(std::make_pair(":KEY_S", KEY_S));
+		enumMap.insert(std::make_pair(":KEY_T", KEY_T));
+		enumMap.insert(std::make_pair(":KEY_U", KEY_U));
+		enumMap.insert(std::make_pair(":KEY_V", KEY_V));
+		enumMap.insert(std::make_pair(":KEY_W", KEY_W));
+		enumMap.insert(std::make_pair(":KEY_X", KEY_X));
+		enumMap.insert(std::make_pair(":KEY_Y", KEY_Y));
+		enumMap.insert(std::make_pair(":KEY_Z", KEY_Z));
+		//
+		enumMap.insert(std::make_pair(":MOUSE_BUTTON_LEFT", MOUSE_BUTTON_LEFT));
+		enumMap.insert(std::make_pair(":MOUSE_BUTTON_RIGHT", MOUSE_BUTTON_RIGHT));
+		enumMap.insert(std::make_pair(":MOUSE_BUTTON_MIDDLE", MOUSE_BUTTON_MIDDLE));
 
-    }
-    if (0 != enumMap.count(s)) return enumMap.at(s);
-    return KEY_NULL;
+	}
+	if (0 != enumMap.count(s)) return enumMap.at(s);
+	return KEY_NULL;
 }
 
 static int StringToGamepadAxis(const std::string& s)
 {
-    static bool first = true;
-    static std::map<std::string, int> enumMap;
-    if (first)
-    {
-        first = false;
-        enumMap.insert(std::make_pair(":GAMEPAD_AXIS_LEFT_X", GAMEPAD_AXIS_LEFT_X));
-        enumMap.insert(std::make_pair(":GAMEPAD_AXIS_LEFT_Y", GAMEPAD_AXIS_LEFT_Y));
-    }
-    if (0 != enumMap.count(s)) return enumMap.at(s);
-    return KEY_NULL;
+	static bool first = true;
+	static std::map<std::string, int> enumMap;
+	if (first)
+	{
+		first = false;
+		enumMap.insert(std::make_pair(":GAMEPAD_AXIS_LEFT_X", GAMEPAD_AXIS_LEFT_X));
+		enumMap.insert(std::make_pair(":GAMEPAD_AXIS_LEFT_Y", GAMEPAD_AXIS_LEFT_Y));
+	}
+	if (0 != enumMap.count(s)) return enumMap.at(s);
+	return KEY_NULL;
 }
 
 static int StringToGamepadButton(const std::string& s)
 {
-    static bool first = true;
-    static std::map<std::string, int> enumMap;
-    if (first)
-    {
-        first = false;
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_UP", GAMEPAD_BUTTON_LEFT_FACE_UP));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_DOWN", GAMEPAD_BUTTON_LEFT_FACE_DOWN));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_LEFT", GAMEPAD_BUTTON_LEFT_FACE_LEFT));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_RIGHT", GAMEPAD_BUTTON_LEFT_FACE_RIGHT));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_UP", GAMEPAD_BUTTON_RIGHT_FACE_UP));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_DOWN", GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_LEFT", GAMEPAD_BUTTON_RIGHT_FACE_LEFT));
-        enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_RIGHT", GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
-    }
-    if (0 != enumMap.count(s)) return enumMap.at(s);
-    return KEY_NULL;
+	static bool first = true;
+	static std::map<std::string, int> enumMap;
+	if (first)
+	{
+		first = false;
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_UP", GAMEPAD_BUTTON_LEFT_FACE_UP));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_DOWN", GAMEPAD_BUTTON_LEFT_FACE_DOWN));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_LEFT", GAMEPAD_BUTTON_LEFT_FACE_LEFT));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_LEFT_FACE_RIGHT", GAMEPAD_BUTTON_LEFT_FACE_RIGHT));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_UP", GAMEPAD_BUTTON_RIGHT_FACE_UP));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_DOWN", GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_LEFT", GAMEPAD_BUTTON_RIGHT_FACE_LEFT));
+		enumMap.insert(std::make_pair(":GAMEPAD_BUTTON_RIGHT_FACE_RIGHT", GAMEPAD_BUTTON_RIGHT_FACE_RIGHT));
+	}
+	if (0 != enumMap.count(s)) return enumMap.at(s);
+	return KEY_NULL;
 }
 #endif // EXTENSIONS_RAYLIB_H

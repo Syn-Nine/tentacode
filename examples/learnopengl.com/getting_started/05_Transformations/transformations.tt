@@ -1,0 +1,135 @@
+// Equivalent output to https://learnopengl.com/Getting-started/Transformations
+
+include "../../includes/math3d.tt";
+
+// create window
+ray::InitWindow(800, 600, "Getting Started - Transformations");
+ray::SetTargetFPS(60);
+
+ray::rlClearColor(51, 77, 77, 255);
+
+// load the shader for tutorial 2
+i32 program = shader::load("transformations.vs", "transformations.fs");
+
+// create vertices and load them to a vertex buffer object
+vec<f32> verts = [
+    // positions       // colors        // texture coords
+     0.5,  0.5, 0.0,   1.0, 0.0, 0.0,   1.0, 1.0,   // top right
+     0.5, -0.5, 0.0,   0.0, 1.0, 0.0,   1.0, 0.0,   // bottom right
+    -0.5, -0.5, 0.0,   0.0, 0.0, 1.0,   0.0, 0.0,   // bottom let
+    -0.5,  0.5, 0.0,   1.0, 1.0, 0.0,   0.0, 1.0    // top let 
+	 ];
+	 
+vec<i32> indices = [
+	0, 3, 1, // first triangle
+	1, 3, 2  // second triangle
+	];
+
+i32 vao = ray::rlLoadVertexArray();
+ray::rlEnableVertexArray(vao);
+
+i32 vbo = ray::rlLoadVertexBuffer(verts, false);
+i32 ebo = ray::rlLoadVertexBufferElement(indices, false);
+
+i32 SZ_FLOAT = 4;
+
+// position attribute
+ray::rlSetVertexAttribute(0, 3, RL_FLOAT, false, 8 * SZ_FLOAT, 0);
+ray::rlEnableVertexAttribute(0);
+
+// color attribute
+ray::rlSetVertexAttribute(1, 3, RL_FLOAT, false, 8 * SZ_FLOAT, 3 * SZ_FLOAT);
+ray::rlEnableVertexAttribute(1);
+
+// texture coord attribute
+ray::rlSetVertexAttribute(2, 2, RL_FLOAT, false, 8 * SZ_FLOAT, 6 * SZ_FLOAT);
+ray::rlEnableVertexAttribute(2);
+
+// texture 1
+ray_texture texture1 = ray::LoadTexture("../../assets/container.png");
+i32 texid1 = ray::GetTextureId(texture1);
+
+// texture 2
+ray_image image2 = ray::LoadImage("../../assets/awesomeface.png");
+ray::ImageFlipVertical(image2);
+ray_texture texture2 = ray::LoadTextureFromImage(image2);
+i32 texid2 = ray::GetTextureId(texture2);
+ray::UnloadImage(image2);
+
+// map sampler uniforms to texture slots
+shader::enable(program);
+shader::set_i32(program, "texture1", 0);
+shader::set_i32(program, "texture2", 1);
+
+f64 t_start = clock();
+
+// main loop
+loop {
+	
+	mat4 trans = mat4_identity();
+	trans = mat4_multm(trans, mat4_translate(0.5, -0.5, 0.0));
+	trans = mat4_multm(trans, mat4_rotate(clock() - t_start, vec3_new(0, 0, 1)));
+
+	// rendering
+	ray::BeginDrawing();
+		ray::rlClearScreenBuffers();
+		
+		shader::enable(program);
+			shader::set_mat4(program, "transform", trans);
+			ray::rlActiveTextureSlot(0);
+			ray::rlEnableTexture(texid1);
+			ray::rlActiveTextureSlot(1);
+			ray::rlEnableTexture(texid2);
+			ray::rlEnableVertexArray(vao);
+			ray::rlDrawVertexArrayElements(0, 6, 0);
+			ray::rlDisableVertexArray();
+		shader::disable();
+
+	ray::EndDrawing();
+
+	// check for window close event
+	if ray::WindowShouldClose() { break; }
+	
+}
+
+ray::rlUnloadVertexArray(vao);
+ray::rlUnloadVertexBuffer(vbo);
+ray::rlUnloadVertexBuffer(ebo);
+ray::rlUnloadShaderProgram(program);
+ray::UnloadTexture(texture1);
+ray::UnloadTexture(texture2);
+
+ray::CloseWindow();
+
+
+//-----------------------------------------------------------------------------
+// shader utilities
+//-----------------------------------------------------------------------------
+
+def i32 shader::load(string vs, string fs) {
+	return ray::rlLoadShaderCode(file::readstring(vs), file::readstring(fs));
+}
+
+def shader::enable(i32 program) {
+	ray::rlEnableShader(program);
+}
+
+def shader::disable() {
+	ray::rlDisableShader();
+}
+
+def shader::set_bool(i32 program, string name, bool val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val as i32 ], RL_SHADER_UNIFORM_INT);
+}
+
+def shader::set_i32(i32 program, string name, i32 val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val ], RL_SHADER_UNIFORM_INT);
+}
+
+def shader::set_f32(i32 program, string name, f32 val) {
+	ray::rlSetUniform(ray::rlGetLocationUniform(program, name), [ val ], RL_SHADER_UNIFORM_FLOAT);
+}
+
+def shader::set_mat4(i32 program, string name, mat4 mat) {
+	ray::rlSetUniformMatrix(ray::rlGetLocationUniform(program, name), mat);
+}

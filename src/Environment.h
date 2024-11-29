@@ -87,6 +87,12 @@ public:
 		}
 	}
 
+	void EmitReturnCleanup()
+	{
+		if (m_parent) m_parent->EmitCleanup();
+		EmitCleanup();
+	}
+
 	//-------------------------------------------------------------------------
 
 	bool HasParent() const { return m_parent; }
@@ -118,9 +124,9 @@ public:
 		m_vars[lexeme] = var_struct(val, lexeme);
 	}
 
-	void AssignToVariable(const std::string& var, TValue rhs);
+	void AssignToVariable(Token* token, const std::string& var, TValue rhs);
 	
-	void AssignToVariableVectorIndex(const std::string& var, TValue idx, TValue rhs);
+	void AssignToVariableVectorIndex(Token* token, const std::string& var, TValue idx, TValue rhs);
 	
 
 	TValue GetVariable(Token* token, const std::string& var)
@@ -236,126 +242,6 @@ public:
 	}
 
 
-
-	/*
-
-	void DefineUdt(std::string id, llvm::StructType* stype, std::vector<Token*> tokens, std::vector<std::string> names, std::vector<llvm::Type*> ty, std::vector<LiteralTypeEnum> vecTypes, std::vector<std::string> vecTypeIds)
-	{
-		m_udts[id] = stype;
-		m_udt_tokens[id] = tokens;
-		m_udt_names[id] = names;
-		m_udt_ty[id] = ty;
-		m_udt_vecTypes[id] = vecTypes;
-		m_udt_vecTypeIds[id] = vecTypeIds;
-
-		std::map<std::string, size_t> name_to_idx;
-		for (size_t i = 0; i < names.size(); ++i)
-		{
-			name_to_idx.insert(std::make_pair(names[i], i));
-		}
-		m_udt_name_to_idx[id] = name_to_idx;
-
-		if (2 <= Environment::GetDebugLevel()) printf("DefineUdt(%s)\n", id.c_str());
-	}
-
-	llvm::StructType* GetUdt(std::string id)
-	{
-		if (0 != m_udts.count(id)) return m_udts.at(id);
-		if (m_parent) return m_parent->GetUdt(id);
-		return nullptr;
-	}
-
-	bool IsUdt(std::string id)
-	{
-		if (0 != m_udts.count(id)) return true;
-		if (m_parent) return m_parent->IsUdt(id);
-		return false;
-	}
-
-	std::vector<Token*> GetUdtMemberTokens(std::string id)
-	{
-		if (0 != m_udt_tokens.count(id)) return m_udt_tokens.at(id);
-		if (m_parent) return m_parent->GetUdtMemberTokens(id);
-		std::vector<Token*> ret;
-		return ret;
-	}
-
-	std::vector<LiteralTypeEnum> GetUdtMemberVecTypes(std::string id)
-	{
-		if (0 != m_udt_vecTypes.count(id)) return m_udt_vecTypes.at(id);
-		if (m_parent) return m_parent->GetUdtMemberVecTypes(id);
-		std::vector<LiteralTypeEnum> ret;
-		return ret;
-	}
-
-	LiteralTypeEnum GetUdtMemberVecTypeAt(std::string id, size_t idx)
-	{
-		if (0 != m_udt_vecTypes.count(id) && idx < m_udt_vecTypes.at(id).size()) return m_udt_vecTypes.at(id).at(idx);
-		if (m_parent) return m_parent->GetUdtMemberVecTypeAt(id, idx);
-		return LITERAL_TYPE_INVALID;
-	}
-
-	std::vector<std::string> GetUdtMemberVecTypeIds(std::string id)
-	{
-		if (0 != m_udt_vecTypeIds.count(id)) return m_udt_vecTypeIds.at(id);
-		if (m_parent) return m_parent->GetUdtMemberVecTypeIds(id);
-		std::vector<std::string> ret;
-		return ret;
-	}
-
-	std::string GetUdtMemberVecTypeIdAt(std::string id, size_t idx)
-	{
-		if (0 != m_udt_vecTypeIds.count(id) && idx < m_udt_vecTypeIds.at(id).size()) return m_udt_vecTypeIds.at(id).at(idx);
-		if (m_parent) return m_parent->GetUdtMemberVecTypeIdAt(id, idx);
-		return "";
-	}
-
-	Token* GetUdtMemberTokenAt(std::string id, size_t idx)
-	{
-		if (0 != m_udt_tokens.count(id) && idx < m_udt_tokens.at(id).size()) return m_udt_tokens.at(id).at(idx);
-		if (m_parent) return m_parent->GetUdtMemberTokenAt(id, idx);
-		return nullptr;
-	}
-
-	std::vector<std::string> GetUdtMemberNames(std::string id)
-	{
-		if (0 != m_udt_names.count(id)) return m_udt_names.at(id);
-		if (m_parent) return m_parent->GetUdtMemberNames(id);
-		std::vector<std::string> ret;
-		return ret;
-	}
-
-	int GetUdtMemberIndex(std::string udt_name, std::string member_name)
-	{
-		if (0 != m_udt_name_to_idx.count(udt_name) && 0 != m_udt_name_to_idx.at(udt_name).count(member_name))
-		{
-			return m_udt_name_to_idx.at(udt_name).at(member_name);
-		}
-		if (m_parent) return m_parent->GetUdtMemberIndex(udt_name, member_name);
-		return -1;
-	}
-
-	std::vector<llvm::Type*> GetUdtTy(std::string id)
-	{
-		if (0 != m_udt_ty.count(id)) return m_udt_ty.at(id);
-		if (m_parent) return m_parent->GetUdtTy(id);
-		std::vector<llvm::Type*> ret;
-		return ret;
-	}
-
-private:
-
-	std::map<std::string, llvm::StructType*> m_udts;
-	std::map<std::string, std::vector<Token*> > m_udt_tokens;
-	std::map<std::string, std::vector<std::string> > m_udt_names;
-	std::map<std::string, std::map<std::string, size_t> > m_udt_name_to_idx;
-	std::map<std::string, std::vector<llvm::Type*> > m_udt_ty;
-	std::map<std::string, std::vector<LiteralTypeEnum> > m_udt_vecTypes;
-	std::map<std::string, std::vector<std::string> > m_udt_vecTypeIds;
-
-	
-	*/
-
 private:
 
 	Environment()
@@ -363,6 +249,11 @@ private:
 		m_parent = nullptr;
 		m_loopBreak = nullptr;
 		m_loopContinue = nullptr;
+	}
+
+	bool IsVariable(const std::string& var)
+	{
+		return 0 != m_vars.count(var);
 	}
 
 	void EmitCleanup()
@@ -374,12 +265,6 @@ private:
 			v.Cleanup();
 		}
 	}
-
-	bool IsVariable(const std::string& var)
-	{
-		return 0 != m_vars.count(var);
-	}
-
 
 	Environment* m_parent;
 

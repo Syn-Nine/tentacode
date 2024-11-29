@@ -53,7 +53,7 @@ public:
 		m_keywordList.insert(std::make_pair("return", TOKEN_RETURN));
 		m_keywordList.insert(std::make_pair("struct", TOKEN_STRUCT));
 		m_keywordList.insert(std::make_pair("include", TOKEN_INCLUDE));
-		m_keywordList.insert(std::make_pair("internal", TOKEN_INTERNAL));
+		//m_keywordList.insert(std::make_pair("internal", TOKEN_INTERNAL));
 		//m_keywordList.insert(std::make_pair("global", TOKEN_GLOBAL));
 		m_keywordList.insert(std::make_pair("FILELINE", TOKEN_FILELINE));
 		m_keywordList.insert(std::make_pair("pi", TOKEN_PI));

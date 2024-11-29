@@ -380,15 +380,18 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 {
 	TValue ret;
 
-	TokenTypeEnum vtype = args->at(0)->GetType();
-
+	Token* vtype_token = args->at(0);
+	
 	llvm::Type* ty = nullptr;
-
-	if (!TokenToType(vtype, ret.m_vec_type, ret.m_bits, ty))
+	llvm::Value* sz_bytes = nullptr;
+	
+	if (!TokenToType(vtype_token, ret.m_vec_type, ret.m_bits, sz_bytes, ty))
 	{
 		Error(token, "Invalid vector type.");
 		return NullInvalid();
 	}
+
+	ret.m_vec_type_name = vtype_token->Lexeme();
 
 	llvm::Value* defval = nullptr;
 	llvm::Type* defty = m_builder->getPtrTy();
@@ -410,9 +413,7 @@ TValue TValue::Construct_Vec_Dynamic(Token* token, TokenPtrList* args, std::stri
 	{
 		// get a pointer to an empty vector
 		llvm::Value* vtype = m_builder->getInt64(ret.m_vec_type);
-		int nbytes = std::max(1, ret.m_bits / 8);
-		llvm::Value* span = m_builder->getInt64(nbytes);
-		llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, span }, "calltmp");
+		llvm::Value* ptr = m_builder->CreateCall(m_module->getFunction("__new_dyn_vec"), { vtype, sz_bytes }, "calltmp");
 		ret.m_is_storage = false;
 		ret.m_value = defval;
 		ret.m_ty = ty;
@@ -433,7 +434,6 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 {
 	TValue ret;
 
-	TokenTypeEnum vtype = args->at(0)->GetType();
 	int vsize = args->at(1)->IntValue();
 
 	if (1 > vsize)
@@ -450,12 +450,16 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 	llvm::Value* count = m_builder->getInt64(vsize);
 
 	llvm::Type* ty = nullptr;
-
-	if (!TokenToType(vtype, ret.m_vec_type, ret.m_bits, ty))
+	Token* vtype_token = args->at(0);
+	llvm::Value* sz_bytes = nullptr;
+	
+	if (!TokenToType(vtype_token, ret.m_vec_type, ret.m_bits, sz_bytes, ty))
 	{
 		Error(token, "Invalid vector type.");
 		return NullInvalid();
 	}
+	
+	ret.m_vec_type_name = vtype_token->Lexeme();
 
 	llvm::Value* defval = nullptr;
 	llvm::ArrayType* defty = llvm::ArrayType::get(ty, vsize);
@@ -516,7 +520,7 @@ TValue TValue::Construct_Vec_Fixed(Token* token, TokenPtrList* args, std::string
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Null(Token* token, LiteralTypeEnum type, int bits)
 {
-	TValue ret = Construct_Prototype(token, type, bits);
+	TValue ret = Construct_Prototype(token);
 	if (ret.IsInvalid()) return ret;
 	
 	if (LITERAL_TYPE_INVALID != type) ret.m_value = llvm::Constant::getNullValue(ret.m_ty);
@@ -531,23 +535,18 @@ TValue TValue::Construct_Prototype(Token* token)
 {
 	LiteralTypeEnum type;
 	int bits;
-	llvm::Type* ty;
-	TokenToType(token->GetType(), type, bits, ty);
-	return Construct_Prototype(token, type, bits);
-}
+	llvm::Type* ty = nullptr;
+	llvm::Value* sz_bytes = nullptr;
 
+	TokenToType(token, type, bits, sz_bytes, ty);
 
-
-//-----------------------------------------------------------------------------
-TValue TValue::Construct_Prototype(Token* token, LiteralTypeEnum type, int bits)
-{
 	TValue ret;
 	ret.m_token = token;
 	ret.m_type = type;
 	ret.m_bits = bits;
-	ret.m_ty = MakeTy(type, bits);
 	ret.m_value = nullptr;
-
+	ret.m_ty = ty;
+	
 	if (!ret.m_ty)
 	{
 		Error(token, "Invalid variable prototype.");
