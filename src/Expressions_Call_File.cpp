@@ -1,6 +1,5 @@
 #include "Expressions.h"
 
-
 //-----------------------------------------------------------------------------
 TValue CallExpr::codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
 {
@@ -54,7 +53,7 @@ TValue CallExpr::codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, 
 			else
 			{
 				llvm::Value* gep = builder->CreateGEP(builder->getPtrTy(), rhs.Value(), builder->getInt32(0), "geptmp");
-				llvm::Value* len = builder->getInt64(rhs.FixedVecLen());
+				llvm::Value* len = builder->getInt64(rhs.GetFixedVecLen());
 				builder->CreateCall(module->getFunction("__file_writelines_fixed_vec"), { lhs.Value(), gep, len }, "calltmp");
 			}
 		}
@@ -80,6 +79,6 @@ TValue CallExpr::codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, 
 			return TValue::NullInvalid();
 		}
 	}
-
+	
 	return TValue::NullInvalid();
 }

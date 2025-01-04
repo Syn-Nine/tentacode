@@ -1,6 +1,8 @@
 #include "Scanner.h"
 #include "Utility.h"
 
+size_t Scanner::m_linecount = 0;
+
 void Scanner::AddToken(TokenTypeEnum type)
 {
 	std::string lexeme = m_buffer.substr(m_start, m_current - m_start);
@@ -113,22 +115,25 @@ void Scanner::Number()
 {
 	while (IsDigit(Peek())) { Advance(); }
 
-	bool isInt = true;
-
 	if ('.' == Peek() && IsDigit(PeekNext()))
 	{
-		isInt = false;
-		// consume . and continue;
-		Advance();
-		while (IsDigit(Peek())) { Advance(); }
+		Decimal();
 	}
+	else
+	{
+		std::string t = m_buffer.substr(m_start, m_current - m_start);
+		AddToken(TOKEN_INTEGER, int32_t(std::stoi(t)));
+	}
+}
+
+void Scanner::Decimal()
+{
+	// consume . and continue;
+	Advance();
+	while (IsDigit(Peek())) { Advance(); }
 
 	std::string t = m_buffer.substr(m_start, m_current - m_start);
-	
-	if (isInt)
-		AddToken(TOKEN_INTEGER, int32_t(std::stoi(t)));
-	else
-		AddToken(TOKEN_FLOAT, std::stod(t));
+	AddToken(TOKEN_FLOAT, std::stod(t));
 }
 
 char Scanner::Peek()
@@ -175,11 +180,12 @@ void Scanner::ScanToken()
 	case ',': AddToken(TOKEN_COMMA); break;
 	case '-': AddToken(TOKEN_MINUS); break;
 	case '+': AddToken(TOKEN_PLUS); break;
+	case '^': AddToken(TOKEN_HAT); break;
 	case ';': AddToken(TOKEN_SEMICOLON); break;
 	case '*': AddToken(TOKEN_STAR); break;
 	case '%': AddToken(TOKEN_PERCENT); break;
 	case '@': AddToken(TOKEN_AT); break;
-
+	
 	// one or two character tokens
 	case '!': 
 		if (Match('='))
@@ -197,7 +203,7 @@ void Scanner::ScanToken()
 	case '<': AddToken(Match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS); break;
 	
 	// two character tokens
-	case '&': Match('&') ? AddToken(TOKEN_AND) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
+	case '&': Match('&') ? AddToken(TOKEN_AND) : AddToken(TOKEN_AMPERSAND); break;
 	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
 	case ':':
 		/*if (Match(':'))
@@ -221,6 +227,10 @@ void Scanner::ScanToken()
 		{
 			AddToken(Match('=') ? TOKEN_DOT_DOT_EQUAL : TOKEN_DOT_DOT);
 		}
+		else if (IsDigit(Peek()))
+		{
+			Decimal();
+		}
 		else
 		{
 			AddToken(TOKEN_DOT);
@@ -237,7 +247,11 @@ void Scanner::ScanToken()
 		{
 			while (true)
 			{
-				if (Peek() == '\n') m_line++;
+				if (Peek() == '\n')
+				{
+					m_linecount++;
+					m_line++;
+				}
 				if (Peek() == '*' && PeekNext() == '/')
 				{
 					Advance(); Advance(); break;
@@ -263,6 +277,7 @@ void Scanner::ScanToken()
 		break;
 
 	case '\n':
+		m_linecount++;
 		m_line++;
 		break;
 
@@ -292,7 +307,11 @@ void Scanner::ScanString()
 	char c = Peek();
 	while (c != '"' && !IsAtEnd())
 	{
-		if (c == '\n') m_line++;
+		if (c == '\n')
+		{
+			m_linecount++;
+			m_line++;
+		}
 		if (c == '\\') {
 			if (PeekNext() == 'n') {
 				inner_line = true; Advance();

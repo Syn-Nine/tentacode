@@ -40,11 +40,11 @@ public:
 
 	llvm::StructType* GetLLVMStruct() { return m_llvm_struc; }
 
-	TValue GetMember(Token* token, const std::string& lex);
+	TType GetMember(Token* token, const std::string& lex);
 	llvm::Value* GetGEPLoc(Token* token, const std::string& lex);
 	
 	std::vector<std::string>& GetMemberNames() { return m_member_names; }
-	std::vector<TValue>& GetMemberVec() { return m_member_types; }
+	std::vector<TType>& GetMemberVec() { return m_member_types; }
 
 	bool IsValid() const { return m_valid; }
 
@@ -59,8 +59,9 @@ private:
 	std::string m_name;
 	llvm::StructType* m_llvm_struc;
 	std::map<std::string, llvm::Value*> m_gep_loc;
-	std::map<std::string, TValue > m_type_map;
-	std::vector<TValue> m_member_types;
+
+	std::map<std::string, TType> m_type_map;
+	std::vector<TType> m_member_types;
 	std::vector<std::string> m_member_names;
 
 };

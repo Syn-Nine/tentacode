@@ -21,6 +21,7 @@
 #include "TStruct.h"
 #include "TFunction.h"
 #include "TValue.h"
+#include "TType.h"
 #include "Token.h"
 #include "Parser.h"
 #include "Scanner.h"
@@ -52,7 +53,6 @@ bool Run(const char* buf, const char* filename)
 	if (std::string(buf).compare("quit") == 0) return false;
 	if (std::string(buf).compare("q") == 0) return false;
 
-
 	Scanner scanner(buf, errorHandler, filename);
 	TokenList tokens = scanner.ScanTokens();
 
@@ -60,6 +60,9 @@ bool Run(const char* buf, const char* filename)
 	{
 		Parser parser(tokens, errorHandler);
 		StmtList stmts = parser.Parse();
+
+		printf("Line Count: %d\n", Scanner::LineCount());
+		printf("Compiling...\n");
 
 		// push global environment
 		Environment* env = Environment::Push();
@@ -69,6 +72,7 @@ bool Run(const char* buf, const char* filename)
 		TValue::RegisterLLVM(builder.get(), module.get());
 		TFunction::RegisterLLVM(builder.get(), module.get());
 		TStruct::RegisterLLVM(builder.get(), module.get());
+		TType::RegisterLLVM(builder.get(), module.get());
 		
 		LoadExtensions(builder.get(), module.get(), env);
 		LoadExtensions_Raylib(builder.get(), module.get(), env);
@@ -126,7 +130,6 @@ bool Run(const char* buf, const char* filename)
 
 		// pop global environment
 		Environment::Pop();
-
 
 		if (1 <= Environment::GetDebugLevel())
 		{
@@ -223,6 +226,8 @@ int main(int nargs, char* argsv[])
 		TheJIT->addModule(std::move(TSM));
 
 		auto ExprSymbol = ExitOnErr(TheJIT->lookup("jit_main"));
+
+		printf("Launching...\n");
 		void (*FP)() = ExprSymbol.getAddress().toPtr<void (*)()>();
 
 		printf("\nOutput:\n");

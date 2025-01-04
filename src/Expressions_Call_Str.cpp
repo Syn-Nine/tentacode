@@ -1,6 +1,5 @@
 #include "Expressions.h"
-
-
+#include "llvm/Support/Parallel.h"
 //-----------------------------------------------------------------------------
 TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
 {
@@ -64,7 +63,7 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 
 		TValue lhs = m_arguments[0]->codegen(builder, module, env);
 		TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
-		if (lhs.IsVecAny() && LITERAL_TYPE_STRING == lhs.GetVecType() && rhs.IsString())
+		if (lhs.IsVecAny() && lhs.GetTType().GetInternal(0).IsString() && rhs.IsString())
 		{
 			llvm::Value* s = nullptr;
 			if (lhs.IsVecDynamic())
@@ -76,7 +75,7 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			else
 			{
 				llvm::Value* gep = builder->CreateGEP(builder->getPtrTy(), lhs.Value(), builder->getInt32(0), "geptmp");
-				llvm::Value* len = builder->getInt64(lhs.FixedVecLen());
+				llvm::Value* len = builder->getInt64(lhs.GetFixedVecLen());
 				s = builder->CreateCall(module->getFunction("__str_join_fixed_vec"), { gep, rhs.Value(), len }, "calltmp");
 				return TValue::MakeString(callee, s);
 			}
@@ -208,7 +207,7 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			return TValue::NullInvalid();
 		}
 	}
-
+	
 	return TValue::NullInvalid();
 }
 

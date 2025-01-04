@@ -37,6 +37,8 @@ public:
 		m_keywordList.insert(std::make_pair("f64", TOKEN_VAR_F64));
 		m_keywordList.insert(std::make_pair("vec", TOKEN_VAR_VEC));
 		m_keywordList.insert(std::make_pair("map", TOKEN_VAR_MAP));
+		m_keywordList.insert(std::make_pair("set", TOKEN_VAR_SET));
+		m_keywordList.insert(std::make_pair("tuple", TOKEN_VAR_TUPLE));
 		m_keywordList.insert(std::make_pair("enum", TOKEN_VAR_ENUM));
 		m_keywordList.insert(std::make_pair("string", TOKEN_VAR_STRING));
 		m_keywordList.insert(std::make_pair("bool", TOKEN_VAR_BOOL));
@@ -46,6 +48,7 @@ public:
 		m_keywordList.insert(std::make_pair("for", TOKEN_FOR));
 		m_keywordList.insert(std::make_pair("in", TOKEN_IN));
 		m_keywordList.insert(std::make_pair("as", TOKEN_AS));
+		m_keywordList.insert(std::make_pair("const", TOKEN_CONST));
 		m_keywordList.insert(std::make_pair("break", TOKEN_BREAK));
 		m_keywordList.insert(std::make_pair("continue", TOKEN_CONTINUE));
 		m_keywordList.insert(std::make_pair("loop", TOKEN_LOOP));
@@ -68,6 +71,8 @@ public:
 		m_keywordList.insert(std::make_pair("ray_renderTexture2D", TOKEN_VAR_RENDER_TEXTURE_2D));
 	}
 
+	static size_t LineCount() { return m_linecount; }
+
 	TokenList ScanTokens();
 
 private:
@@ -77,6 +82,7 @@ private:
 	void AddToken(TokenTypeEnum type, double value);
 
 	char Advance();
+	void Decimal();
 	void Enum();
 	void Identifier();
 	bool IsAlpha(char c);
@@ -97,6 +103,8 @@ private:
 	int m_start;
 	int m_line;
 	std::string m_filename;
+
+	static size_t m_linecount;
 
 	TokenList m_tokens;
 	ErrorHandler* m_errorHandler;

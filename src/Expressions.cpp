@@ -60,29 +60,38 @@ void copy_udt(llvm::IRBuilder<>* builder,
 TValue AssignExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("AssignExpr::codegen()\n");
+
+	std::string var = m_token->Lexeme();
+	TType ttype_hint = env->GetVariable(m_token, var).GetTType();
 	
-	TValue rhs = m_right->codegen(builder, module, env);
-	if (rhs.IsInvalid())
+	TValue rhs;
+	if (EXPRESSION_BRACKET == m_right->GetType())
+	{
+		rhs = static_cast<BracketExpr*>(m_right)->codegen(builder, module, env, ttype_hint);
+	}
+	else
+	{
+		rhs = m_right->codegen(builder, module, env);
+	}
+	if (!rhs.IsValid())
 	{
 		env->Error(m_token, "Invalid assignment.");
 		return TValue::NullInvalid();
 	}
 
 	rhs = rhs.GetFromStorage();
-	
-	std::string var = m_token->Lexeme();
 
 	if (m_vecIndex)
 	{
 		TValue vidx = m_vecIndex->codegen(builder, module, env);
-		if (vidx.IsInvalid())
+		if (!vidx.IsValid())
 		{
 			env->Error(m_token, "Invalid vector index.");
 			return TValue::NullInvalid();
 		}
 
 		vidx = vidx.GetFromStorage();
-		env->AssignToVariableVectorIndex(m_token, var, vidx, rhs);
+		env->AssignToVariableIndex(m_token, var, vidx, rhs);
 	}
 	else
 	{
@@ -130,7 +139,7 @@ TValue BinaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 
 	
 	TValue lhs = m_left->codegen(builder, module, env);
-	if (lhs.IsInvalid()) return TValue::NullInvalid();
+	if (!lhs.IsValid()) return TValue::NullInvalid();
 	/*if (EXPRESSION_GET == m_left->GetType())
 	{
 		llvm::Type* ty = nullptr;
@@ -141,18 +150,23 @@ TValue BinaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		if (ty) lhs = TValue(lhs.type, builder->CreateLoad(ty, lhs.value, "gep_load"));
 	}
 	*/
-
+	
+	// check for type conversion
 	if (TOKEN_AS == m_token->GetType() && EXPRESSION_VARIABLE == m_right->GetType())
 	{
 		TokenTypeEnum new_type = (static_cast<VariableExpr*>(m_right))->Operator()->GetType();
 		return lhs.As(new_type);
 	}
-	
 
 	TValue rhs = m_right->codegen(builder, module, env);
-	if (rhs.IsInvalid()) return TValue::NullInvalid();
+	if (!rhs.IsValid()) return TValue::NullInvalid();
 
-	
+	// check for pair syntax
+	if (TOKEN_COLON == m_token->GetType())
+	{
+		return TValue::Construct_Pair(lhs, rhs);
+	}
+
 	// upcase to double if one side is int and the other is float, or we are dividing
 	if (lhs.IsInteger() && (rhs.IsFloat() || m_token->GetType() == TOKEN_SLASH))
 	{
@@ -172,6 +186,7 @@ TValue BinaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 	case TOKEN_STAR:    return lhs.Multiply(rhs);
 	case TOKEN_SLASH:   return lhs.Divide(rhs);
 	case TOKEN_PERCENT: return lhs.Modulus(rhs);
+	case TOKEN_HAT:		return lhs.Power(rhs);
 
 	//-------------------------------------------------------------------------//
 	case TOKEN_GREATER:       return lhs.IsGreaterThan(rhs, false);
@@ -203,16 +218,11 @@ TValue BinaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 
 
 //-----------------------------------------------------------------------------
-TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, TType ttype_hint)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("BracketExpr::codegen()\n");
 	
-	TokenPtrList* args = new TokenPtrList();
-	std::vector<TValue> vals;
-
-	bool has_int = false;
-	bool has_double = false;
-	int max_bits = 0;
+	TValue::TValueList vals;
 
 	for (Expr* arg : m_arguments)
 	{
@@ -229,16 +239,11 @@ TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 				{
 					// inclue get from storage in case of storage type
 					TValue val = lhs->codegen(builder, module, env).GetFromStorage();
-					
 					int qty = le->GetLiteral().IntValue();
 					for (size_t i = 0; i < qty; ++i)
 					{
 						vals.push_back(val);
 					}
-
-					if (val.IsInteger()) has_int = true;
-					if (val.IsFloat()) has_double = true;
-					max_bits = std::max(val.NumBits(), max_bits);
 				}
 				else
 				{
@@ -256,64 +261,16 @@ TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 		{
 			// get from storage in case it's a variable
 			TValue v = arg->codegen(builder, module, env).GetFromStorage();
-
 			vals.push_back(v);
-			if (v.IsInteger()) has_int = true;
-			if (v.IsFloat()) has_double = true;
-			max_bits = std::max(v.NumBits(), max_bits);
 		}
 	}
 
 	// to do, allow assigning to empty brackets to clear dynamic vectors
 	if (vals.empty()) return TValue::NullInvalid();
 
-	TokenTypeEnum vectype;
-
-	if (has_double)
-	{
-		// convert to max common bitsize
-		if (16 == max_bits) max_bits = 32;
-
-		if (32 == max_bits) vectype = TOKEN_VAR_F32;
-		else if (64 == max_bits) vectype = TOKEN_VAR_F64;
-
-		// convert everything to double at max common bitsize
-		for (auto& v : vals)
-		{
-			v = v.CastToFloat(max_bits);
-		}
-	}
-	else if (has_int) // has int, but not float
-	{
-		// intentionally different than double
-		if (16 == max_bits) vectype = TOKEN_VAR_I16;
-		else if (32 == max_bits) vectype = TOKEN_VAR_I32;
-		else if (64 == max_bits) vectype = TOKEN_VAR_I64;
-
-		// convert everything to double at max common bitsize
-		for (auto& v : vals)
-		{
-			v = v.CastToInt(max_bits);
-		}
-	}
-	else
-	{
-		if (vals[0].IsBool()) vectype = TOKEN_VAR_BOOL;
-		else if (vals[0].IsString()) vectype = TOKEN_VAR_STRING;
-		else if (vals[0].IsEnum()) vectype = TOKEN_VAR_ENUM;
-		else
-		{
-			env->Error(vals[0].GetToken(), "Type not supported in fixed length vector.");
-			return TValue::NullInvalid();
-		}
-	}
-
-	Token* vec = new Token(TOKEN_VAR_VEC, "<anon>", m_token->Line(), m_token->Filename());
-	args->push_back(new Token(vectype, "<anon>", m_token->Line(), m_token->Filename()));
-	args->push_back(new Token(TOKEN_INTEGER, "<anon>", vals.size(), vals.size(), m_token->Line(), m_token->Filename()));
-	
-	return TValue::Construct(vec, args, "<anon>", false, &vals);
+	return TValue::Construct(ttype_hint, "anon", false, &vals);
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -323,15 +280,25 @@ TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 		
 	VariableExpr* vs = static_cast<VariableExpr*>(m_object); // parent object
 	
-	std::string var_name = vs->Operator()->Lexeme();
+	Token* struct_token = vs->Operator();
+	std::string var_name = struct_token->Lexeme();
 	std::string mem_name = m_token->Lexeme();
 
-	TValue vidx;
-	Expr* temp = vs->VecIndex();
-	if (temp) vidx = temp->codegen(builder, module, env).GetFromStorage();
+	TValue obj = env->GetVariable(struct_token, var_name);
+	if (!obj.IsValid()) return TValue::NullInvalid();
 
-	TValue obj = env->GetVariable(m_token, var_name);
-	return obj.GetStructVariable(m_token, vidx.Value(), mem_name);
+	Expr* e0 = vs->VecIndex();
+	if (e0)
+	{
+		TValue idx0 = e0->codegen(builder, module, env).GetFromStorage();
+		obj = obj.GetAtIndex(idx0);
+	}
+	
+	TValue idx1;
+	if (m_right) idx1 = m_right->codegen(builder, module, env).GetFromStorage();
+	obj = obj.GetStructVariable(m_token, idx1.Value(), mem_name);
+
+	return obj;
 }
 
 
@@ -340,7 +307,7 @@ TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 TValue LogicalExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("LogicalExpr::codegen()\n");
-	
+
 	if (!m_left || !m_right) return TValue::NullInvalid();
 	TValue lhs = m_left->codegen(builder, module, env).GetFromStorage();
 	TValue rhs = m_right->codegen(builder, module, env).GetFromStorage();
@@ -357,7 +324,7 @@ TValue LogicalExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 	default:
 		break;
 	}
-	
+
 	return TValue::NullInvalid();
 }
 
@@ -384,17 +351,29 @@ TValue SetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	if (2 <= Environment::GetDebugLevel()) printf("SetExpr::codegen()\n");
 	
 	TValue lhs = m_object->codegen(builder, module, env);
-	if (lhs.IsInvalid()) return TValue::NullInvalid();
+	if (!lhs.IsValid()) return TValue::NullInvalid();
 
 	TValue rhs = m_value->codegen(builder, module, env).GetFromStorage();
-	if (rhs.IsInvalid()) return TValue::NullInvalid();
+	if (!rhs.IsValid()) return TValue::NullInvalid();
 
 	rhs = rhs.CastToMatchImplicit(lhs);
-	if (rhs.IsInvalid()) return TValue::NullInvalid();
+	if (!rhs.IsValid()) return TValue::NullInvalid();
 
-	builder->CreateStore(rhs.Value(), lhs.Value());
+	if (!lhs.IsUDT())
+	{
+		if (lhs.IsString()) // deep copy strings
+		{
+			lhs = lhs.GetFromStorage();
+			builder->CreateCall(module->getFunction("__str_assign"), { lhs.Value(), rhs.Value() }, "calltmp");
+		}
+		else
+		{
+			builder->CreateStore(rhs.Value(), lhs.Value());
+		}
+	}
 
 	return TValue::NullInvalid();
+
 	/*
 
 
@@ -522,12 +501,12 @@ TValue UnaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	if (2 <= Environment::GetDebugLevel()) printf("UnaryExpr::codegen()\n");
 	
 	TValue rhs = m_right->codegen(builder, module, env);
-	if (rhs.IsInvalid())
+	if (!rhs.IsValid())
 	{
 		env->Error(m_token, "Unable to perform unary operation.");
 		return TValue::NullInvalid();
 	}
-
+	
 	switch (m_token->GetType())
 	{
 	case TOKEN_MINUS:
@@ -552,27 +531,26 @@ TValue VariableExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 	
 	// returns the value stored at a TValue memory location
 	TValue ret = env->GetVariable(m_token, m_token->Lexeme());
-
 	if (m_vecIndex)
 	{
 		TValue vidx = m_vecIndex->codegen(builder, module, env);
-		if (vidx.IsInvalid())
+		if (!vidx.IsValid())
 		{
-			env->Error(m_token, "Invalid vector index.");
+			env->Error(m_token, "Invalid index.");
 			return TValue::NullInvalid();
 		}
-		else if (!ret.IsVecAny())
+		else if (!ret.CanIndex())
 		{
-			env->Error(m_token, "Variable is not a vector.");
+			env->Error(m_token, "Variable can not be indexed.");
 			return TValue::NullInvalid();
 		}
 
-		// get from storage in case it's a variable
+		// get index from storage in case it's a variable
 		vidx = vidx.GetFromStorage();
 
-		return ret.GetAtVectorIndex(vidx);
+		return ret.GetAtIndex(vidx);
 	}
-	
+
 	return ret;
 
 

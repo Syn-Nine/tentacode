@@ -19,37 +19,6 @@
 
 class Environment
 {
-private:
-	struct var_struct
-	{
-		TValue tvalue;
-		std::string lexeme;
-
-		var_struct() {}
-		var_struct(TValue val, std::string lex) : tvalue(val), lexeme(lex)
-		{}
-	};
-
-	struct func_struct
-	{
-		TFunction tfunc;
-		std::string lexeme;
-
-		func_struct() {}
-		func_struct(TFunction func, std::string lex) : tfunc(func), lexeme(lex)
-		{}
-	};
-
-	struct struct_struct
-	{
-		TStruct tstruc;
-		std::string lexeme;
-
-		struct_struct() {}
-		struct_struct(TStruct struc, std::string lex) : tstruc(struc), lexeme(lex)
-		{}
-	};
-
 
 public:
 	
@@ -121,20 +90,18 @@ public:
 
 	void DefineVariable(TValue val, std::string lexeme)
 	{
-		m_vars[lexeme] = var_struct(val, lexeme);
+		m_vars[lexeme] = val;
 	}
 
 	void AssignToVariable(Token* token, const std::string& var, TValue rhs);
 	
-	void AssignToVariableVectorIndex(Token* token, const std::string& var, TValue idx, TValue rhs);
+	void AssignToVariableIndex(Token* token, const std::string& var, TValue idx, TValue rhs);
 	
 
-	TValue GetVariable(Token* token, const std::string& var)
+	static TValue GetVariable(Token* token, const std::string& var)
 	{
-		if (IsVariable(var)) return m_vars.at(var).tvalue;
-		if (m_parent) return m_parent->GetVariable(token, var);
-		Error(token, "Variable not found in environment.");
-		return TValue::NullInvalid();
+		if (m_stack.empty()) return TValue::NullInvalid();
+		return m_stack.back()->GetVariable_Recursive(token, var);
 	}
 
 
@@ -198,12 +165,12 @@ public:
 
 	static void DefineFunction(TFunction func, std::string lexeme)
 	{
-		m_func[lexeme] = func_struct(func, lexeme);
+		m_func[lexeme] = func;
 	}
 
 	static TFunction GetFunction(Token* token, const std::string& func)
 	{
-		if (IsFunction(func)) return m_func.at(func).tfunc;
+		if (IsFunction(func)) return m_func.at(func);
 		Error(token, "Function not found in environment.");
 		return TFunction();
 	}
@@ -231,12 +198,12 @@ public:
 
 	static void DefineStruct(TStruct struc, std::string lexeme)
 	{
-		m_struc[lexeme] = struct_struct(struc, lexeme);
+		m_struc[lexeme] = struc;
 	}
 
 	static TStruct GetStruct(Token* token, const std::string& struc)
 	{
-		if (IsStruct(struc)) return m_struc.at(struc).tstruc;
+		if (IsStruct(struc)) return m_struc.at(struc);
 		Error(token, "Structure not found in environment.");
 		return TStruct();
 	}
@@ -266,11 +233,19 @@ private:
 		}
 	}
 
+	TValue GetVariable_Recursive(Token* token, const std::string& var)
+	{
+		if (IsVariable(var)) return m_vars.at(var);
+		if (m_parent) return m_parent->GetVariable_Recursive(token, var);
+		Error(token, "Variable not found in environment.");
+		return TValue::NullInvalid();
+	}
+
 	Environment* m_parent;
 
 	static std::vector<Environment*> m_stack;
 
-	std::map<std::string, var_struct> m_vars;
+	std::map<std::string, TValue> m_vars;
 	
 	std::vector<TValue> m_cleanup;
 
@@ -285,9 +260,8 @@ private:
 	llvm::BasicBlock* m_loopContinue;
 
 	TFunction m_parent_function;
-	static std::map<std::string, func_struct> m_func;
-	
-	static std::map<std::string, struct_struct> m_struc;
+	static std::map<std::string, TFunction> m_func;
+	static std::map<std::string, TStruct> m_struc;
 
 };
 

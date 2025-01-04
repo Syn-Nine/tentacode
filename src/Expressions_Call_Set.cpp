@@ -1,11 +1,11 @@
 #include "Expressions.h"
 
 //-----------------------------------------------------------------------------
-TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
+TValue CallExpr::codegen_set(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("vec::append"))
+	if (0 == name.compare("set::insert"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
@@ -14,14 +14,10 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			VariableExpr* ve = static_cast<VariableExpr*>(m_arguments[0]);
 			std::string var = ve->Operator()->Lexeme();
 			TValue tval = env->GetVariable(callee, var);
-			TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
-			if (tval.IsVecDynamic())
+			TValue rhs = m_arguments[1]->codegen(builder, module, env);
+			if (tval.IsSet())
 			{
-				tval.EmitAppend(rhs);
-			}
-			else if (tval.IsVecFixed())
-			{
-				env->Error(callee, "Cannot append to fixed size vector.");
+				tval.EmitSetInsert(rhs);
 			}
 			else
 			{
@@ -29,7 +25,7 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			}
 			return TValue::NullInvalid();
 		}
-	}
+	}/*
 	else if (0 == name.compare("vec::contains"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
@@ -51,12 +47,7 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 				return TValue::NullInvalid();
 			}
 		}
-		else
-		{
-			env->Error(callee, "Argument type mismatch.");
-			return TValue::NullInvalid();
 		}
-	}
 	else if (0 == name.compare("vec::fill"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
@@ -98,8 +89,8 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			env->Error(callee, "Argument type mismatch.");
 			return TValue::NullInvalid();
 		}
-	}
-	
+	}*/
+
 	return TValue::NullInvalid();
 }
 

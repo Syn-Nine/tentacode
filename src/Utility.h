@@ -76,7 +76,10 @@ static llvm::Value* CreateEntryAlloca(llvm::IRBuilder<>* builder, llvm::Type* Ty
 {
     llvm::Function* ftn = builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> entry_builder(&ftn->getEntryBlock(), ftn->getEntryBlock().begin());
-    return entry_builder.CreateAlloca(Ty, ArraySize, Name);
+    llvm::Value* ret = entry_builder.CreateAlloca(Ty, ArraySize, Name);
+    llvm::Constant* nullval = llvm::Constant::getNullValue(Ty);
+    entry_builder.CreateStore(nullval, ret);
+    return ret;
 }
 
 #endif

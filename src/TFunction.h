@@ -9,6 +9,7 @@
 #include "llvm/IR/BasicBlock.h"
 
 #include "TValue.h"
+#include "TType.h"
 #include "Token.h"
 #include "Literal.h"
 
@@ -41,7 +42,7 @@ public:
 		std::vector<llvm::Type*> args,
 		LiteralTypeEnum rettype);
 
-	static TFunction Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, void* bodyPtr);
+	static TFunction Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, std::vector<bool> mut, void* bodyPtr);
 	
 	void Construct_Body();
 
@@ -50,15 +51,16 @@ public:
 
 	llvm::Function* GetLLVMFunc() { return m_llvm_func; }
 
-	std::vector<TValue> GetParams() const { return m_param_types; }
+	std::vector<TType> GetParamTypes() const { return m_paramTypes; }
+	std::vector<std::string> GetParamNames() const { return m_paramNames; }
 
-	TValue GetReturnRef() const
+	TType GetReturnType()
 	{
-		if (m_has_return_ref) { return m_param_types[0]; }
-		return TValue::NullInvalid();
+		if (m_has_return_ref) return m_paramTypes[0];
+		return TType();
 	}
 
-	TValue GetReturn() { return m_retval; }
+	TType GetInternalReturnType() { return m_rettype_internal; }
 
 
 private:
@@ -72,12 +74,15 @@ private:
 
 	Token* m_name;
 	bool m_has_return_ref;
-	TValue m_retval;
+	TType m_rettype_internal;
+
 	TValue m_retref;
 	llvm::Function* m_llvm_func;
 
-	std::vector<TValue> m_param_types;
-	std::vector<std::string> m_param_names;
+	std::vector<TType> m_paramTypes;
+	std::vector<std::string> m_paramNames;
+
+
 };
 
 

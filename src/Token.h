@@ -59,12 +59,14 @@ public:
 		case TOKEN_MINUS: type = "TOKEN_MINUS"; break;
 		case TOKEN_PERCENT: type = "TOKEN_PERCENT"; break;
 		case TOKEN_PLUS: type = "TOKEN_PLUS"; break;
+		case TOKEN_HAT: type = "TOKEN_HAT"; break;
 		case TOKEN_COLON: type = "TOKEN_COLON"; break;
 		//case TOKEN_COLON_COLON: type = "TOKEN_COLON_COLON"; break;
 		case TOKEN_SEMICOLON: type = "TOKEN_SEMICOLON"; break;
 		case TOKEN_SLASH: type = "TOKEN_SLASH"; break;
 		case TOKEN_STAR: type = "TOKEN_STAR"; break;
 		case TOKEN_AT: type = "TOKEN_AT"; break;
+		case TOKEN_AMPERSAND: type = "TOKEN_AMPERSAND"; break;
 
 		// one or two character tokens
 		case TOKEN_BANG: type = "TOKEN_BANG"; break;
@@ -101,6 +103,8 @@ public:
 		case TOKEN_VAR_MAP: type = "TOKEN_VAR_MAP"; break;
 		case TOKEN_VAR_ENUM: type = "TOKEN_VAR_ENUM"; break;
 		case TOKEN_VAR_BOOL: type = "TOKEN_VAR_BOOL"; break;
+		case TOKEN_VAR_SET: type = "TOKEN_VAR_SET"; break;
+		case TOKEN_VAR_TUPLE: type = "TOKEN_VAR_TUPLE"; break;
 		case TOKEN_AND: type = "TOKEN_AND"; break;
 		case TOKEN_ELSE: type = "TOKEN_ELSE"; break;
 		case TOKEN_IF: type = "TOKEN_IF"; break;
@@ -109,6 +113,7 @@ public:
 		case TOKEN_FOR: type = "TOKEN_FOR"; break;
 		case TOKEN_IN: type = "TOKEN_IN"; break;
 		case TOKEN_AS: type = "TOKEN_AS"; break;
+		case TOKEN_CONST: type = "TOKEN_CONST"; break;
 		case TOKEN_BREAK: type = "TOKEN_BREAK"; break;
 		case TOKEN_CONTINUE: type = "TOKEN_CONTINUE"; break;
 		case TOKEN_LOOP: type = "TOKEN_LOOP"; break;
@@ -166,5 +171,13 @@ private:
 
 typedef std::vector<Token> TokenList;
 typedef std::vector<Token*> TokenPtrList;
+
+struct TypeToken
+{
+	Token* type;
+	TokenPtrList* args;
+	TypeToken() { type = nullptr; args = nullptr; }
+};
+
 
 #endif // TOKEN_H

@@ -9,6 +9,8 @@
 #include "Environment.h"
 #include "Literal.h"
 #include "TVec.h"
+#include "TSet.h"
+#include "TMap.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -18,6 +20,7 @@
 #include <chrono>
 #include <algorithm>
 #include <assert.h>
+#include <thread>
 
 #ifdef _WIN32
 #define DLLEXPORT __declspec(dllexport)
@@ -25,7 +28,44 @@
 #define DLLEXPORT
 #endif
 
+void __parjob(int32_t job_start, int32_t job_end, void (*f)(int32_t*))
+{
+	//printf("%d-%d\n", job_start, job_end);
+	for (int32_t i = job_start; i <= job_end; ++i)
+	{
+		f(&i);
+	}
+}
 
+extern "C" DLLEXPORT void __parfor(int32_t n_threads, int32_t n_jobs, void (*f)(int32_t*))
+{
+	if (0 == n_threads || 0 >= n_jobs) return;
+
+	if (n_jobs < n_threads) n_threads = n_jobs;
+	int n_cores = std::thread::hardware_concurrency();
+	if (n_threads < 0) n_threads = std::max(1, n_cores - 1);
+	if (n_threads > n_cores - 1) n_threads = std::max(1, n_cores - 1);
+
+	int rem = n_jobs % n_threads;
+	int stride = (n_jobs - rem) / n_threads;
+	int j0 = 0;
+	int j1 = stride - 1;
+
+	std::vector<std::thread> threads;
+	for (int32_t i = 0; i < n_threads; ++i)
+	{
+		//printf("%d\n", i);
+		threads.push_back(std::thread(__parjob, j0, j1, f));
+		j0 = j1 + 1;
+		j1 = j0 + stride - 1;
+		if (i == n_threads - 2) j1 = n_jobs - 1;
+	}
+	
+	for (int32_t i = 0; i < threads.size(); ++i)
+	{
+		threads[i].join();
+	}
+}
 
 extern "C" DLLEXPORT void print(std::string* p)
 {
@@ -53,10 +93,16 @@ extern "C" DLLEXPORT std::string* input()
 //-----------------------------------------------------------------------------
 extern "C" DLLEXPORT void __del_string(std::string* str)
 {
-	if (!str)
-		printf("Attempted to delete null string pointer.\n");
-	else
-		delete str;
+	if (!str) return; // pointer never set, nothing to delete
+
+	if (-1 == reinterpret_cast<int64_t>(str))
+	{
+		//printf("Attempted to double-delete a string pointer.\n");
+		return;
+	}
+	
+	//printf("deleting: %s: %llu\n", str->c_str(), str);
+	delete str;
 }
 
 extern "C" DLLEXPORT std::string* __new_string_from_literal(char* str)
@@ -71,7 +117,8 @@ extern "C" DLLEXPORT std::string* __new_string_from_string(std::string* str)
 
 extern "C" DLLEXPORT std::string* __new_string_void()
 {
-	return new std::string();
+	//return new std::string("void_string");
+	return new std::string("");
 }
 
 extern "C" DLLEXPORT std::string* __string_cat(std::string* a, std::string* b)
@@ -116,6 +163,11 @@ extern "C" DLLEXPORT double __str_to_double(std::string* a)
 	return std::stod(*a);
 }
 
+extern "C" DLLEXPORT int64_t __str_len(std::string* a)
+{
+	return a->length();
+}
+
 
 //-----------------------------------------------------------------------------
 
@@ -131,16 +183,49 @@ extern "C" DLLEXPORT double __clock_impl()
 	return double(std::chrono::duration_cast<std::chrono::microseconds>(p.time_since_epoch()).count() / 1000000.0);
 }
 
-extern "C" DLLEXPORT double __pow_impl(double base, double exponent)
+extern "C" DLLEXPORT int64_t __pow_impl(int64_t base, int64_t exponent)
+{
+	return pow(base, exponent);
+}
+
+extern "C" DLLEXPORT double __powf_impl(double base, double exponent)
 {
 	return powf(base, exponent);
 }
 
+extern "C" DLLEXPORT int64_t __max_impl(int64_t lhs, int64_t rhs)
+{
+	if (lhs > rhs) return lhs;
+	return rhs;
+}
+
+extern "C" DLLEXPORT double __maxf_impl(double lhs, double rhs)
+{
+	if (lhs > rhs) return lhs;
+	return rhs;
+}
+
+extern "C" DLLEXPORT int64_t __min_impl(int64_t lhs, int64_t rhs)
+{
+	if (lhs < rhs) return lhs;
+	return rhs;
+}
+
+extern "C" DLLEXPORT double __minf_impl(double lhs, double rhs)
+{
+	if (lhs < rhs) return lhs;
+	return rhs;
+}
 
 extern "C" DLLEXPORT double __sgn(double val)
 {
 	if (val < 0) return -1.0;
 	return 1.0;
+}
+
+extern "C" DLLEXPORT double fract(double val)
+{
+	return val - floor(val);
 }
 
 extern "C" DLLEXPORT double __rand_impl()
@@ -160,6 +245,139 @@ extern "C" DLLEXPORT int64_t __rand_range_impl(int64_t lhs, int64_t rhs)
 	std::uniform_int_distribution<> dist(lhs, rhs-1);
 	return dist(gen);
 }
+
+
+
+// map
+//-----------------------------------------------------------------------------
+
+extern "C" DLLEXPORT void* __new_map(int64_t vtype, int32_t bits, int64_t span)
+{
+	LiteralTypeEnum vt = LiteralTypeEnum(vtype);
+	return new TMap(vt, bits, span);
+}
+
+extern "C" DLLEXPORT void __map_insert_int_key(TMap* ptr, int64_t key, void* data)
+{
+	ptr->InsertAtInt(key, data);
+}
+
+extern "C" DLLEXPORT void __map_insert_string_key(TMap* ptr, std::string* key, void* data)
+{
+	ptr->InsertAtString(*key, data);
+}
+
+extern "C" DLLEXPORT int64_t __map_len(TMap* ptr)
+{
+	return ptr->Size();
+}
+
+extern "C" DLLEXPORT void __map_start_iter(TMap* ptr)
+{
+	return ptr->StartIteration();
+}
+
+extern "C" DLLEXPORT int16_t __get_map_iter_key_i16(TMap* ptr)
+{
+	return ptr->GetIterKey_i16();
+}
+
+extern "C" DLLEXPORT int32_t __get_map_iter_key_i32(TMap* ptr)
+{
+	return ptr->GetIterKey_i32();
+}
+
+extern "C" DLLEXPORT int64_t __get_map_iter_key_i64(TMap* ptr)
+{
+	return ptr->GetIterKey_i64();
+}
+
+extern "C" DLLEXPORT std::string* __get_map_iter_key_str(TMap* ptr)
+{
+	return new std::string(ptr->GetIterKey_str());
+}
+
+extern "C" DLLEXPORT void __get_map_iter_val(TMap* ptr, void* dst)
+{
+	void* src = ptr->GetIterValue();
+	int sz_bytes = ptr->Span();
+	memcpy(dst, src, sz_bytes);
+}
+
+extern "C" DLLEXPORT void __get_map_val_at_i64(TMap* ptr, int64_t idx, void* dst)
+{
+	ptr->GetAtInt(idx, dst);
+}
+
+extern "C" DLLEXPORT void __set_map_val_at_i64(TMap* ptr, int64_t idx, void* dst)
+{
+	ptr->SetAtInt(idx, dst);
+}
+
+extern "C" DLLEXPORT void __get_map_val_at_str(TMap* ptr, std::string* idx, void* dst)
+{
+	ptr->GetAtStr(*idx, dst);
+}
+
+extern "C" DLLEXPORT void __set_map_val_at_str(TMap* ptr, std::string* idx, void* dst)
+{
+	ptr->SetAtStr(*idx, dst);
+}
+
+// set
+//-----------------------------------------------------------------------------
+
+extern "C" DLLEXPORT void* __new_set(int64_t vtype, int32_t bits)
+{
+	LiteralTypeEnum vt = LiteralTypeEnum(vtype);
+	return new TSet(vt, bits);
+}
+
+extern "C" DLLEXPORT void __set_insert_int(TSet* ptr, int64_t val)
+{
+	ptr->Insert_Int(val);
+}
+
+extern "C" DLLEXPORT void __set_insert_string(TSet* ptr, std::string* str)
+{
+	ptr->Insert_String(*str);
+}
+
+extern "C" DLLEXPORT int64_t __set_len(TSet* ptr)
+{
+	return ptr->Size();
+}
+
+extern "C" DLLEXPORT void __set_start_iter(TSet* ptr)
+{
+	return ptr->StartIteration();
+}
+
+extern "C" DLLEXPORT int16_t __get_set_iter_val_i16(TSet* ptr)
+{
+	return ptr->GetIterValue_i16();
+}
+
+extern "C" DLLEXPORT int32_t __get_set_iter_val_i32(TSet* ptr)
+{
+	return ptr->GetIterValue_i32();
+}
+
+extern "C" DLLEXPORT int64_t __get_set_iter_val_i64(TSet* ptr)
+{
+	return ptr->GetIterValue_i16();
+}
+
+extern "C" DLLEXPORT std::string* __get_set_iter_val_str(TSet* ptr)
+{
+	return new std::string(ptr->GetIterValue_str());
+}
+
+extern "C" DLLEXPORT void __set_assign(TSet* a, TSet* b)
+{
+	*a = *b; // clone
+}
+
 
 // fixed vec
 //-----------------------------------------------------------------------------
@@ -655,6 +873,8 @@ extern "C" DLLEXPORT bool __dyn_vec_contains_i64(TVec* srcPtr, int64_t val)
 
 
 
+
+
 // file
 //-----------------------------------------------------------------------------
 
@@ -855,6 +1075,33 @@ extern "C" DLLEXPORT void __vec_append_udt(int dstType, void* dstPtr, void* val)
 
 */
 
+//-----------------------------------------------------------------------------
+// math
+extern "C" DLLEXPORT double mix(double a, double b, double ratio) {
+	// lerp
+	return a + (b - a) * ratio;
+}
+
+// from wikipedia
+extern "C" DLLEXPORT double clamp(double x, double lowerlimit = 0.0f, double upperlimit = 1.0f) {
+	if (x < lowerlimit) return lowerlimit;
+	if (x > upperlimit) return upperlimit;
+	return x;
+}
+
+extern "C" DLLEXPORT double smoothstep(double a, double b, double ratio) {
+	// Scale, and clamp x to 0..1 range
+	ratio = clamp((ratio - a) / (b - a));
+	return ratio * ratio * (3.0f - 2.0f * ratio);
+}
+
+extern "C" DLLEXPORT double smootherstep(double a, double b, double ratio) {
+	// Scale, and clamp x to 0..1 range
+	ratio = clamp((ratio - a) / (b - a));
+	return ratio * ratio * ratio * (ratio * (6.0f * ratio - 15.0f) + 10.0f);
+}
+
+
 
 static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
@@ -865,7 +1112,14 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		//
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__del_string", *module);
 	}
-
+	{ // void = f(i32, ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__parfor", *module);
+	}
 	{	// ptr = ftn(ptr, ptr)
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), { builder->getPtrTy(), builder->getPtrTy() }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__string_cat", *module);
@@ -938,8 +1192,12 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "asin", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "atan", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "floor", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ceil", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "sqrt", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "fract", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "round", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__sgn", *module);
+
 	}
 
 	{	// int = ftn(int)
@@ -954,12 +1212,28 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__mod_impl", *module);
 	}
 
+	{	// double = ftn(double, double, double)
+		std::vector<llvm::Type*> args(3, builder->getDoubleTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "mix", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "smoothstep", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "smootherstep", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "clamp", *module);
+	}
 	{	// double = ftn(double, double)
 		std::vector<llvm::Type*> args(2, builder->getDoubleTy());
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), args, false);
-		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__pow_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__powf_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__minf_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__maxf_impl", *module);
 	}
-
+	{	// i64 = ftn(i64, i64)
+		std::vector<llvm::Type*> args(2, builder->getInt64Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__pow_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__min_impl", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__max_impl", *module);
+	}
 
 	{	// double = ftn()
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getDoubleTy(), {}, false);
@@ -1063,7 +1337,7 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__fixed_vec_to_string", *module);
 	}
 
-	{ // ptr = f(i64)
+	{ // ptr = f(i64, i64)
 		std::vector<llvm::Type*> args;
 		args.push_back(builder->getInt64Ty());
 		args.push_back(builder->getInt64Ty());
@@ -1083,6 +1357,9 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		args.push_back(builder->getPtrTy());
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__dyn_vec_len", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_len", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_len", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_len", *module);
 	}
 
 	{
@@ -1180,6 +1457,145 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__dyn_vec_append_string", *module);
 	}
 
+	// Sets
+	//-------------------------------------------------------------------------
+
+	{ // ptr = f(i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt64Ty());
+		args.push_back(builder->getInt32Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__new_set", *module);
+	}
+	{ // void = f(ptr, ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_insert_string", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_assign", *module);
+	}
+	{ // void = f(ptr, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt64Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_insert_int", *module);
+	}
+	{ // void = f()
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), { }, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_start_iter", *module);
+	}
+	{ // i16 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt16Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_set_iter_val_i16", *module);
+	}
+	{ // i32 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_set_iter_val_i32", *module);
+	}
+	{ // i64 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_set_iter_val_i64", *module);
+	}
+	{ // ptr = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_set_iter_val_str", *module);
+	}
+
+
+	// Maps
+	//-------------------------------------------------------------------------
+
+	{ // ptr = f(i64, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getInt64Ty());
+		args.push_back(builder->getInt32Ty());
+		args.push_back(builder->getInt64Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__new_map", *module);
+	}
+	{ // void = f(ptr, i64, ptr, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt64Ty());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_insert_int_key", *module);
+	}
+	{ // void = f(ptr, ptr, ptr, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_insert_string_key", *module);
+	}
+	{ // void = f()
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), { }, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_start_iter", *module);
+	}
+	{ // i16 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt16Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_iter_key_i16", *module);
+	}
+	{ // i32 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt32Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_iter_key_i32", *module);
+	}
+	{ // i64 = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt64Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_iter_key_i64", *module);
+	}
+	{ // ptr = f(ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_iter_key_str", *module);
+	}
+	{ // void = f(ptr, ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_iter_val", *module);
+	}
+	{ // ptr = f(ptr, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt64Ty());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_val_at_i64", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_map_val_at_i64", *module);
+	}
+	{ // ptr = f(ptr, ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__get_map_val_at_str", *module);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__set_map_val_at_str", *module);
+	}
+
+
+
+	
 	
 }
 

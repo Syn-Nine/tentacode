@@ -130,17 +130,45 @@ private:
 
 
 //-----------------------------------------------------------------------------
+class ForEachStmt : public Stmt
+{
+public:
+	ForEachStmt() = delete;
+
+	ForEachStmt(Token* key, Token* val, Expr* expr, Stmt* body)
+	{
+		m_key = key;
+		m_val = val;
+		m_expr = expr;
+		m_body = body;
+	}
+
+	StatementTypeEnum GetType() { return STATEMENT_FOREACH; }
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+
+private:
+	Token* m_key;
+	Token* m_val;
+	Expr* m_expr;
+	Stmt* m_body;
+};
+
+
+
+//-----------------------------------------------------------------------------
 class FunctionStmt : public Stmt
 {
 public:
 	FunctionStmt() = delete;
 
-	FunctionStmt(Token* rettype, Token* name, TokenList types, TokenList params, StmtList* body)
+	FunctionStmt(Token* rettype, Token* name, TokenList types, TokenList params, std::vector<bool> mut, StmtList* body)
 	{
 		m_rettype = rettype;
 		m_name = name;
 		m_types = types;
 		m_params = params;
+		m_mutable = mut;
 		m_body = body;
 	}
 
@@ -161,6 +189,7 @@ private:
 	TokenList m_types;
 	TokenList m_params;
 	StmtList* m_body;
+	std::vector<bool> m_mutable;
 };
 
 
@@ -171,8 +200,9 @@ class IfStmt : public Stmt
 public:
 	IfStmt() = delete;
 
-	IfStmt(Expr* condition, Stmt* thenBranch, Stmt* elseBranch)
+	IfStmt(Token* token, Expr* condition, Stmt* thenBranch, Stmt* elseBranch)
 	{
+		m_token = token;
 		m_condition = condition;
 		m_thenBranch = thenBranch;
 		m_elseBranch = elseBranch;
@@ -180,6 +210,7 @@ public:
 
 	StatementTypeEnum GetType() { return STATEMENT_IF; }
 
+	Token* Operator() { return m_token; }
 	/*Expr* GetCondition() { return m_condition; }
 	Stmt* GetThenBranch() { return m_thenBranch; }
 	Stmt* GetElseBranch() { return m_elseBranch; }*/
@@ -187,6 +218,7 @@ public:
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
+	Token* m_token;
 	Expr* m_condition;
 	Stmt* m_thenBranch;
 	Stmt* m_elseBranch;
@@ -277,31 +309,59 @@ class VarStmt : public Stmt
 public:
 	VarStmt() = delete;
 
-	VarStmt(Token* type, Token* id, Expr* expr, TokenPtrList* vecArgs)
+	VarStmt(TypeToken type, TokenPtrList ids, ArgList exprs)
 	{
-		m_type = type;
-		m_id = id;
-		m_expr = expr;
-		m_vecArgs = vecArgs;
+		m_type_token = type;
+		m_ids = ids;
+		m_exprs = exprs;
 	}
 
-	Token* Id() { return m_id; }
+	TokenPtrList IDs() { return m_ids; }
+	ArgList Expressions() { return m_exprs; }
 
-	Expr* Expression() { return m_expr; }
-	Token* VarType() { return m_type; }
-
-	/*LiteralTypeEnum VarVecType() { return m_vecType; }
-	std::string VarVecTypeId() { return m_vecTypeId; }*/
-
+	Token* VarType() { return m_type_token.type; }
+	TokenPtrList* TypeArgs() { return m_type_token.args; }
+	
 	StatementTypeEnum GetType() { return STATEMENT_VAR; }
 
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 
 private:
+	TypeToken m_type_token;
+	TokenPtrList m_ids;
+	ArgList m_exprs;
+};
+
+
+//-----------------------------------------------------------------------------
+class VarConstStmt : public Stmt
+{
+public:
+	VarConstStmt() = delete;
+
+	VarConstStmt(Token* type, TokenPtrList ids, ArgList exprs)
+	{
+		m_type = type;
+		m_ids = ids;
+		m_exprs = exprs;
+	}
+
+	//Token* Id() { return m_id; }
+
+	//Expr* Expression() { return m_expr; }
+	Token* VarType() { return m_type; }
+
+	/*LiteralTypeEnum VarVecType() { return m_vecType; }
+	std::string VarVecTypeId() { return m_vecTypeId; }*/
+
+	StatementTypeEnum GetType() { return STATEMENT_VAR_CONST; }
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+
+private:
 	Token* m_type;
-	Token* m_id;
-	Expr* m_expr;
-	TokenPtrList* m_vecArgs;
+	TokenPtrList m_ids;
+	ArgList m_exprs;
 };
 
 
@@ -312,12 +372,11 @@ class WhileStmt : public Stmt
 public:
 	WhileStmt() = delete;
 
-	WhileStmt(Expr* condition, Stmt* body, Expr* post, std::string label)
+	WhileStmt(Expr* condition, Stmt* body, Expr* post)
 	{
 		m_condition = condition;
 		m_body = body;
 		m_post = post;
-		m_label = label;
 	}
 
 	StatementTypeEnum GetType() { return STATEMENT_WHILE; }
@@ -332,7 +391,6 @@ private:
 	Expr* m_condition;
 	Expr* m_post;
 	Stmt* m_body;
-	std::string m_label;
 };
 
 #endif // STATEMENTS_H

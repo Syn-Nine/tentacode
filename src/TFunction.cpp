@@ -15,90 +15,83 @@ TFunction TFunction::Construct_Internal(
 	LiteralTypeEnum rettype)
 {
 	TFunction ret;
-	ret.m_name = new Token(TOKEN_IDENTIFIER, lexeme, -1, "");
 	ret.m_body = nullptr;
 	ret.m_llvm_func = ftn;
 	ret.m_internal = true;
+	ret.m_name = new Token(TOKEN_IDENTIFIER, lexeme, -1, "");
 
-	int bits = 0;
-	llvm::Type* ty;
-	// construct null
+	
+	// figure out return type
+	TType retType;
+
 	switch (rettype)
 	{
-	case LITERAL_TYPE_ENUM: // intentional fall-through
+	case LITERAL_TYPE_ENUM:
+		retType = TType::Construct_Enum(ret.m_name);
+		break;
+
 	case LITERAL_TYPE_INTEGER:
-		bits = 32;
-		ty = m_builder->getInt32Ty();
+		retType = TType::Construct_Int(ret.m_name, 32);
 		break;
 
 	case LITERAL_TYPE_FLOAT:
-		bits = 64;
-		ty = m_builder->getDoubleTy();
+		retType = TType::Construct_Float(ret.m_name, 64);
 		break;
 
 	case LITERAL_TYPE_BOOL:
-		bits = 1;
-		ty = m_builder->getIntNTy(1);
+		retType = TType::Construct_Bool(ret.m_name);
 		break;
 
-	case LITERAL_TYPE_POINTER: // intentional fallthrough
+	case LITERAL_TYPE_POINTER:
+		retType = TType::Construct_Ptr(ret.m_name);
+		break;
+
 	case LITERAL_TYPE_STRING:
-		bits = 64;
-		ty = m_builder->getPtrTy();
+		retType = TType::Construct_String(ret.m_name);
 		break;
 
 	case LITERAL_TYPE_INVALID:
 		break;
 
 	default:
-		Environment::Error(ret.m_name, "Unable to determine return type of internal function.");
+		Environment::Error(ret.m_name, "Unable to determine parameter type of internal function.");
 		return TFunction();
 	}
 
-	if (LITERAL_TYPE_INVALID != rettype)
-	{
-		ret.m_retval = TValue::Construct_Explicit(
-			ret.m_name,
-			rettype,
-			llvm::Constant::getNullValue(ty),
-			ty,
-			bits,
-			false,
-			0,
-			LITERAL_TYPE_INVALID
-		);
-	}
+	ret.m_rettype_internal = retType;
 		
 		
 	// figure out parameter types
 	LiteralTypeEnum v_type;
-	TValue v;
 
 	for (size_t i = 0; i < types.size(); ++i)
 	{
+		TType t;
 		v_type = types[i];
 		switch (v_type)
 		{
-		case LITERAL_TYPE_ENUM: // intentional fall-through
+		case LITERAL_TYPE_ENUM:
+			t = TType::Construct_Enum(ret.m_name);
+			break;
+
 		case LITERAL_TYPE_INTEGER:
-			bits = 32;
-			ty = m_builder->getInt32Ty();
+			t = TType::Construct_Int(ret.m_name, 32);
 			break;
 
 		case LITERAL_TYPE_FLOAT:
-			bits = 64;
-			ty = m_builder->getDoubleTy();
+			t = TType::Construct_Float(ret.m_name, 64);
 			break;
 
 		case LITERAL_TYPE_BOOL:
-			bits = 1;
-			ty = m_builder->getIntNTy(1);
+			t = TType::Construct_Bool(ret.m_name);
 			break;
 
-		case LITERAL_TYPE_POINTER: // intentional fallthrough
+		case LITERAL_TYPE_POINTER:
+			t = TType::Construct_Ptr(ret.m_name);
+			break;
+
 		case LITERAL_TYPE_STRING:
-			bits = 64;
-			ty = m_builder->getPtrTy();
+			t = TType::Construct_String(ret.m_name);
 			break;
 
 		default:
@@ -106,22 +99,10 @@ TFunction TFunction::Construct_Internal(
 			return TFunction();
 		}
 
-		v = TValue::Construct_Explicit(
-			ret.m_name,
-			v_type,
-			llvm::Constant::getNullValue(ty),
-			ty,
-			bits,
-			false,
-			0,
-			LITERAL_TYPE_INVALID
-		);
-
-		ret.m_param_names.push_back("");
-		ret.m_param_types.push_back(v);
-
+		if (!t.IsValid()) { return TFunction(); }
+		ret.m_paramTypes.push_back(t);
+		ret.m_paramNames.push_back("anon");
 	}
-
 
 	ret.m_valid = true;
 
@@ -131,154 +112,35 @@ TFunction TFunction::Construct_Internal(
 
 
 //-----------------------------------------------------------------------------
-TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, void* bodyPtr)
+TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, std::vector<bool> mut, void* bodyPtr)
 {
 	TFunction ret;
-	ret.m_name = name;
-	ret.m_body = bodyPtr;
-
-	int ret_bits = 0;
-	LiteralTypeEnum ret_type;
-	TValue ret_param;
-
-	// figure out return type	
-	if (!rettype)
-	{
-		ret_type = LITERAL_TYPE_INVALID;
-	}
-	else
-	{
-		switch (rettype->GetType())
-		{
-		case TOKEN_VAR_I16:
-			ret_type = LITERAL_TYPE_INTEGER;
-			ret_bits = 16;
-			break;
-		case TOKEN_VAR_I32:
-			ret_type = LITERAL_TYPE_INTEGER;
-			ret_bits = 32;
-			break;
-		case TOKEN_VAR_I64:
-			ret_type = LITERAL_TYPE_INTEGER;
-			ret_bits = 32;
-			break;
-		case TOKEN_VAR_F32:
-			ret_type = LITERAL_TYPE_FLOAT;
-			ret_bits = 32;
-			break;
-		case TOKEN_VAR_F64:
-			ret_type = LITERAL_TYPE_FLOAT;
-			ret_bits = 64;
-			break;
-		case TOKEN_VAR_ENUM:
-			ret_type = LITERAL_TYPE_ENUM;
-			ret_bits = 32;
-			break;
-		case TOKEN_VAR_BOOL:
-			ret_type = LITERAL_TYPE_BOOL;
-			ret_bits = 1;
-			break;
-		case TOKEN_VAR_STRING:
-			ret_type = LITERAL_TYPE_STRING;
-			ret_bits = 64;
-			break;
-		case TOKEN_VAR_VEC:
-			ret_type = LITERAL_TYPE_VEC_DYNAMIC;
-			ret_bits = 64;
-			break;
-		case TOKEN_IDENTIFIER:
-			ret_type = LITERAL_TYPE_UDT;
-			ret_bits = 64;
-			break;
-
-		default:
-			Environment::Error(name, "Failed to set return type.");
-			return TFunction();
-		}
-
-		Token* rettype_clone = new Token(*rettype); // need to clone because going to hold on to pointer after this function
-		ret_param = TValue::Construct_Null(rettype_clone, ret_type, ret_bits);
-		ret.m_has_return_ref = true;
-		if (ret_param.IsInvalid())
-		{
-			Environment::Error(name, "Invalid return type.");
-			return TFunction();
-		}
-	}
-
-
-	// figure out parameter types
 	std::vector<llvm::Type*> args;
-	int v_bits;
-	LiteralTypeEnum v_type;
-	TValue v;
 
-	if (ret.m_has_return_ref)
+	TType retType = TType::Construct(rettype, nullptr);
+
+	if (retType.IsValid())
 	{
-		args.push_back(llvm::PointerType::get(ret_param.GetTy(), 0));
-		ret.m_param_names.push_back("__ret_ref");
-		ret.m_param_types.push_back(ret_param);
+		retType.SetReference();
+		ret.m_has_return_ref = true;
+		//ret.m_retType = retType;
+		ret.m_paramTypes.push_back(retType);
+		ret.m_paramNames.push_back("__ret_ref");
+		args.push_back(llvm::PointerType::get(retType.GetTy(), 0));
 	}
 
+	// all parameters are passed by const reference unless specified
 	for (size_t i = 0; i < params.size(); ++i)
 	{
-		switch (types[i].GetType())
-		{
-		case TOKEN_VAR_I16:
-			v_type = LITERAL_TYPE_INTEGER;
-			v_bits = 16;
-			break;
-		case TOKEN_VAR_I32:
-			v_type = LITERAL_TYPE_INTEGER;
-			v_bits = 32;
-			break;
-		case TOKEN_VAR_I64:
-			v_type = LITERAL_TYPE_INTEGER;
-			v_bits = 64;
-			break;
-		case TOKEN_VAR_F32:
-			v_type = LITERAL_TYPE_FLOAT;
-			v_bits = 32;
-			break;
-		case TOKEN_VAR_F64:
-			v_type = LITERAL_TYPE_FLOAT;
-			v_bits = 64;
-			break;
-		case TOKEN_VAR_ENUM:
-			v_type = LITERAL_TYPE_ENUM;
-			v_bits = 32;
-			break;
-		case TOKEN_VAR_BOOL:
-			v_type = LITERAL_TYPE_BOOL;
-			v_bits = 1;
-			break;
-		case TOKEN_VAR_STRING:
-			v_type = LITERAL_TYPE_STRING;
-			v_bits = 64;
-			break;
-		case TOKEN_IDENTIFIER:
-			v_type = LITERAL_TYPE_UDT;
-			v_bits = 64;
-			break;
+		Token* type_clone = new Token(types[i]);
+		TType t = TType::Construct(type_clone, nullptr);
+		if (!t.IsValid()) { delete type_clone; return TFunction(); }
+		t.SetReference();
+		if (!mut[i]) t.SetConstant();
 
-		default:
-			Environment::Error(name, "Failed to set parameter type.");
-			return TFunction();
-		}
-
-		Token* type_clone = new Token(types[i]); // need to clone because going to hold on to pointer after this function
-		v = TValue::Construct_Null(type_clone, v_type, v_bits);
-		if (LITERAL_TYPE_UDT == v_type)
-		{
-			args.push_back(llvm::PointerType::get(v.GetTy(), 0));
-		}
-		else
-		{
-			args.push_back(v.GetTy());
-		}
-		ret.m_param_names.push_back(params[i].Lexeme());
-		ret.m_param_types.push_back(v);
-
+		ret.m_paramTypes.push_back(t);
+		ret.m_paramNames.push_back(params[i].Lexeme());
+		args.push_back(llvm::PointerType::get(t.GetTy(), 0));
 	}
 
 	// create type definition and link
@@ -290,9 +152,11 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 		Environment::Error(name, "Failed compile function prototype.");
 		return TFunction();
 	}
-	
+
+	ret.m_name = name;
+	ret.m_body = bodyPtr;
 	ret.m_valid = true;
-	
+
 	return ret;
 }
 
@@ -308,6 +172,22 @@ void TFunction::Construct_Body()
 	Environment* sub_env = Environment::Push();
 	sub_env->SetParentFunction(m_name, m_name->Lexeme());
 
+	// all variables come in as references
+	int i = 0;
+	for (auto& arg : ftn->args())
+	{
+		TValue val = TValue::Construct_Reference(m_paramTypes[i], m_paramNames[i], &arg);
+		if (!val.IsValid())
+		{
+			Environment::Error(m_name, "Failed to add function parameters to environment on entry.");
+			m_valid = false;
+			return;
+		}
+		sub_env->DefineVariable(val, m_paramNames[i]);
+		i = i + 1;
+	}
+
+	/****
 	// make local variables 
 	int i = 0;
 	for (auto& arg : ftn->args())
@@ -345,16 +225,19 @@ void TFunction::Construct_Body()
 		}
 		sub_env->DefineVariable(v, m_param_names[i]);
 		i = i + 1;
-	}
+	}*/
 
 	StmtList* stmtBody = static_cast<StmtList*>(m_body);
+
+	bool found_return = false;
 
 	for (auto& statement : *stmtBody)
 	{
 		if (Environment::HasErrors()) break;
 		if (STATEMENT_FUNCTION != statement->GetType())
 		{
-			statement->codegen(m_builder, m_module, sub_env);
+			TValue v = statement->codegen(m_builder, m_module, sub_env);
+			if (STATEMENT_RETURN == statement->GetType()) found_return = true;
 		}
 	}
 
@@ -364,7 +247,14 @@ void TFunction::Construct_Body()
 	m_builder->CreateBr(tail);
 	m_builder->SetInsertPoint(tail);
 	
+	if (m_has_return_ref && !found_return)
+	{
+		Environment::Error(m_name, "Function requires a return value.");
+		m_valid = false;
+		return;
+	}
+
 	m_builder->CreateRetVoid();
 
-	verifyFunction(*ftn);
+	m_valid = verifyFunction(*ftn);
 }

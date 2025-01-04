@@ -21,6 +21,7 @@ TValue TValue::As(TokenTypeEnum newType)
 }
 
 
+
 //-----------------------------------------------------------------------------
 TValue TValue::AsInt(int bits)
 {
@@ -31,28 +32,25 @@ TValue TValue::AsInt(int bits)
 	}
 
 	TValue lhs = GetFromStorage();
+	LiteralTypeEnum type = lhs.GetLiteralType();
 
-	if (LITERAL_TYPE_INTEGER == m_type)
+	if (LITERAL_TYPE_INTEGER == type)
 	{
-		if (m_bits == bits) return lhs;
+		if (NumBits() == bits) return lhs;
 		return lhs.CastToInt(bits);
 	}
-	else if (LITERAL_TYPE_FLOAT == m_type)
-	{
-		return lhs.CastToInt(bits);
-	}
-	else if (LITERAL_TYPE_BOOL == m_type)
+	else if (LITERAL_TYPE_FLOAT == type)
 	{
 		return lhs.CastToInt(bits);
 	}
-	else if (LITERAL_TYPE_STRING == m_type)
+	else if (LITERAL_TYPE_BOOL == type)
+	{
+		return lhs.CastToInt(bits);
+	}
+	else if (LITERAL_TYPE_STRING == type)
 	{
 		llvm::Value* v = m_builder->CreateCall(m_module->getFunction("__str_to_int"), { lhs.m_value }, "calltmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_INTEGER, v);
-		ret.m_ty = v->getType();
-		ret.m_bits = 64;
-		ret.m_is_storage = false;
-		return ret.CastToInt(bits);
+		return MakeInt(m_token, 64, v).CastToInt(bits);
 	}
 
 	Error(m_token, "Invalid cast operation.");
@@ -71,24 +69,21 @@ TValue TValue::AsFloat(int bits)
 	}
 
 	TValue lhs = GetFromStorage();
+	LiteralTypeEnum type = lhs.GetLiteralType();
 
-	if (LITERAL_TYPE_FLOAT == m_type)
+	if (LITERAL_TYPE_FLOAT == type)
 	{
-		if (m_bits == bits) return lhs;
+		if (NumBits() == bits) return lhs;
 		return lhs.CastToFloat(bits);
 	}
-	else if (LITERAL_TYPE_INTEGER == m_type)
+	else if (LITERAL_TYPE_INTEGER == type)
 	{
 		return lhs.CastToFloat(bits);
 	}
-	else if (LITERAL_TYPE_STRING == m_type)
+	else if (LITERAL_TYPE_STRING == type)
 	{
 		llvm::Value* v = m_builder->CreateCall(m_module->getFunction("__str_to_double"), { lhs.m_value }, "calltmp");
-		TValue ret = TValue(m_token, LITERAL_TYPE_FLOAT, v);
-		ret.m_ty = v->getType();
-		ret.m_bits = 64;
-		ret.m_is_storage = false;
-		return ret.CastToFloat(bits);
+		return MakeFloat(m_token, 64, v).CastToFloat(bits);
 	}
 
 	Error(m_token, "Invalid cast operation.");
@@ -99,13 +94,13 @@ TValue TValue::AsFloat(int bits)
 //-----------------------------------------------------------------------------
 TValue TValue::AsString()
 {
-	if (LITERAL_TYPE_STRING == m_type) return *this; // clone
+	if (IsString()) return *this; // clone
 
 	TValue lhs = GetFromStorage();
 
 	llvm::Value* s = nullptr;
-	
-	switch (m_type)
+
+	switch (GetLiteralType())
 	{
 	case LITERAL_TYPE_INTEGER:
 	{
@@ -132,11 +127,12 @@ TValue TValue::AsString()
 	}
 	case LITERAL_TYPE_VEC_FIXED:
 	{
-		llvm::Value* srcType = m_builder->getInt32(lhs.m_vec_type);
-		llvm::Value* srcBits = m_builder->getInt32(lhs.m_bits);
-		llvm::Value* srcLen = m_builder->getInt64(lhs.m_fixed_vec_len);
+		LiteralTypeEnum vectype = lhs.m_ttype.GetInternal(0).GetLiteralType();
+		llvm::Value* srcType = m_builder->getInt32(vectype);
+		llvm::Value* srcBits = m_builder->getInt32(lhs.m_ttype.GetInternal(0).NumBits());
+		llvm::Value* srcLen = m_builder->getInt64(lhs.m_ttype.GetFixedVecLen());
 		llvm::Value* srcPtr = m_value;
-		if (LITERAL_TYPE_STRING == lhs.m_vec_type)
+		if (LITERAL_TYPE_STRING == vectype)
 		{
 			srcPtr = m_builder->CreateGEP(m_builder->getPtrTy(), m_value, m_builder->getInt32(0), "geptmp");
 		}
@@ -171,13 +167,13 @@ TValue TValue::CastToFloat(int bits)
 		return NullInvalid();
 	}
 
-	if (LITERAL_TYPE_FLOAT == m_type)
+	if (IsFloat())
 	{
-		if (bits == m_bits) return *this; // clone
+		if (bits == NumBits()) return *this; // clone
 		llvm::Value* defval = m_builder->CreateFPCast(m_value, defty, "fp_cast");
 		return MakeFloat(m_token, bits, defval);
 	}
-	else if (LITERAL_TYPE_INTEGER == m_type)
+	else if (IsInteger())
 	{
 		llvm::Value* defval = m_builder->CreateSIToFP(m_value, defty, "int_to_fp");
 		return MakeFloat(m_token, bits, defval);
@@ -186,6 +182,7 @@ TValue TValue::CastToFloat(int bits)
 	Error(m_token, "Failed to cast to float.");
 	return NullInvalid();
 }
+
 
 
 //-----------------------------------------------------------------------------
@@ -206,18 +203,18 @@ TValue TValue::CastToInt(int bits)
 		return NullInvalid();
 	}
 
-	if (LITERAL_TYPE_INTEGER == m_type)
+	if (IsInteger())
 	{
-		if (bits == m_bits) return *this; // clone
+		if (bits == NumBits()) return *this; // clone
 		llvm::Value* defval = m_builder->CreateIntCast(m_value, defty, true, "int_cast");
 		return MakeInt(m_token, bits, defval);
 	}
-	else if (LITERAL_TYPE_BOOL == m_type)
+	else if (IsBool())
 	{
 		llvm::Value* defval = m_builder->CreateIntCast(m_value, defty, true, "int_cast");
 		return MakeInt(m_token, bits, defval);
 	}
-	else if (LITERAL_TYPE_FLOAT == m_type)
+	else if (IsFloat())
 	{
 		llvm::Value* defval = m_builder->CreateFPToSI(m_value, defty, "fp_to_int");
 		return MakeInt(m_token, bits, defval);
@@ -228,57 +225,78 @@ TValue TValue::CastToInt(int bits)
 }
 
 
-//-----------------------------------------------------------------------------
-void TValue::CastToMaxBits(TValue& lhs, TValue& rhs)
-{
-	if (lhs.m_type != rhs.m_type)
-	{
-		Error(lhs.m_token, "Failed to cast to max bitsize.");
-	}
-
-	if (LITERAL_TYPE_INTEGER == lhs.m_type)
-	{
-		if (lhs.m_bits < rhs.m_bits) lhs = lhs.CastToInt(rhs.m_bits);
-		if (rhs.m_bits < lhs.m_bits) rhs = rhs.CastToInt(lhs.m_bits);
-	}
-	else if (LITERAL_TYPE_FLOAT == lhs.m_type)
-	{
-		if (lhs.m_bits < rhs.m_bits) lhs = lhs.CastToFloat(rhs.m_bits);
-		if (rhs.m_bits < lhs.m_bits) rhs = rhs.CastToFloat(lhs.m_bits);
-	}
-}
-
 
 //-----------------------------------------------------------------------------
 TValue TValue::CastToMatchImplicit(TValue src)
 {
-	LiteralTypeEnum srcType = src.m_type;
-	if (src.IsVecAny()) srcType = src.m_vec_type;
+	return CastToMatchImplicit(src.GetTType());
+}
+
+//-----------------------------------------------------------------------------
+TValue TValue::CastToMatchImplicit(TType src)
+{
+	LiteralTypeEnum dstType = GetLiteralType();
+	LiteralTypeEnum srcType = src.GetLiteralType();
+	int numBits = src.NumBits();
+	if (src.IsVecAny())
+	{
+		srcType = src.GetInternal(0).GetLiteralType();
+		numBits = src.GetInternal(0).NumBits();
+	}
 
 	// types already match, check bitsize
-	if (srcType == m_type)
+	if (srcType == dstType)
 	{
-		if (LITERAL_TYPE_INTEGER == m_type)
-			return CastToInt(src.m_bits);
-		else if (m_type == LITERAL_TYPE_FLOAT)
-			return CastToFloat(src.m_bits);
+		if (IsInteger())
+			return CastToInt(numBits);
+		else if (IsFloat())
+			return CastToFloat(numBits);
 		else
 			return *this; // clone
 	}
 
-	if (LITERAL_TYPE_INTEGER == m_type)
+	if (LITERAL_TYPE_INTEGER == dstType)
 	{
-		if (LITERAL_TYPE_FLOAT == srcType) return CastToFloat(src.m_bits);
+		if (LITERAL_TYPE_FLOAT == srcType) return CastToFloat(numBits);
 	}
-	else if (LITERAL_TYPE_FLOAT == m_type)
+	else if (LITERAL_TYPE_FLOAT == dstType)
 	{
-		if (LITERAL_TYPE_INTEGER == srcType) return CastToInt(src.m_bits);
+		if (LITERAL_TYPE_INTEGER == srcType) return CastToInt(numBits);
 	}
 
 	Error(m_token, "Unable to implicit cast between types.");
 	return NullInvalid();
 }
 
+
+
+//-----------------------------------------------------------------------------
+void TValue::CastToMaxBits(TValue& lhs, TValue& rhs)
+{
+	LiteralTypeEnum lhs_type = lhs.GetLiteralType();
+	LiteralTypeEnum rhs_type = rhs.GetLiteralType();
+	int lhs_bits = lhs.NumBits();
+	int rhs_bits = rhs.NumBits();
+
+	if (lhs_type != rhs_type)
+	{
+		Error(lhs.m_token, "Failed to cast to max bitsize.");
+	}
+
+	if (LITERAL_TYPE_INTEGER == lhs_type)
+	{
+		if (lhs_bits < rhs_bits) lhs = lhs.CastToInt(rhs_bits);
+		if (rhs_bits < lhs_bits) rhs = rhs.CastToInt(lhs_bits);
+	}
+	else if (LITERAL_TYPE_FLOAT == lhs_type)
+	{
+		if (lhs_bits < rhs_bits) lhs = lhs.CastToFloat(rhs_bits);
+		if (rhs_bits < lhs_bits) rhs = rhs.CastToFloat(lhs_bits);
+	}
+}
+
+
+/*
 
 //-----------------------------------------------------------------------------
 TValue TValue::CastFixedToDynVec()
@@ -363,4 +381,4 @@ TValue TValue::CastFixedToDynVec()
 	}
 
 	return ret;
-}
+}*/

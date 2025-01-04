@@ -1,27 +1,36 @@
 #include "Expressions.h"
 
 //-----------------------------------------------------------------------------
-TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
+TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee)
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("vec::append"))
+	if (0 == name.compare("map::insert"))
 	{
-		if (!CheckArgSize(2)) return TValue::NullInvalid();
+		if (2 > m_arguments.size() || 3 < m_arguments.size())
+		{
+			Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
+			Environment::Error(callee, "Argument count mismatch.");
+			return TValue::NullInvalid();
+		}
 
 		if (EXPRESSION_VARIABLE == m_arguments[0]->GetType())
 		{
 			VariableExpr* ve = static_cast<VariableExpr*>(m_arguments[0]);
 			std::string var = ve->Operator()->Lexeme();
 			TValue tval = env->GetVariable(callee, var);
-			TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
-			if (tval.IsVecDynamic())
+
+			TValue mhs = m_arguments[1]->codegen(builder, module, env);
+			TValue rhs;
+			if (3 == m_arguments.size())
 			{
-				tval.EmitAppend(rhs);
+				rhs = m_arguments[2]->codegen(builder, module, env);
+				mhs = TValue::Construct_Pair(mhs, rhs);
 			}
-			else if (tval.IsVecFixed())
+			
+			if (tval.IsMap() && mhs.IsMapPair())
 			{
-				env->Error(callee, "Cannot append to fixed size vector.");
+				tval.EmitMapInsert(mhs);
 			}
 			else
 			{
@@ -29,7 +38,7 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			}
 			return TValue::NullInvalid();
 		}
-	}
+	}/*
 	else if (0 == name.compare("vec::contains"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
@@ -51,12 +60,7 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 				return TValue::NullInvalid();
 			}
 		}
-		else
-		{
-			env->Error(callee, "Argument type mismatch.");
-			return TValue::NullInvalid();
 		}
-	}
 	else if (0 == name.compare("vec::fill"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
@@ -98,8 +102,8 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			env->Error(callee, "Argument type mismatch.");
 			return TValue::NullInvalid();
 		}
-	}
-	
+	}*/
+
 	return TValue::NullInvalid();
 }
 

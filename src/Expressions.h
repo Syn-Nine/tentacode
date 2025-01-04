@@ -5,6 +5,7 @@
 #include <cstdarg>
 
 #include "TValue.h"
+#include "TType.h"
 #include "Token.h"
 #include "Literal.h"
 #include "Environment.h"
@@ -50,11 +51,12 @@ public:
 
 	ExpressionTypeEnum GetType() { return EXPRESSION_ASSIGN; }
 
-	/*Token* Operator() { return m_token; }
-	Expr* Right() { return m_right; }
+	Token* Operator() { return m_token; }
+	/*Expr* Right() { return m_right; }
 	Expr* VecIndex() { return m_vecIndex; }*/
 
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+	
 
 private:
 	Token* m_token;
@@ -109,7 +111,11 @@ public:
 	//Token* Operator() { return m_token; }
 	//ArgList GetArguments() { return m_arguments; }
 
-	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	{
+		return codegen(builder, module, env, TType());
+	}
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, TType ttype_hint);
 
 
 private:
@@ -144,7 +150,9 @@ private:
 	// standard library
 	TValue codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	TValue codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	TValue codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	TValue codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
+	TValue codegen_set(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	TValue codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, Token* callee);
 	
 	bool CheckArgSize(int count);
@@ -224,6 +232,7 @@ public:
 
 	ExpressionTypeEnum GetType() { return EXPRESSION_LITERAL; }
 	
+	//Token* Operator() { return m_token; }
 	Literal GetLiteral() { return m_literal; }
 
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)

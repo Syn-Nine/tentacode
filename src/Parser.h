@@ -104,10 +104,12 @@ private:
 		if (Match(1, TOKEN_STRUCT)) return StructDeclaration();
 		
 		if (Check(TOKEN_DEF)) return Function("function");
+
+		if (Match(1, TOKEN_CONST)) return VarConstDeclaration();
 		
-		if (Match(11, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
+		if (Match(13, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
 			TOKEN_VAR_F32, TOKEN_VAR_F64, TOKEN_VAR_STRING,
-			TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
+			TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_TUPLE, TOKEN_VAR_SET, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF))
 			return VarDeclaration();
 		
 		// raylib custom
@@ -141,12 +143,81 @@ private:
 
 	void Include();
 
+
+	TypeToken ScanTypeToken(Token* token)
+	{
+		TypeToken ret;
+
+		Token* type = token;
+		TokenPtrList* typeArgs = new TokenPtrList();
+		Token* arg0 = nullptr;
+		Token* arg1 = nullptr;
+
+		if (TOKEN_VAR_VEC == type->GetType())
+		{
+			if (!Consume(TOKEN_LESS, "Expected <type> after vec.")) return ret;
+			arg0 = new Token(Advance());
+			if (Check(TOKEN_COMMA))
+			{
+				Advance();
+				if (Check(TOKEN_IDENTIFIER))
+				{
+					Advance();
+					arg1 = new Token(Previous());
+				}
+				else if (Consume(TOKEN_INTEGER, "Expected integer literal for vector fixed length size."))
+				{
+					arg1 = new Token(Previous());
+				}
+			}
+			if (!Consume(TOKEN_GREATER, "Expected '>' after vector type.")) return ret;
+			typeArgs->push_back(arg0);
+			typeArgs->push_back(arg1);
+		}
+		else if (TOKEN_VAR_MAP == type->GetType())
+		{
+			if (!Consume(TOKEN_LESS, "Expected <type> after map.")) return ret;
+			arg0 = new Token(Advance());
+			if (!Consume(TOKEN_COMMA, "Expected map container type")) return ret;
+			arg1 = new Token(Advance());
+			if (!Consume(TOKEN_GREATER, "Expected '>' after map type.")) return ret;
+			typeArgs->push_back(arg0);
+			typeArgs->push_back(arg1);
+		}
+		else if (TOKEN_VAR_SET == type->GetType())
+		{
+			if (!Consume(TOKEN_LESS, "Expected <type> after set.")) return ret;
+			arg0 = new Token(Advance());
+			if (!Consume(TOKEN_GREATER, "Expected '>' after set type.")) return ret;
+			typeArgs->push_back(arg0);
+		}
+		else if (TOKEN_VAR_TUPLE == type->GetType())
+		{
+			if (!Consume(TOKEN_LESS, "Expected <type> after tuple.")) return ret;
+			arg0 = new Token(Advance());
+			typeArgs->push_back(arg0);
+			while (Check(TOKEN_COMMA))
+			{
+				Advance();
+				typeArgs->push_back(new Token(Advance()));
+			}
+			if (!Consume(TOKEN_GREATER, "Expected '>' after tuple type.")) return ret;
+		}
+
+		ret.type = type;
+		ret.args = typeArgs;
+		return ret;
+	}
+
+
 	//-----------------------------------------------------------------------------
 	Stmt* Function(std::string kind)
 	{
 		Consume(TOKEN_DEF, "");
 
 		// check for return type
+		TokenPtrList* retArgs = new TokenPtrList();
+
 		Token* rettype = nullptr;
 		if (Check(TOKEN_VAR_I16) ||
 			Check(TOKEN_VAR_I32) ||
@@ -159,6 +230,28 @@ private:
 		{
 			rettype = new Token(Advance());
 		}
+		else if (Check(TOKEN_VAR_VEC))
+		{
+			/*if (Consume(TOKEN_LESS, "Expected <type> after vec."))
+			{
+				retArgs->push_back(new Token(Advance()));
+				
+				if (Check(TOKEN_COMMA))
+				{
+					Advance();
+					if (Check(TOKEN_IDENTIFIER))
+					{
+						Advance();
+						retArgs->push_back(new Token(Previous()));
+					}
+					else if (Consume(TOKEN_INTEGER, "Expected integer literal for vector fixed length size."))
+					{
+						retArgs->push_back(new Token(Previous()));
+					}
+				}
+				Consume(TOKEN_GREATER, "Expected '>' after vector type.");
+			}*/
+		}
 		
 		if (!Consume(TOKEN_IDENTIFIER, "Expected " + kind + " name.")) return nullptr;
 		Token* name = new Token(Previous());
@@ -167,6 +260,7 @@ private:
 		
 		TokenList params;
 		TokenList types;
+		std::vector<bool> mut;
 
 		if (!Check(TOKEN_RIGHT_PAREN))
 		{
@@ -184,6 +278,16 @@ private:
 					(Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_IDENTIFIER)))
 				{
 					types.push_back(Advance());
+					if (Check(TOKEN_AMPERSAND))
+					{
+						mut.push_back(true);
+						Advance();
+					}
+					else
+					{
+						mut.push_back(false);
+					}
+
 					if (Consume(TOKEN_IDENTIFIER, "Expect parameter name."))
 					{
 						params.push_back(Token(Previous()));
@@ -197,9 +301,11 @@ private:
 		if (!Consume(TOKEN_LEFT_BRACE, "Expected '{' before " + kind + " body.")) return nullptr;
 
 		StmtList* body = BlockStatement();
-		return new FunctionStmt(rettype, name, types, params, body);
+		return new FunctionStmt(rettype, name, types, params, mut, body);
 	}
 	
+	
+	//-----------------------------------------------------------------------------
 	Stmt* StructDeclaration()
 	{
 		if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
@@ -214,9 +320,10 @@ private:
 		StmtList* vars = new StmtList();
 		while (!Check(TOKEN_RIGHT_BRACE) && !IsAtEnd() && !m_errorHandler->HasErrors())
 		{
-			if (Match(17, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
+			if (Match(19, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64,
 				TOKEN_VAR_F32, TOKEN_VAR_F64, TOKEN_VAR_STRING,
-				TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL, TOKEN_DEF,
+				TOKEN_VAR_VEC, TOKEN_VAR_MAP, TOKEN_VAR_ENUM, TOKEN_VAR_BOOL,
+				TOKEN_VAR_TUPLE, TOKEN_VAR_SET, TOKEN_DEF,
 
 				// raylib custom
 				TOKEN_VAR_FONT, TOKEN_VAR_IMAGE, TOKEN_VAR_RENDER_TEXTURE_2D, TOKEN_VAR_TEXTURE, TOKEN_VAR_SOUND, TOKEN_VAR_SHADER))
@@ -245,153 +352,306 @@ private:
 
 		return new StructStmt(id, vars);
 	}
+	
 
-
+	//-----------------------------------------------------------------------------
 	Stmt* VarDeclaration()
 	{
-		Token* type = new Token(Previous());
-		Token* vtype = nullptr;
-		Token* vsize = nullptr;
+		TypeToken typeToken = ScanTypeToken(new Token(Previous()));
+		if (!typeToken.type) return nullptr;
 
-		if (TOKEN_VAR_VEC == type->GetType())
+		TokenPtrList ids;
+		ArgList exprs;
+
+		bool paired = true;
+		if (Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_COMMA)) paired = false;
+
+		if (paired)
 		{
-			if (Consume(TOKEN_LESS, "Expected <type> after vec."))
+			while (true)
 			{
-				vtype = new Token(Advance());
-				if (Check(TOKEN_COMMA))
-				{
-					Advance();
-					if (Consume(TOKEN_INTEGER, "Expected integer literal for vector fixed length size."))
-					{
-						vsize = new Token(Previous());
-					}
-				}
-				Consume(TOKEN_GREATER, "Expected '>' after vector type.");
+				Token* id;
+				if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+				id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), typeToken.type->Line(), typeToken.type->Filename());
+
+				ids.push_back(id);
+
+				Expr* expr = nullptr;
+				if (Match(1, TOKEN_EQUAL)) expr = Assignment();
+				exprs.push_back(expr);
+
+				// todo - fix this logic to make more appropriate errors
+				if (Check(TOKEN_SEMICOLON)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
 			}
 		}
-
-		Token* id;
-		if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
-		id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), type->Line(), type->Filename());
-
-		Expr* expr = nullptr;
-		if (Match(1, TOKEN_EQUAL))
+		else
 		{
-			Expr* value = Assignment();
-			expr = new AssignExpr(id, value, nullptr);
+			while (true)
+			{
+				Token* id;
+				if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+				id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), typeToken.type->Line(), typeToken.type->Filename());
+
+				ids.push_back(id);
+				if (Check(TOKEN_SEMICOLON) || Check(TOKEN_EQUAL)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after identifier.")) return nullptr;
+			}
+
+			Expr* expr = nullptr;
+			if (Match(1, TOKEN_EQUAL))
+			{
+				while (true)
+				{
+					expr = Assignment();
+					exprs.push_back(expr);
+
+					// todo - fix this logic to make more appropriate errors
+					if (Check(TOKEN_SEMICOLON)) break;
+					if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < ids.size(); ++i)
+				{
+					exprs.push_back(nullptr);
+				}
+			}
 		}
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		TokenPtrList* vecArgs = new TokenPtrList();
-		vecArgs->push_back(vtype);
-		vecArgs->push_back(vsize);
-		return new VarStmt(type, id, expr, vecArgs);
+		if (ids.size() != exprs.size())
+		{
+			Error(*typeToken.type, "Assignment count mismatch.");
+			return nullptr;
+		}
+
+		return new VarStmt(typeToken, ids, exprs);
 	}
 
 
 	//-----------------------------------------------------------------------------
 	Stmt* UdtDeclaration()
 	{
-		Token* type = new Token(Advance());
+		TypeToken typeToken = ScanTypeToken(new Token(Advance()));
+		if (!typeToken.type) return nullptr;
 		
-		Token* id = nullptr;
 		Token prev = Advance();
 		std::string name = prev.Lexeme();
 
-		id = new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename());
+		TokenPtrList ids;
+		ArgList exprs;
 
-		Expr* expr = nullptr;
-		if (Match(1, TOKEN_EQUAL))
+		bool paired = true;
+		if (Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_COMMA)) paired = false;
+
+		if (paired)
 		{
-			Expr* value = Assignment();
-			expr = new AssignExpr(id, value, nullptr);
+			while (true)
+			{
+				Token* id = nullptr;
+				id = new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename());
+				ids.push_back(id);
+
+				Expr* expr = nullptr;
+				if (Match(1, TOKEN_EQUAL)) expr = Assignment();
+				exprs.push_back(expr);
+
+				if (Check(TOKEN_SEMICOLON)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
+			}
+		}
+		else
+		{
+			while (true)
+			{
+				Token* id = nullptr;
+				id = new Token(TOKEN_IDENTIFIER, name, prev.Line(), prev.Filename());
+				ids.push_back(id);
+
+				if (Check(TOKEN_SEMICOLON) || Check(TOKEN_EQUAL)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after identifier.")) return nullptr;
+			}
+
+			Expr* expr = nullptr;
+			if (Match(1, TOKEN_EQUAL))
+			{
+				while (true)
+				{
+					expr = Assignment();
+					exprs.push_back(expr);
+
+					if (Check(TOKEN_SEMICOLON)) break;
+					if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < ids.size(); ++i)
+				{
+					exprs.push_back(nullptr);
+				}
+			}
 		}
 
 		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
 
-		return new VarStmt(type, id, expr, nullptr);
+		if (ids.size() != exprs.size())
+		{
+			Error(*typeToken.type, "Assignment count mismatch.");
+			return nullptr;
+		}
+
+		return new VarStmt(typeToken, ids, exprs);
 	}
-	
+
 
 	//-----------------------------------------------------------------------------
-	Stmt* VarDeclarationForInRange()
+	Stmt* VarConstDeclaration()
 	{
-		Token* id = nullptr;
-		if (Consume(TOKEN_IDENTIFIER, "Expected identifier."))
+		if (!Match(3, TOKEN_VAR_I16, TOKEN_VAR_I32, TOKEN_VAR_I64))
 		{
-			id = new Token(Previous());
+			Error(Previous(), "Expected integer type after const.");
+			return nullptr;
+		}
 
-			if (Consume(TOKEN_IN, "Expected 'in'."))
+		Token* type = new Token(Previous());
+
+		TokenPtrList ids;
+		ArgList exprs;
+
+		bool paired = true;
+		if (Check(TOKEN_IDENTIFIER) && CheckNext(TOKEN_COMMA)) paired = false;
+
+		if (paired)
+		{
+			while (true)
 			{
-				Expr* expr = Expression();
-				if (EXPRESSION_RANGE == expr->GetType())
+				Token* id;
+				if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+				id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), type->Line(), type->Filename());
+
+				ids.push_back(id);
+
+				if (!Consume(TOKEN_EQUAL, "Expected assignment after identifier.")) return nullptr;
+
+				Expr* expr = nullptr;
+				if (Check(TOKEN_INTEGER))
 				{
-					RangeExpr* r = (RangeExpr*)expr;
-					if (TOKEN_DOT_DOT_EQUAL == r->Operator()->GetType())
-					{
-						// overwrite old range expression with one that increments the right side
-						Expr* temp = new BinaryExpr(r->Right(), new Token(TOKEN_PLUS, "+", r->Operator()->Line(), r->Operator()->Filename()), new LiteralExpr(id, int32_t(1)));
-						Expr* old = expr;
-						expr = new RangeExpr(r->Left(), r->Operator(), temp);
-						delete old;
-					}
+					expr = Primary();
 				}
-				else // attempt to build range expression starting at 0
+				else
 				{
-					expr = new RangeExpr(new LiteralExpr(id, int32_t(0)), new Token(TOKEN_DOT_DOT, "..", id->Line(), id->Filename()), expr);
+					Error(Previous(), "Expected integer value for constant.");
+					return nullptr;
 				}
-				return new VarStmt(new Token(TOKEN_VAR_I32, "i32", id->Line(), id->Filename()), id, expr, nullptr);
+
+				exprs.push_back(expr);
+
+				if (Check(TOKEN_SEMICOLON)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
 			}
 		}
-		
-		return nullptr;
+		else
+		{
+			while (true)
+			{
+				Token* id;
+				if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+				id = new Token(TOKEN_IDENTIFIER, Previous().Lexeme(), type->Line(), type->Filename());
+
+				ids.push_back(id);
+
+				// todo - fix this logic to make more appropriate errors
+				if (Check(TOKEN_SEMICOLON) || Check(TOKEN_EQUAL)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after identifier.")) return nullptr;
+			}
+
+			if (!Consume(TOKEN_EQUAL, "Expected assignment after identifier.")) return nullptr;
+
+			while (true)
+			{
+				Expr* expr = nullptr;
+				if (Check(TOKEN_INTEGER))
+				{
+					expr = Primary();
+				}
+				else
+				{
+					Error(Previous(), "Expected integer value for constant.");
+					return nullptr;
+				}
+
+				exprs.push_back(expr);
+
+				// todo - fix this logic to make more appropriate errors
+				if (Check(TOKEN_SEMICOLON)) break;
+				if (!Consume(TOKEN_COMMA, "Expected ',' after expression.")) return nullptr;
+			}
+		}
+
+		if (!Consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.")) return nullptr;
+
+		if (ids.size() != exprs.size())
+		{
+			Error(*type, "Assignment count mismatch.");
+			return nullptr;
+		}
+
+		return new VarConstStmt(type, ids, exprs);
 	}
 	
 
 	//-----------------------------------------------------------------------------
 	Stmt* ForStatement()
 	{
-		Stmt* initializer = VarDeclarationForInRange();
-		if (!initializer)
+		Token* key = nullptr;
+		Token* val = nullptr;
+		Expr* expr = nullptr;
+		if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+
+		val = new Token(Previous());
+		if (Check(TOKEN_COMMA))
 		{
-			Error(Previous(), "Expected initializer after for.");
-			return nullptr;
+			Advance();
+			if (!Consume(TOKEN_IDENTIFIER, "Expected identifier.")) return nullptr;
+			key = val;
+			val = new Token(Previous());
 		}
+
+		if (!Consume(TOKEN_IN, "Expected 'in'.")) return nullptr;
+
+		expr = Expression();
+		if (EXPRESSION_RANGE == expr->GetType())
+		{
+			RangeExpr* r = (RangeExpr*)expr;
+			if (TOKEN_DOT_DOT_EQUAL == r->Operator()->GetType())
+			{
+				// overwrite old range expression with one that increments the right side
+				Expr* temp = new BinaryExpr(r->Right(), new Token(TOKEN_PLUS, "+", r->Operator()->Line(), r->Operator()->Filename()), new LiteralExpr(val, int32_t(1)));
+				Expr* old = expr;
+				expr = new RangeExpr(r->Left(), r->Operator(), temp);
+				delete old;
+			}
+		}
+		else if (EXPRESSION_LITERAL == expr->GetType())
+		{
+			// attempt to build range expression starting at 0
+			expr = new RangeExpr(new LiteralExpr(val, int32_t(0)), new Token(TOKEN_DOT_DOT, "..", val->Line(), val->Filename()), expr);
+		}
+
 
 		if (Check(TOKEN_LEFT_BRACE))
 		{
 			Stmt* body = Statement();
 			if (body)
 			{
-				// build increment
-				Expr* rhs = new LiteralExpr(new Token(Previous()), int32_t(1));
-				Token* var = ((VarStmt*)initializer)->Id();
-				Expr* lhs = new VariableExpr(new Token(*var), nullptr);
-				Expr* binary = new BinaryExpr(lhs, new Token(TOKEN_PLUS, "+", var->Line(), var->Filename()), rhs);
-				Expr* increment = new AssignExpr(var, binary, nullptr);
-
-				Expr* rangeLeft = ((RangeExpr*)((VarStmt*)initializer)->Expression())->Left();
-				Expr* rangeRight = ((RangeExpr*)((VarStmt*)initializer)->Expression())->Right();
-
-				// build condition
-				Expr* condition = new BinaryExpr(lhs, new Token(TOKEN_LESS, "<", var->Line(), var->Filename()), rangeRight);
-
-				// build while statement
-				std::string label = GenerateUUID();
-				body = new WhileStmt(condition, body, increment, label);
-
-				// build new initializer
-				Expr* assign_expr = new AssignExpr(var, rangeLeft, nullptr);
-				Stmt* newinit = new VarStmt(new Token(TOKEN_VAR_I32, "i32", var->Line(), var->Filename()), var, assign_expr, nullptr);
-
-				// build outer block
+				// wrap foreach in a block to get a local environment scope
 				StmtList* list = new StmtList();
-				list->push_back(newinit);
-				list->push_back(body);
-				body = new BlockStmt(list);
-
-				return body;
+				list->push_back(new ForEachStmt(key, val, expr, body));
+				return new BlockStmt(list);
 			}
 		}
 		else
@@ -410,8 +670,7 @@ private:
 			Stmt* body = Statement();
 			if (body)
 			{
-				std::string label = GenerateUUID();
-				return new WhileStmt(new LiteralExpr(nullptr, true), body, nullptr, label);
+				return new WhileStmt(new LiteralExpr(nullptr, true), body, nullptr);
 			}
 		}
 		else
@@ -426,6 +685,7 @@ private:
 	//-----------------------------------------------------------------------------
 	Stmt* IfStatement()
 	{
+		Token* token = new Token(Previous());
 		Expr* condition = Expression();
 
 		if (Check(TOKEN_LEFT_BRACE))
@@ -450,7 +710,7 @@ private:
 					}
 				}
 			}
-			return new IfStmt(condition, thenBranch, elseBranch);
+			return new IfStmt(token, condition, thenBranch, elseBranch);
 		}
 		else
 		{
@@ -542,8 +802,7 @@ private:
 		if (Check(TOKEN_LEFT_BRACE))
 		{
 			Stmt* body = Statement();
-			std::string label = GenerateUUID();
-			return new WhileStmt(condition, body, nullptr, label);
+			return new WhileStmt(condition, body, nullptr);
 		}
 		else
 		{
@@ -648,9 +907,25 @@ private:
 	//-----------------------------------------------------------------------------
 	Expr* Comparison()
 	{
-		Expr* expr = Range();//Struct();
+		Expr* expr = Pair();//Range();//Struct();
 
 		while (Match(4, TOKEN_GREATER, TOKEN_GREATER_EQUAL, TOKEN_LESS, TOKEN_LESS_EQUAL))
+		{
+			Token* oper = new Token(Previous());
+			Expr* right = Pair();//Range();//Struct();
+			expr = new BinaryExpr(expr, oper, right);
+		}
+
+		return expr;
+	}
+
+
+	//-----------------------------------------------------------------------------
+	Expr* Pair()
+	{
+		Expr* expr = Range();//Struct();
+
+		while (Match(1, TOKEN_COLON))
 		{
 			Token* oper = new Token(Previous());
 			Expr* right = Range();//Struct();
@@ -659,7 +934,6 @@ private:
 
 		return expr;
 	}
-
 
 	//-----------------------------------------------------------------------------
 	/*Expr* Struct()
@@ -705,15 +979,31 @@ private:
 	//-----------------------------------------------------------------------------
 	Expr* Multiplication()
 	{
-		Expr* expr = Unary();
+		Expr* expr = Power();
 
 		while (Match(2, TOKEN_SLASH, TOKEN_STAR))
+		{
+			Token* oper = new Token(Previous());
+			Expr* right = Power();
+			expr = new BinaryExpr(expr, oper, right);
+		}
+		
+		return expr;
+	}
+
+
+	//-----------------------------------------------------------------------------
+	Expr* Power()
+	{
+		Expr* expr = Unary();
+
+		while (Match(1, TOKEN_HAT))
 		{
 			Token* oper = new Token(Previous());
 			Expr* right = Unary();
 			expr = new BinaryExpr(expr, oper, right);
 		}
-		
+
 		return expr;
 	}
 
