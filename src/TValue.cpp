@@ -118,6 +118,7 @@ void TValue::EmitMapInsert(TValue rhs)
 	{
 		val = val.MakeStorage();
 		vptr = val.GetPtrToStorage();
+		if (val.IsString()) vptr = val.GetFromStorage().Value();
 	}
 
 	if (vptr)
@@ -254,12 +255,12 @@ TValue TValue::EmitContains(TValue rhs)
 	TType i0 = m_ttype.GetInternal(0);
 	TType i1 = rhs.m_ttype;
 
-	if (!m_ttype.IsVecDynamic())
+	if (!m_ttype.IsVecDynamic() && !m_ttype.IsMap())
 	{
 		Error(m_token, "Cannot check contents of type.");
 		return NullInvalid();
 	}
-	else if (i0.GetLiteralType() != i1.GetLiteralType())
+	if (i0.GetLiteralType() != i1.GetLiteralType())
 	{
 		Error(rhs.GetToken(), "Cannot check contents of mismatched type.");
 		return NullInvalid();
@@ -292,37 +293,53 @@ TValue TValue::EmitContains(TValue rhs)
 
 	TValue ret;
 
-	if (i0.IsInteger())
-	{
-		llvm::Value* v = nullptr;
-		int bits = i0.NumBits();
-		if (16 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i16"), { ptr, tmp }, "calltmp");
-		else if (32 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i32"), { ptr, tmp }, "calltmp");
-		else if (64 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i64"), { ptr, tmp }, "calltmp");
+	if (m_ttype.IsVecDynamic()) {
+		if (i0.IsInteger())
+		{
+			llvm::Value* v = nullptr;
+			int bits = i0.NumBits();
+			if (16 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i16"), { ptr, tmp }, "calltmp");
+			else if (32 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i32"), { ptr, tmp }, "calltmp");
+			else if (64 == bits) v = m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_i64"), { ptr, tmp }, "calltmp");
 
-		if (v) ret = TValue::MakeBool(m_token, v);
+			if (v) ret = TValue::MakeBool(m_token, v);
+		}
+		/*else if (LITERAL_TYPE_FLOAT == m_vec_type)
+		{
+			if (32 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f32"), { ptr, tmp }, "calltmp");
+			else if (64 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f64"), { ptr, tmp }, "calltmp");
+		}
+		else if (LITERAL_TYPE_ENUM == m_vec_type)
+		{
+			m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_enum"), { ptr, tmp }, "calltmp");
+		}
+		else if (LITERAL_TYPE_BOOL == m_vec_type)
+		{
+			m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_bool"), { ptr, tmp }, "calltmp");
+		}
+		else if (LITERAL_TYPE_STRING == m_vec_type)
+		{
+			m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_string"), { ptr, tmp }, "calltmp");
+		}*/
+		else
+		{
+			Error(rhs.GetToken(), "Failed to check contents of dynamic vector.");
+			return NullInvalid();
+		}
 	}
-	/*else if (LITERAL_TYPE_FLOAT == m_vec_type)
-	{
-		if (32 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f32"), { ptr, tmp }, "calltmp");
-		else if (64 == m_bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_f64"), { ptr, tmp }, "calltmp");
-	}
-	else if (LITERAL_TYPE_ENUM == m_vec_type)
-	{
-		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_enum"), { ptr, tmp }, "calltmp");
-	}
-	else if (LITERAL_TYPE_BOOL == m_vec_type)
-	{
-		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_bool"), { ptr, tmp }, "calltmp");
-	}
-	else if (LITERAL_TYPE_STRING == m_vec_type)
-	{
-		m_builder->CreateCall(m_module->getFunction("__dyn_vec_contains_string"), { ptr, tmp }, "calltmp");
-	}*/
-	else
-	{
-		Error(rhs.GetToken(), "Failed to check contents of dynamic vector.");
-		return NullInvalid();
+	else {
+		// map
+		if (i0.IsInteger() || i0.IsEnum())
+		{
+			tmp = m_builder->CreateIntCast(tmp, m_builder->getInt64Ty(), true, "int_cast");
+			llvm::Value* v = m_builder->CreateCall(m_module->getFunction("__map_contains_key_int"), { ptr, tmp }, "calltmp");
+			ret = TValue::MakeBool(m_token, v);
+		}
+		else if (i0.IsString())
+		{
+			llvm::Value* v = m_builder->CreateCall(m_module->getFunction("__map_contains_key_string"), { ptr, tmp }, "calltmp");
+			ret = TValue::MakeBool(m_token, v);
+		}
 	}
 
 	return ret;
@@ -487,6 +504,16 @@ llvm::Value* TValue::GetPtrToStorage()
 //-----------------------------------------------------------------------------
 TValue TValue::GetAtIndex(TValue idx)
 {
+	// character indexing inside a string
+	if (m_ttype.IsString())
+	{
+		TValue lhs = GetFromStorage();
+		llvm::Value* len = m_builder->getInt32(1);
+		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__str_substr"), { lhs.Value(), idx.Value(), len }, "calltmp");
+		return TValue::MakeString(m_token, s);
+	}
+
+	// else it's a container
 	TType i0 = m_ttype.GetInternal(0);
 
 	if (m_ttype.IsVecFixed())
@@ -549,7 +576,19 @@ TValue TValue::GetAtIndex(TValue idx)
 				Error(m_token, "Expected string index for map.");
 				return NullInvalid();
 			}
-			m_builder->CreateCall(m_module->getFunction("__get_map_val_at_str"), { dstPtr, idx.m_value, tmp }, "calltmp");
+			if (i1.IsString())
+			{
+				// tmp is holding the location of the return string
+				// need to pull string out of map into a different temporary location
+				tmp = ret.GetFromStorage().Value();
+				llvm::Value* tmp2 = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "tmp2");
+				m_builder->CreateCall(m_module->getFunction("__get_map_val_at_str"), { dstPtr, idx.m_value, tmp2 }, "calltmp");
+				m_builder->CreateCall(m_module->getFunction("__str_assign"), { tmp, tmp2 }, "calltmp");
+			}
+			else
+			{
+				m_builder->CreateCall(m_module->getFunction("__get_map_val_at_str"), { dstPtr, idx.m_value, tmp }, "calltmp");
+			}
 		}
 
 		return ret;

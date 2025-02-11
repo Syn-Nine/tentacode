@@ -40,6 +40,21 @@ public:
 		m_data = nullptr;*/
 	}
 
+	bool ContainsKeyInt(int64_t key)
+	{
+		//printf("testing map for key: %ll\n", key);
+		if (16 == m_bits) return m_map16.count(key) != 0;
+		else if (32 == m_bits) return m_map32.count(key) != 0;
+		else if (64 == m_bits) return m_map64.count(key) != 0;
+		return false;
+	}
+
+	bool ContainsKeyString(std::string key)
+	{
+		//printf("testing map for key: %s\n", key.c_str());
+		return m_mapStr.count(key.c_str()) != 0;
+	}
+
 	void InsertAtInt(int64_t key, void* data)
 	{
 		assert(m_is_integer);

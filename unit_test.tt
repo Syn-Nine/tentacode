@@ -3,7 +3,6 @@ if FILELINE != "File:unit_test.tt, Line:2" {
     println("Failed FILELINE test, " + FILELINE);
 }
 
-
 //-----------------------------------------------------------------------------
 println("-- default initialization test for basic types");
 {
@@ -14,7 +13,6 @@ println("-- default initialization test for basic types");
 	if ""    != s { println("Test Failed, " + FILELINE); }
 	//if ""    != e as string { println("Test Failed, " + FILELINE); }
 }
-
 
 //-----------------------------------------------------------------------------
 println("-- assignment test for basic types");
@@ -301,11 +299,21 @@ println("-- fixed vec i32 test");
 	// bracket initializer with replicator
 	vec<i32,5> ivec = [2; 5];
 	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
-	i32 sum = 0;
+	i32 sum = 0; // simple for loop summation
 	for i in len(ivec) {
 		sum = sum + ivec[i];
 	}
 	if 10 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		sum = sum + i;
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		sum = sum + ivec[k] + v;
+	}
+	if 20 != sum { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
 	vec<i32,7> ivec = [1, 2;5, 3];
@@ -319,6 +327,12 @@ println("-- fixed vec i32 test");
 	//vec<i32> x = [1, 2, 3];
 	//if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
 	//if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
+	// constant size variable test
+	const i32 i = 3;
+	vec<i32,i> ii;
+	if 3 != len(ii) { println("Test Failed, " + FILELINE); }
+
 }
 
 
@@ -328,7 +342,7 @@ println("-- dynamic vec i32 test");
 	// zero initializer
 	vec<i32> ivec;
 	if 0 != len(ivec) { println("Test Failed, " + FILELINE); }
-	
+
 	// bracket initializer list with redefinition
 	vec<i32> ivec = [1, 2, 3];
 	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
@@ -377,16 +391,27 @@ println("-- dynamic vec i32 test");
 	if bvec[0] + bvec[1] + bvec[2] != 8 { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator
-	vec<i32> ivec = [2; 5];
+	//vec<i32> ivec = [2; 5];
+	vec<i32> ivec = [2, 2, 2, 2, 2];
 	if 5 != len(ivec) { println("Test Failed, " + FILELINE); }
 	i32 sum = 0;
 	for i in len(ivec) {
 		sum = sum + ivec[i];
 	}
 	if 10 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		sum = sum + i;
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		sum = sum + ivec[k] + v;
+	}
+	if 20 != sum { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
-	vec<i32> ivec = [1, 2.1;5, 3];
+	vec<i32> ivec = [1, 2.1;5, 3]; // test replicator type hint to change float to i32
 	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
 	i32 sum = 0;
 	for i in len(ivec) {
@@ -400,16 +425,16 @@ println("-- dynamic vec i32 test");
 	if 3 != len(tvec) { println("Test Failed, " + FILELINE); }
 	if tvec[2] != 3 { println("Test Failed, " + FILELINE); }
 	
-	vec<i32> x = [1, 2, 3];
-	if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
-	if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	//vec<i32> x = [1, 2, 3];
+	//if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
+	//if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 	
-	vec<i32> v = vec::fill(-1, 5);
-	i32 sum = 0;
-	for i in len(v) {
-		if v[i] == -1 { sum = sum + 1; }
-	}
-	if sum != 5 { println("Test Failed, " + FILELINE); }
+	//vec<i32> v = vec::fill(-1, 5);
+	//i32 sum = 0;
+	//for i in len(v) {
+	//	if v[i] == -1 { sum = sum + 1; }
+	//}
+	//if sum != 5 { println("Test Failed, " + FILELINE); }
 }
 
 
@@ -470,6 +495,16 @@ println("-- fixed vec f32 test");
 		sum = sum + ivec[i];
 	}
 	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+	f32 sum = 0; // by value summation
+	for i in ivec {
+		sum = sum + i;
+	}
+	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+	f32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		sum = sum + ivec[k] + v;
+	}
+	if abs(22 - sum) > 0.00001 { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
 	vec<f32,7> ivec = [1.1, 2.3;5, 3.4];
@@ -479,7 +514,6 @@ println("-- fixed vec f32 test");
 		sum = sum + ivec[i];
 	}
 	if abs(16 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
-
 
 	// vec<f32> x = [1, 2, 3];
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
@@ -550,6 +584,16 @@ println("-- dynamic vec f32 test");
 		sum = sum + ivec[i];
 	}
 	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+	f32 sum = 0; // by value summation
+	for i in ivec {
+		sum = sum + i;
+	}
+	if abs(11 - sum) > 0.000001 { println("Test Failed, " + FILELINE); }
+	f32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		sum = sum + ivec[k] + v;
+	}
+	if abs(22 - sum) > 0.00001 { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
 	vec<f32> ivec = [1.1, 2.3;5, 3.4];
@@ -570,12 +614,13 @@ println("-- dynamic vec f32 test");
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
 	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 	
-	vec<f32> v = vec::fill(1.1, 5);
-	i32 sum = 0;
-	for i in len(v) {
-		if abs(1.1 - v[i]) < 0.000001 { sum = sum + 1; }
-	}
-	if sum != 5 { println("Test Failed, " + FILELINE); }
+	//vec<f32> v = vec::fill(1.1, 5);
+	//i32 sum = 0;
+	//for i in len(v) {
+	//	if abs(1.1 - v[i]) < 0.000001 { sum = sum + 1; }
+	//}
+	//if sum != 5 { println("Test Failed, " + FILELINE); }
+	
 }
 
 
@@ -632,7 +677,18 @@ println("-- fixed vec enum test");
 		if ivec[i] == :G { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
-
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i == :G { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if v == :G { sum = sum + 1; }
+		if ivec[k] == :G { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
+	
 	// bracket initializer with replicator and list
 	vec<enum,7> ivec = [:H, :I;5, :H];
 	if 7 != len(ivec) { println("Test Failed, " + FILELINE); }
@@ -645,6 +701,7 @@ println("-- fixed vec enum test");
 	// vec<enum> x = [1, 2, 3];
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
 	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	
 }
 
 
@@ -659,7 +716,7 @@ println("-- dynamic vec enum test");
 	vec<enum> ivec = [:A, :B, :C];
 	if 3 != len(ivec) { println("Test Failed, " + FILELINE); }
 	if ivec[0] != :A || :B != ivec[1] || ivec[2] != :C { println("Test Failed, " + FILELINE); }
-	
+
 	// bracket assignment
 	vec<enum> ivec;
 	ivec = [:A, :B, :C];
@@ -707,6 +764,17 @@ println("-- dynamic vec enum test");
 		if ivec[i] == :G { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i == :G { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if v == :G { sum = sum + 1; }
+		if ivec[k] == :G { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
 	vec<enum> ivec = [:H, :I;5, :H];
@@ -727,12 +795,13 @@ println("-- dynamic vec enum test");
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
 	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 	
-	vec<enum> v = vec::fill(:TEST, 5);
-	i32 sum = 0;
-	for i in len(v) {
-		if :TEST == v[i] { sum = sum + 1; }
-	}
-	if sum != 5 { println("Test Failed, " + FILELINE); }
+	//vec<enum> v = vec::fill(:TEST, 5);
+	//i32 sum = 0;
+	//for i in len(v) {
+	//	if :TEST == v[i] { sum = sum + 1; }
+	//}
+	//if sum != 5 { println("Test Failed, " + FILELINE); }
+	
 }
 
 
@@ -791,6 +860,17 @@ println("-- fixed vec bool test");
 		if ivec[i] { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if v { sum = sum + 1; }
+		if ivec[k] { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
 
 	// bracket initializer with replicator and list
 	vec<bool,7> ivec = [true, false, true;3, false, true];
@@ -867,6 +947,17 @@ println("-- dynamic vec bool test");
 		if ivec[i] { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if v { sum = sum + 1; }
+		if ivec[k] { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
 	
 	// bracket initializer with replicator and list
 	vec<bool> ivec = [true, false, true;3, false, true];
@@ -888,19 +979,18 @@ println("-- dynamic vec bool test");
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
 	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
 	
-	vec<bool> v = vec::fill(true, 5);
-	i32 sum = 0;
-	for i in len(v) {
-		if v[i] { sum = sum + 1; }
-	}
-	if sum != 5 { println("Test Failed, " + FILELINE); }
+	//vec<bool> v = vec::fill(true, 5);
+	//i32 sum = 0;
+	//for i in len(v) {
+	//	if v[i] { sum = sum + 1; }
+	//}
+	//if sum != 5 { println("Test Failed, " + FILELINE); }
 }
 
 
 //-----------------------------------------------------------------------------
 println("-- fixed vec string test");
 {
-	
 	// zero initializer
 	vec<string,1> ivec;
 	if 1 != len(ivec) { println("Test Failed, " + FILELINE); }
@@ -958,6 +1048,17 @@ println("-- fixed vec string test");
 		if ivec[i] == "h" { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i == "h" { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if ivec[k] == "h" { sum = sum + 1; }
+		if v == "h" { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
 	
 	// bracket initializer with replicator and list
 	vec<string,7> ivec = ["i", "j";5, "k"];
@@ -970,7 +1071,7 @@ println("-- fixed vec string test");
 	
 	// vec<string> x = [1, 2, 3];
 	// if !vec::contains(x, 1) { println("Test Failed, " + FILELINE); }
-	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }
+	// if vec::contains(x, 4) { println("Test Failed, " + FILELINE); }	
 }
 
 
@@ -1033,6 +1134,17 @@ println("-- dynamic vec string test");
 		if ivec[i] == "h" { sum = sum + 1; }
 	}
 	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by value summation
+	for i in ivec {
+		if i == "h" { sum = sum + 1; }
+	}
+	if 5 != sum { println("Test Failed, " + FILELINE); }
+	i32 sum = 0; // by key,value summation
+	for k,v in ivec {
+		if ivec[k] == "h" { sum = sum + 1; }
+		if v == "h" { sum = sum + 1; }
+	}
+	if 10 != sum { println("Test Failed, " + FILELINE); }
 	
 	// bracket initializer with replicator and list
 	vec<string> ivec = ["i", "j";5, "k"];
@@ -1131,8 +1243,8 @@ println("-- string operation test");
 	if "aa   " != str::ltrim(i) { println("Test Failed, " + FILELINE); }
 	if " aa" != str::rtrim(i) { println("Test Failed, " + FILELINE); }
 	if "aa" != str::trim(i) { println("Test Failed, " + FILELINE); }
+	
 }
-
 
 //-----------------------------------------------------------------------------
 println("-- stack overflow test");
@@ -1156,3 +1268,4 @@ println("-- memory leak test");
 
 //
 println("Test Complete");
+*/

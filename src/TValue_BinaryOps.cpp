@@ -132,6 +132,12 @@ TValue TValue::Multiply(TValue rhs)
 			return lhs;
 		}
 	}
+	else if (LITERAL_TYPE_STRING == lhs_type && LITERAL_TYPE_INTEGER == rhs_type)
+	{
+		rhs.CastToInt(32);
+		llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__str_replicate"), { lhs.Value(), rhs.Value() }, "calltmp");
+		return TValue::MakeString(m_token, s);
+	}
 
 	Error(m_token, "Failed to multiply values.");
 	return NullInvalid();

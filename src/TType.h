@@ -71,7 +71,7 @@ public:
 	}
 	bool CanIndex()
 	{
-		return IsVecAny() || IsMap() || IsTuple();
+		return IsVecAny() || IsMap() || IsTuple() || IsString();
 	}
 
 	bool IsVecAny() { return m_literal_type == LITERAL_TYPE_VEC_DYNAMIC || m_literal_type == LITERAL_TYPE_VEC_FIXED; }

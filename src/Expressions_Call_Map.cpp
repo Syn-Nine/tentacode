@@ -38,8 +38,8 @@ TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			}
 			return TValue::NullInvalid();
 		}
-	}/*
-	else if (0 == name.compare("vec::contains"))
+	}
+	else if (0 == name.compare("map::contains"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
@@ -49,7 +49,7 @@ TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			std::string var = ve->Operator()->Lexeme();
 
 			TValue tval = env->GetVariable(callee, var);
-			if (tval.IsVecAny())
+			if (tval.IsMap())
 			{
 				TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
 				return tval.EmitContains(rhs);
@@ -60,8 +60,13 @@ TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, E
 				return TValue::NullInvalid();
 			}
 		}
-		}
-	else if (0 == name.compare("vec::fill"))
+		else
+		{
+			env->Error(callee, "Argument type mismatch.");
+			return TValue::NullInvalid();
+		}	
+	}
+	/*else if (0 == name.compare("vec::fill"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 

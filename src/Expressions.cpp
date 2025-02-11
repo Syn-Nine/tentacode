@@ -541,7 +541,7 @@ TValue VariableExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 		}
 		else if (!ret.CanIndex())
 		{
-			env->Error(m_token, "Variable can not be indexed.");
+			env->Error(m_token, "Variable cannot be indexed.");
 			return TValue::NullInvalid();
 		}
 

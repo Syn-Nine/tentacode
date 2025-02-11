@@ -69,6 +69,10 @@ extern "C" DLLEXPORT void ray_DrawTextureTileMap(Texture2D* in0, int32_t xx, int
     }
 }
 
+
+extern "C" DLLEXPORT void ray_DrawTextureProRGBA(Texture2D* in0, double in1a, double in1b, double in1c, double in1d, double in2a, double in2b, double in2c, double in2d, double in3a, double in3b, double in4, uint8_t rr, uint8_t gg, uint8_t bb, uint8_t aa) { DrawTexturePro(*in0, { float(in1a), float(in1b), float(in1c), float(in1d) }, { float(in2a), float(in2b), float(in2c), float(in2d) }, { float(in3a), float(in3b) }, in4, Color { rr, gg, bb, aa }); }
+
+
 extern "C" DLLEXPORT int32_t ray_ImagePeek(Image* in0, int32_t in1, int32_t in2, int32_t in3)
 {
     Image img = *in0;
@@ -1092,7 +1096,24 @@ static void LoadExtensions_Raylib(llvm::IRBuilder<>* builder, llvm::Module* modu
             LITERAL_TYPE_ENUM
             }, args, LITERAL_TYPE_INVALID), lexeme);
     }
-	{
+    {
+        std::vector<llvm::Type*> args;
+        args.push_back(builder->getPtrTy());
+        args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
+        args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
+        args.push_back(builder->getDoubleTy()); args.push_back(builder->getDoubleTy());
+        args.push_back(builder->getDoubleTy());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        args.push_back(builder->getInt32Ty());
+        llvm::FunctionType* FT = llvm::FunctionType::get(builder->getVoidTy(), args, false);
+        llvm::Function* ftn = llvm::Function::Create(FT, llvm::Function::InternalLinkage, "ray_DrawTextureProRGBA", *module);
+        std::string lexeme = "ray::DrawTextureProRGBA";
+        env->DefineFunction(TFunction::Construct_Internal(lexeme, ftn, { LITERAL_TYPE_POINTER, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_FLOAT, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER, LITERAL_TYPE_INTEGER }, args, LITERAL_TYPE_INVALID), lexeme);
+    }
+
+    {
 		std::vector<llvm::Type*> args;
 		args.push_back(builder->getPtrTy());
 		args.push_back(builder->getInt32Ty());
@@ -1297,6 +1318,7 @@ static Color StringToColor(const std::string& s)
 		enumMap.insert(std::make_pair(":BROWN", BROWN));
 		enumMap.insert(std::make_pair(":DARKBROWN", DARKBROWN));
 		enumMap.insert(std::make_pair(":WHITE", WHITE));
+        enumMap.insert(std::make_pair(":WHITE50", Color{ 255, 255, 255, 128 }));
 		enumMap.insert(std::make_pair(":BLACK", BLACK));
 		enumMap.insert(std::make_pair(":BLACK50", Color{ 0, 0, 0, 128 }));
 		enumMap.insert(std::make_pair(":BLANK", BLANK));
@@ -1308,6 +1330,7 @@ static Color StringToColor(const std::string& s)
         enumMap.insert(std::make_pair(":SHARKGRAY", Color{ 34, 32, 39, 255 }));
 		enumMap.insert(std::make_pair(":SLATEGRAY", Color{ 140, 173, 181, 255 }));
 		enumMap.insert(std::make_pair(":DARKSLATEGRAY", Color{ 67, 99, 107, 255 }));
+        enumMap.insert(std::make_pair(":BITTERSWEET", Color{ 254, 111, 94, 255 }));
 
 	}
 	if (0 != enumMap.count(s)) return enumMap.at(s);

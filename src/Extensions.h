@@ -93,7 +93,7 @@ extern "C" DLLEXPORT std::string* input()
 //-----------------------------------------------------------------------------
 extern "C" DLLEXPORT void __del_string(std::string* str)
 {
-	if (!str) return; // pointer never set, nothing to delete
+	if (0 == reinterpret_cast<int64_t>(str)) return; // pointer never set, nothing to delete
 
 	if (-1 == reinterpret_cast<int64_t>(str))
 	{
@@ -121,52 +121,6 @@ extern "C" DLLEXPORT std::string* __new_string_void()
 	return new std::string("");
 }
 
-extern "C" DLLEXPORT std::string* __string_cat(std::string* a, std::string* b)
-{
-	return new std::string(*a + *b);
-}
-
-extern "C" DLLEXPORT bool __str_cmp(std::string* a, std::string* b)
-{
-	return 0 == a->compare(*b);
-}
-
-extern "C" DLLEXPORT void __str_assign(std::string* a, std::string* b)
-{
-	*a = *b; // clone
-}
-
-extern "C" DLLEXPORT std::string* __bool_to_string(bool val)
-{
-	if (val) return new std::string("true");
-	return new std::string("false");
-}
-
-
-extern "C" DLLEXPORT std::string* __float_to_string(double val)
-{
-	return new std::string(std::to_string(val));
-}
-
-extern "C" DLLEXPORT std::string* __int_to_string(int64_t val)
-{
-	return new std::string(std::to_string(val));
-}
-
-extern "C" DLLEXPORT int64_t __str_to_int(std::string* a)
-{
-	return std::stol(*a);
-}
-
-extern "C" DLLEXPORT double __str_to_double(std::string* a)
-{
-	return std::stod(*a);
-}
-
-extern "C" DLLEXPORT int64_t __str_len(std::string* a)
-{
-	return a->length();
-}
 
 
 //-----------------------------------------------------------------------------
@@ -255,6 +209,16 @@ extern "C" DLLEXPORT void* __new_map(int64_t vtype, int32_t bits, int64_t span)
 {
 	LiteralTypeEnum vt = LiteralTypeEnum(vtype);
 	return new TMap(vt, bits, span);
+}
+
+extern "C" DLLEXPORT bool __map_contains_key_int(TMap* ptr, int64_t key)
+{
+	return ptr->ContainsKeyInt(key);
+}
+
+extern "C" DLLEXPORT bool __map_contains_key_string(TMap* ptr, std::string* key)
+{
+	return ptr->ContainsKeyString(*key);
 }
 
 extern "C" DLLEXPORT void __map_insert_int_key(TMap* ptr, int64_t key, void* data)
@@ -959,7 +923,71 @@ extern "C" DLLEXPORT void __file_writestring(std::string* filename, std::string*
 //-----------------------------------------------------------------------------
 // string
 
-// string utilities
+extern "C" DLLEXPORT std::string* __string_cat(std::string* a, std::string* b)
+{
+	if (b->empty()) return new std::string(*a);
+	//printf("str_cat: %s[%d], %s[%d]\n", a->c_str(), a->length(), b->c_str(), b->length());
+	return new std::string(*a + *b);
+}
+
+extern "C" DLLEXPORT std::string* __str_replicate(std::string* a, int32_t n)
+{
+	if (0 >= n) return new std::string();
+
+	std::string ret = *a;
+	for (size_t i = 0; i < n - 1; ++i)
+	{
+		ret.append(*a);
+	}
+	return new std::string(ret);
+}
+
+extern "C" DLLEXPORT bool __str_cmp(std::string* a, std::string* b)
+{
+	return 0 == a->compare(*b);
+}
+
+extern "C" DLLEXPORT void __str_assign(std::string* a, std::string* b)
+{
+	//printf("string assign: %s\n", b->c_str());
+	*a = *b; // clone
+}
+
+extern "C" DLLEXPORT std::string* __bool_to_string(bool val)
+{
+	if (val) return new std::string("true");
+	return new std::string("false");
+}
+
+
+extern "C" DLLEXPORT std::string* __float_to_string(double val)
+{
+	return new std::string(std::to_string(val));
+}
+
+extern "C" DLLEXPORT std::string* __int_to_string(int64_t val)
+{
+	return new std::string(std::to_string(val));
+}
+
+extern "C" DLLEXPORT int64_t __str_to_int(std::string* a)
+{
+	return std::stol(*a);
+}
+
+extern "C" DLLEXPORT double __str_to_double(std::string* a)
+{
+	return std::stod(*a);
+}
+
+extern "C" DLLEXPORT int64_t __str_len(std::string* a)
+{
+	if (0 == reinterpret_cast<int64_t>(a)) printf("attempting to get length of nullptr string\n");
+	if (-1 == reinterpret_cast<int64_t>(a)) printf("attempting to get length of deleted string\n");
+	return a->length();
+}
+
+
 extern "C" DLLEXPORT bool __str_contains(std::string* src, std::string* val)
 {
 	return std::string::npos != src->find(*val);
@@ -1016,6 +1044,9 @@ extern "C" DLLEXPORT std::string* __str_join_dyn_vec(TVec* srcPtr, std::string* 
 
 extern "C" DLLEXPORT std::string* __str_substr(std::string* src, int32_t idx, int32_t len)
 {
+	if (0 == reinterpret_cast<int64_t>(src)) printf("attempting to get length of nullptr string\n");
+	if (-1 == reinterpret_cast<int64_t>(src)) printf("attempting to get length of deleted string\n");
+	
 	if (idx < 0) idx += src->length();
 	if (idx < 0) idx = 0;
 	if (len < 0) return new std::string(src->substr(idx));
@@ -1126,7 +1157,10 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_split", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_join_dyn_vec", *module);
 	}
-
+	{	// ptr = ftn(ptr, i32)
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), { builder->getPtrTy(), builder->getInt32Ty() }, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_replicate", *module);
+	}
 	{	// ptr = ftn(ptr, ptr, i64)
 		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getPtrTy(), { builder->getPtrTy(), builder->getPtrTy(), builder->getInt64Ty() }, false);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_join_fixed_vec", *module);
@@ -1361,7 +1395,20 @@ static void LoadExtensions(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_len", *module);
 		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__str_len", *module);
 	}
-
+	{ // bool = f(ptr, i64)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getInt64Ty());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_contains_key_int", *module);
+	}
+	{ // bool = f(ptr, ptr)
+		std::vector<llvm::Type*> args;
+		args.push_back(builder->getPtrTy());
+		args.push_back(builder->getPtrTy());
+		llvm::FunctionType* FT = llvm::FunctionType::get(builder->getInt1Ty(), args, false);
+		llvm::Function::Create(FT, llvm::Function::InternalLinkage, "__map_contains_key_string", *module);
+	}
 	{
 		std::vector<llvm::Type*> args;
 		args.push_back(builder->getPtrTy());
