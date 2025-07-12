@@ -5,7 +5,7 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("vec::append"))
+	if (0 == name.compare("vec::append!"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
@@ -98,6 +98,11 @@ TValue CallExpr::codegen_vec(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			env->Error(callee, "Argument type mismatch.");
 			return TValue::NullInvalid();
 		}
+	}
+	else
+	{
+		env->Error(callee, "Function not found in namespace.");
+		return TValue::NullInvalid();
 	}
 	
 	return TValue::NullInvalid();

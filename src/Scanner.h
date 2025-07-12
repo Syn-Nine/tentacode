@@ -42,6 +42,7 @@ public:
 		m_keywordList.insert(std::make_pair("enum", TOKEN_VAR_ENUM));
 		m_keywordList.insert(std::make_pair("string", TOKEN_VAR_STRING));
 		m_keywordList.insert(std::make_pair("bool", TOKEN_VAR_BOOL));
+		m_keywordList.insert(std::make_pair("auto", TOKEN_VAR_AUTO));
 		m_keywordList.insert(std::make_pair("else", TOKEN_ELSE));
 		m_keywordList.insert(std::make_pair("if", TOKEN_IF));
 		m_keywordList.insert(std::make_pair("while", TOKEN_WHILE));

@@ -2,6 +2,7 @@
 #include "Environment.h"
 #include "TVec.h"
 #include "TStruct.h"
+#include "TFunction.h"
 
 #include "llvm/Support/Casting.h"
 
@@ -55,6 +56,7 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 
 	if (global)
 	{
+		llvm::Constant* nullval = llvm::Constant::getNullValue(defty);
 		defval = new llvm::GlobalVariable(*m_module, defty, false, llvm::GlobalValue::InternalLinkage, nullval, lexeme);
 		if (!defval) Error(ttype.GetToken(), "Failed to create global variable.");
 	}
@@ -78,7 +80,7 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 
 		if (ret.IsString())
 		{
-			llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp");
+			llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp_construct");
 			m_builder->CreateStore(s, defval);
 			Environment::AddToCleanup(ret);
 		}
@@ -95,9 +97,8 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 				for (size_t i = 0; i < len; ++i)
 				{
 					llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), defval, m_builder->getInt32(i), "geptmp");
-					llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), {}, "calltmp");
+					llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), {}, "calltmp_vecfixed_string");
 					m_builder->CreateStore(s, gep);
-					// to do - figure out how to clean up this string allocation
 				}
 			}
 
@@ -105,7 +106,7 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 			if (i0.IsUDT())
 			{
 				// construct internal strings
-				TStruct tstruc = Environment::GetStruct(ret.m_token, i0.GetToken()->Lexeme());
+				TStruct tstruc = Environment::GetStruct(ret.m_token, i0.GetLexeme());
 
 				std::vector<std::string>& member_names = tstruc.GetMemberNames();
 				std::vector<TType>& members = tstruc.GetMemberVec();
@@ -121,7 +122,7 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 						if (members[i].IsString())
 						{
 							llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), ret.m_value, { gep_idx, m_builder->getInt32(i) }, member_names[i] + "_init");
-							llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp");
+							llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp_vecfixed_udt");
 							m_builder->CreateStore(s, gep);
 						}
 					}
@@ -144,6 +145,8 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 					i++;
 				}
 			}
+
+			Environment::AddToCleanup(ret);
 		}
 		else if (ret.IsVecDynamic())
 		{
@@ -223,7 +226,7 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 		else if (ret.IsUDT())
 		{
 			// construct internal strings
-			TStruct tstruc = Environment::GetStruct(ret.m_token, ttype.GetToken()->Lexeme());
+			TStruct tstruc = Environment::GetStruct(ret.m_token, ttype.GetLexeme());
 
 			std::vector<std::string>& member_names = tstruc.GetMemberNames();
 			std::vector<TType>& members = tstruc.GetMemberVec();
@@ -237,53 +240,34 @@ TValue TValue::Construct(TType ttype, std::string lexeme, bool global, TValueLis
 				if (members[i].IsString())
 				{
 					llvm::Value* gep = m_builder->CreateGEP(ttype.GetTy(), ret.m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_init");
-					llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp");
+					llvm::Value* s = m_builder->CreateCall(m_module->getFunction("__new_string_void"), { }, "calltmp_udt");
 					m_builder->CreateStore(s, gep);
 				}
 			}
-			//Environment::AddToCleanup(ret);
+			Environment::AddToCleanup(ret);
 			ret.m_is_storage = false;
 		}
 
 		return ret;
 	}
-	
-	
-	/****
-	switch (token->GetType())
-	{
-	case TOKEN_VAR_VEC:
-		if (args && 2 == args->size())
-		{
-			if (!args->at(1))
-				return Construct_Vec_Dynamic(token, args, lexeme, global, targs);
-			else
-				return Construct_Vec_Fixed(token, args, lexeme, global, targs);
-		}
-		else
-		{
-			Error(token, "Expected vector arguments.");
-		}
-
-	case TOKEN_VAR_IMAGE: // intentional fall-through
-	case TOKEN_VAR_TEXTURE:
-	case TOKEN_VAR_FONT:
-	case TOKEN_VAR_SOUND:
-	case TOKEN_VAR_SHADER:
-	case TOKEN_VAR_RENDER_TEXTURE_2D:
-		return Construct_Pointer(token, lexeme, global);
-
-	case TOKEN_IDENTIFIER:
-		return Construct_Struct(token, lexeme, global);
-
-	default:
-		
-	}
-	*/
 
 	Error(ttype.GetToken(), "Invalid type in variable constructor.");
 
 	return TValue::NullInvalid();
+}
+
+
+//-----------------------------------------------------------------------------
+TValue TValue::Construct_Brace(Token* token, TValueList* targs)
+{
+	TValue ret;
+
+	ret.m_ttype = TType::Construct_Brace(token);
+	ret.m_token = token;
+	ret.m_brace_args = *targs;
+	ret.m_is_valid = true;
+	
+	return ret;
 }
 
 
@@ -312,6 +296,25 @@ TValue TValue::Construct_ConstInt(Token* token, std::string lexeme, Literal lit)
 	return NullInvalid();
 }
 
+
+//-----------------------------------------------------------------------------
+TValue TValue::Construct_Functor(TType ttype, const std::string& anon_sig, llvm::Function* func)
+{
+	// make a wrapper around an llvm pointer to a function
+	TValue ret;
+	ret.m_is_storage = true;
+	ret.m_ttype = ttype;
+	ret.m_token = ttype.GetToken();
+	llvm::Value* a = CreateEntryAlloca(m_builder, m_builder->getPtrTy(), nullptr, "alloctmp");
+	m_builder->CreateStore(func, a);
+	ret.m_value = a;
+	ret.m_functor_sig = anon_sig;
+	ret.m_is_valid = true;
+
+	//m_builder->CreateStore(s, defval);
+
+	return ret;
+}
 
 //-----------------------------------------------------------------------------
 TValue TValue::Construct_Reference(TType ttype, std::string lexeme, llvm::Value* ptr)

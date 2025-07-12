@@ -18,12 +18,79 @@ void TValue::Cleanup()
 		//m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
 		m_builder->CreateStore(m_builder->getInt64(-1), m_value, "dirty_ptr");
 	}
-	/****else if (LITERAL_TYPE_VEC_DYNAMIC == m_type)
+	else if (IsVecDynamic())
 	{
 		llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "tmpload");
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_delete"), { ptr }, "delvec");
-		m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
-	}*/
+		//m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
+		m_builder->CreateStore(m_builder->getInt64(-1), m_value, "dirty_ptr");
+	}
+	else if (IsUDT())
+	{
+		TStruct tstruc = Environment::GetStruct(m_token, m_ttype.GetLexeme());
+		std::vector<std::string>& member_names = tstruc.GetMemberNames();
+		std::vector<TType>& members = tstruc.GetMemberVec();
+		llvm::Value* gep_zero = m_builder->getInt32(0);
+
+		for (size_t i = 0; i < members.size(); ++i)
+		{
+			// todo - add support initialization of complex containers
+			// initialize empty strings
+			if (members[i].IsString())
+			{
+				llvm::Value* gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_init");
+				llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), gep, "tmpload");
+				//printf("attempting to delete: %llu\n", ptr);
+				m_builder->CreateCall(m_module->getFunction("__del_string"), { ptr }, "delstr");
+				//m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
+				m_builder->CreateStore(m_builder->getInt64(-1), m_value, "dirty_ptr");
+			}
+		}
+	}
+	else if (IsVecFixed())
+	{
+		TType i0 = m_ttype.GetInternal(0);
+		int len = m_ttype.GetFixedVecLen();
+
+		if (i0.IsString())
+		{
+			for (size_t i = 0; i < len; ++i)
+			{
+				llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), m_value, m_builder->getInt32(i), "geptmp");
+				llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), gep, "tmpload");
+				//printf("attempting to delete: %llu\n", ptr);
+				m_builder->CreateCall(m_module->getFunction("__del_string"), { ptr }, "delstr");
+				//m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
+				m_builder->CreateStore(m_builder->getInt64(-1), m_value, "dirty_ptr");
+			}
+		}
+		else if (i0.IsUDT())
+		{
+			return;
+			TStruct tstruc = Environment::GetStruct(m_token, m_ttype.GetLexeme());
+			std::vector<std::string>& member_names = tstruc.GetMemberNames();
+			std::vector<TType>& members = tstruc.GetMemberVec();
+			llvm::Value* gep_zero = m_builder->getInt32(0);
+
+			for (size_t j = 0; j < len; ++j)
+			{
+				llvm::Value* gep_idx = m_builder->getInt32(j);
+
+				for (size_t i = 0; i < members.size(); ++i)
+				{
+					if (members[i].IsString())
+					{
+						llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), m_value, { gep_idx, m_builder->getInt32(i) }, member_names[i] + "_init");
+						llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), gep, "tmpload");
+						//printf("attempting to delete: %llu\n", ptr);
+						m_builder->CreateCall(m_module->getFunction("__del_string"), { ptr }, "delstr");
+						//m_builder->CreateStore(llvm::Constant::getNullValue(m_builder->getPtrTy()), m_value, "nullify_ptr");
+						m_builder->CreateStore(m_builder->getInt64(-1), m_value, "dirty_ptr");
+					}
+				}
+			}
+		}
+	}
 }
 
 
@@ -86,7 +153,7 @@ void TValue::EmitMapInsert(TValue rhs)
 	TType i0 = m_ttype.GetInternal(0);
 	TType i1 = m_ttype.GetInternal(1);
 
-	llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "loadtmp");
+	llvm::Value* ptr = GetFromStorage().m_value;
 
 	if (i0.GetLiteralType() != key.GetLiteralType())
 	{
@@ -205,8 +272,15 @@ void TValue::EmitAppend(TValue rhs)
 	//if (rhs.IsFloat() && i0.IsInteger()) rhs = rhs.CastToInt(i0.NumBits());
 	//if (rhs.IsInteger() && i0.IsFloat()) rhs = rhs.CastToFloat(i0.NumBits());
 	
+	// mismatch check
+	if (rhs.GetLiteralType() != i0.GetLiteralType())
+	{
+		Error(rhs.GetToken(), "Cannot store mismatched type.");
+		return;
+	}
+	
 	// append
-	if (rhs.IsInteger() && i0.IsInteger())
+	if (rhs.IsInteger())
 	{
 		// match bitsize
 		//tmp = m_builder->CreateIntCast(tmp, i0.GetTy(), true, "int_cast");
@@ -215,7 +289,7 @@ void TValue::EmitAppend(TValue rhs)
 		else if (32 == bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_i32"), { ptr, tmp }, "calltmp");
 		else if (64 == bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_i64"), { ptr, tmp }, "calltmp");
 	}
-	else if (rhs.IsFloat() && i0.IsFloat())
+	else if (rhs.IsFloat())
 	{
 		// match bitsize
 		//tmp = m_builder->CreateFPCast(tmp, i0.GetTy(), "fp_cast");
@@ -223,22 +297,42 @@ void TValue::EmitAppend(TValue rhs)
 		if (32 == bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_f32"), { ptr, tmp }, "calltmp");
 		else if (64 == bits) m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_f64"), { ptr, tmp }, "calltmp");
 	}
-	else if (rhs.IsEnum() && i0.IsEnum())
+	else if (rhs.IsEnum())
 	{
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_enum"), { ptr, tmp }, "calltmp");
 	}
-	else if (rhs.IsBool() && i0.IsBool())
+	else if (rhs.IsBool())
 	{
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_bool"), { ptr, tmp }, "calltmp");
 	}
-	else if (rhs.IsString() && i0.IsString())
+	else if (rhs.IsString())
 	{
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_string"), { ptr, tmp }, "calltmp");
 	}
-	else if (rhs.GetLiteralType() != i0.GetLiteralType())
+	else if (rhs.IsUDT())
 	{
-		Error(rhs.GetToken(), "Cannot store mismatched type.");
-		return;
+		// returns memory address where data was copied to
+		llvm::Value* lhs_ptr = m_builder->CreateCall(m_module->getFunction("__dyn_vec_append_struct"), { ptr, i0.GetSzBytes(), tmp }, "calltmp");
+
+		// deep copy members if needed
+		TStruct tstruc = Environment::GetStruct(m_token, i0.GetLexeme());
+		std::vector<std::string>& member_names = tstruc.GetMemberNames();
+		std::vector<TType>& members = tstruc.GetMemberVec();
+		llvm::Value* gep_zero = m_builder->getInt32(0);
+
+		for (size_t i = 0; i < members.size(); ++i)
+		{
+			// todo - add support initialization of complex containers
+			// initialize empty strings
+			if (members[i].IsString())
+			{
+				llvm::Value* rhs_gep = m_builder->CreateGEP(i0.GetTy(), rhs.Value(), {gep_zero, m_builder->getInt32(i)}, member_names[i] + "_rhs");
+				llvm::Value* lhs_gep = m_builder->CreateGEP(i0.GetTy(), lhs_ptr, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_lhs");
+				llvm::Value* ptr = m_builder->CreateLoad(m_builder->getPtrTy(), rhs_gep, "tmpload");
+				tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { ptr }, "calltmp");
+				m_builder->CreateStore(tmp, lhs_gep);
+			}
+		}
 	}
 	else
 	{
@@ -463,20 +557,7 @@ TValue TValue::GetIterValue()
 			return TValue::MakeString(m_token, v);
 		}
 	}
-	else if (IsMap())
-	{
-		// make a temporary to hold the return value through a reference
-		TType i1 = m_ttype.GetInternal(1);
-		TValue temp = TValue::Construct(i1, "temp", false);
-		llvm::Value* tmp = temp.Value();
-		if (temp.IsUDT())
-		{
-			tmp = m_builder->CreateGEP(i1.GetTy(), tmp, { m_builder->getInt32(0) }, "geptmp");
-		}
-		m_builder->CreateCall(m_module->getFunction("__get_map_iter_val"), { ptr, tmp }, "calltmp");
-		return temp;
-	}
-
+	
 	return NullInvalid();
 }
 
@@ -533,9 +614,7 @@ TValue TValue::GetAtIndex(TValue idx)
 		{*/
 		llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), m_value, {idx.m_value}, "geptmp");
 		//llvm::Value* gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { idx.m_value }, "geptmp");
-		TValue ret = Construct(i0, "tmp", false);
-		ret.SetValue(gep);
-		return ret;
+		return Construct_Reference(i0, "tmp", gep);
 		//}
 	}
 	else if (m_ttype.IsVecDynamic())
@@ -544,9 +623,7 @@ TValue TValue::GetAtIndex(TValue idx)
 		m_builder->CreateCall(m_module->getFunction("__dyn_vec_assert_idx"), { dstPtr, idx.m_value }, "calltmp");
 		llvm::Value* dataPtr = m_builder->CreateCall(m_module->getFunction("__dyn_vec_data_ptr"), { dstPtr }, "calltmp");
 		llvm::Value* gep = m_builder->CreateGEP(i0.GetTy(), dataPtr, {idx.m_value}, "geptmp");
-		TValue ret = Construct(i0, "tmp", false);
-		ret.SetValue(gep);
-		return ret;
+		return Construct_Reference(i0, "tmp", gep);
 	}
 	else if (m_ttype.IsMap())
 	{
@@ -659,8 +736,8 @@ TValue TValue::GetStructVariable(Token* token, llvm::Value* vec_idx, const std::
 
 	llvm::Value* zero = m_builder->getInt32(0);
 
-	std::string udt_name = m_token->Lexeme();
-	if (IsVecAny()) udt_name = m_ttype.GetInternal(0).GetToken()->Lexeme();
+	std::string udt_name = m_ttype.GetLexeme(); //m_token->Lexeme();
+	if (IsVecAny()) udt_name = m_ttype.GetInternal(0).GetLexeme();//GetToken()->Lexeme();
 	
 	TStruct struc = Environment::GetStruct(m_token, udt_name);
 	if (!struc.IsValid()) return TValue::NullInvalid();
@@ -675,13 +752,13 @@ TValue TValue::GetStructVariable(Token* token, llvm::Value* vec_idx, const std::
 	llvm::Value* gep = nullptr;
 	if (vec_idx)
 	{
-		ret = TValue::Construct(ttype.GetInternal(0), "tmp", false);
 		gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_loc, vec_idx }, name);
+		ret = TValue::Construct_Reference(ttype.GetInternal(0), "tmp", gep);
 	}
 	else
 	{
-		ret = TValue::Construct(ttype, "tmp", false);
 		gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_loc }, name);
+		ret = TValue::Construct_Reference(ttype, "tmp", gep);
 	}
 
 	if (!gep)
@@ -689,7 +766,7 @@ TValue TValue::GetStructVariable(Token* token, llvm::Value* vec_idx, const std::
 		Error(m_token, "Failed to get structure variable.");
 	}
 
-	ret.SetValue(gep);
+	//ret.SetValue(gep);
 
 	return ret;
 }
@@ -721,7 +798,7 @@ void TValue::Store(TValue rhs)
 		Error(rhs.GetToken(), "Cannot store invalid value.");
 		return;
 	}
-	else if (GetLiteralType() != rhs.GetLiteralType() || GetTy() != rhs.GetTy())
+	else if (!IsTypeMatched(rhs.GetTType()))
 	{
 		/****if (IsVecAny() && rhs.IsVecAny())
 		{
@@ -741,12 +818,15 @@ void TValue::Store(TValue rhs)
 		{*/
 			//m_ty->print(llvm::errs());
 			//rhs.m_ty->print(llvm::errs());
+		if (!rhs.GetTType().IsBrace())
+		{
 			rhs = rhs.GetFromStorage().CastToMatchImplicit(*this);
 			if (!rhs.IsValid())
 			{
 				Error(rhs.GetToken(), "Cannot store mismatched type.");
 				return;
 			}
+		}
 		//}
 	}
 
@@ -755,8 +835,9 @@ void TValue::Store(TValue rhs)
 	case LITERAL_TYPE_INTEGER: // intentional fall-through
 	case LITERAL_TYPE_FLOAT:
 	case LITERAL_TYPE_ENUM:
-	case LITERAL_TYPE_POINTER:
 	case LITERAL_TYPE_BOOL:
+	case LITERAL_TYPE_POINTER:
+	case LITERAL_TYPE_FUNCTOR:
 	{
 		rhs = rhs.GetFromStorage();//.CastToMatchImplicit(*this);
 		m_builder->CreateStore(rhs.m_value, m_value);
@@ -771,7 +852,46 @@ void TValue::Store(TValue rhs)
 	}
 	case LITERAL_TYPE_SET:
 	{
-		if ((m_ttype.GetInternal(0).IsInteger() && rhs.m_ttype.GetInternal(0).IsInteger()) || (m_ttype.GetInternal(0).IsString() && rhs.m_ttype.GetInternal(0).IsString()))
+		if (rhs.m_ttype.IsBrace())
+		{
+			// clear out lhs set
+			TValue lhs = GetFromStorage(); // clone
+			//TType i0 = m_ttype.GetInternal(0);
+			m_builder->CreateCall(m_module->getFunction("__set_clear"), { lhs.m_value }, "calltmp");
+
+			TValueList args = rhs.GetBraceArgs();
+			for (size_t i = 0; i < args.size(); ++i)
+			{
+				lhs.EmitSetInsert(args[i]);
+				/*
+				// get the brace member from storage if required
+				TValue arg = args[i].GetFromStorage();
+
+				// if storage location and brace member are identical types, directly load
+				if (i0.IsTypeMatched(arg.GetTType()))
+				{
+					llvm::Value* tmp = arg.m_value;
+					// if arg is a string, clone it
+					if (i0.IsString())
+					{
+						m_builder->CreateCall(m_module->getFunction("__set_insert_string"), { lhs.m_value, tmp }, "calltmp");
+					}
+					else
+					{
+						m_builder->CreateCall(m_module->getFunction("__set_insert_int"), { lhs.m_value, tmp }, "calltmp");
+					}
+				}
+				else
+				{
+					// types are not identical, need to cast the brace member to the vec type
+					arg = arg.CastToMatchImplicit(i0);
+					if (!arg.IsValid()) return;
+					m_builder->CreateCall(m_module->getFunction("__set_insert_int"), { lhs.m_value, arg.m_value }, "calltmp");
+				}*/
+			}
+		}
+		//else if ((m_ttype.GetInternal(0).IsInteger() && rhs.m_ttype.GetInternal(0).IsInteger()) || (m_ttype.GetInternal(0).IsString() && rhs.m_ttype.GetInternal(0).IsString()))
+		else if (m_ttype.IsTypeMatched(rhs.GetTType()))
 		{
 			TValue lhs = *this; // clone
 			GetFromStorage(lhs, rhs);
@@ -786,16 +906,30 @@ void TValue::Store(TValue rhs)
 	}
 	case LITERAL_TYPE_MAP:
 	{
-		/*if ((m_ttype.GetInternal(0).IsInteger() && rhs.m_ttype.GetInternal(0).IsInteger()) || (m_ttype.GetInternal(0).IsString() && rhs.m_ttype.GetInternal(0).IsString()))
+		if (rhs.m_ttype.IsBrace())
 		{
-			TValue lhs = *this; // clone
-			GetFromStorage(lhs, rhs);
-			m_builder->CreateCall(m_module->getFunction("__map_assign"), { lhs.m_value, rhs.m_value }, "calltmp");
+			// clear out lhs map
+			TValue lhs = GetFromStorage(); // clone
+			//TType i0 = m_ttype.GetInternal(0);
+			m_builder->CreateCall(m_module->getFunction("__map_clear"), { lhs.m_value }, "calltmp");
+
+			TValueList args = rhs.GetBraceArgs();
+			for (size_t i = 0; i < args.size(); ++i)
+			{
+				lhs.EmitMapInsert(args[i]);
+			}
+		}
+		else if (m_ttype.IsTypeMatched(rhs.GetTType()))
+		{
+			//TValue lhs = *this; // clone
+			//GetFromStorage(lhs, rhs);
+			//m_builder->CreateCall(m_module->getFunction("__map_assign"), { lhs.m_value, rhs.m_value }, "calltmp");
 		}
 		else
 		{
-			Error(rhs.m_token, "Cannot store mismatched map types.");
-		}*/
+			Error(rhs.m_token, "Cannot store mismatched set types.");
+			return;
+		}
 		break;
 	}
 	case LITERAL_TYPE_VEC_DYNAMIC:
@@ -864,6 +998,50 @@ void TValue::Store(TValue rhs)
 			GetFromStorage(lhs, rhs);
 			m_builder->CreateCall(m_module->getFunction("__dyn_vec_replace"), { lhs.m_value, rhs.m_value }, "calltmp");
 		}
+		else if (rhs.m_ttype.IsBrace())
+		{
+			TValueList args = rhs.GetBraceArgs();
+			
+			// clear the lhs vector and pre-size it
+			TValue lhs = GetFromStorage(); // clone
+			llvm::Value* sz = m_builder->getInt64(args.size());
+			m_builder->CreateCall(m_module->getFunction("__dyn_vec_clear_presize"), { lhs.m_value, sz }, "calltmp");
+
+			// attempt to copy over each brace member to the dyn vec
+			llvm::Value* zero = m_builder->getInt32(0);
+			TType i0 = m_ttype.GetInternal(0);
+			llvm::Type* lhs_ty0 = i0.GetTy();
+			llvm::Value* dstPtr = m_builder->CreateLoad(m_builder->getPtrTy(), m_value, "loadtmp");
+			llvm::Value* dataPtr = m_builder->CreateCall(m_module->getFunction("__dyn_vec_data_ptr"), { dstPtr }, "calltmp");
+
+			for (size_t i = 0; i < args.size(); ++i)
+			{
+				llvm::Value* gep_idx = m_builder->getInt32(i);
+				llvm::Value* lhs_gep = m_builder->CreateGEP(lhs_ty0, dataPtr, { gep_idx }, "geptmp");
+
+				// get the brace member from storage if required
+				TValue arg = args[i].GetFromStorage();
+
+				// if storage location and brace member are identical types, directly load
+				if (i0.IsTypeMatched(arg.GetTType()))
+				{
+					llvm::Value* tmp = arg.m_value;
+					// if arg is a string, clone it
+					if (i0.IsString())
+					{
+						tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
+					}
+					m_builder->CreateStore(tmp, lhs_gep);
+				}
+				else
+				{
+					// types are not identical, need to cast the brace member to the vec type
+					arg = arg.CastToMatchImplicit(i0);
+					if (!arg.IsValid()) return;
+					m_builder->CreateStore(arg.m_value, lhs_gep);
+				}
+			}
+		}
 		else
 		{
 			Error(rhs.GetToken(), "Cannot assign to dynamic vector.");
@@ -883,12 +1061,11 @@ void TValue::Store(TValue rhs)
 			TValue lhs = *this;
 			GetFromStorage(lhs, rhs);
 			llvm::Value* zero = m_builder->getInt32(0);
+			llvm::Type* lhs_ty0 = m_ttype.GetInternal(0).GetTy();
+			llvm::Type* rhs_ty0 = rhs.m_ttype.GetInternal(0).GetTy();
 
 			if (m_ttype.GetTy() != rhs.m_ttype.GetTy())
 			{
-				llvm::Type* lhs_ty0 = m_ttype.GetInternal(0).GetTy();
-				llvm::Type* rhs_ty0 = rhs.m_ttype.GetInternal(0).GetTy();
-
 				for (size_t i = 0; i < m_ttype.GetFixedVecLen(); ++i)
 				{
 					llvm::Value* gep_idx = m_builder->getInt32(i);
@@ -927,9 +1104,71 @@ void TValue::Store(TValue rhs)
 			}
 			else
 			{
-				llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero }, "lhs_geptmp");
-				llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero }, "rhs_geptmp");
-				m_builder->CreateStore(m_builder->CreateLoad(m_ttype.GetTy(), rhs_gep), lhs_gep);
+				if (m_ttype.GetInternal(0).IsString())
+				{
+					// deep copy fixed vec of strings
+					for (size_t i = 0; i < m_ttype.GetFixedVecLen(); ++i)
+					{
+						llvm::Value* gep_idx = m_builder->getInt32(i);
+						llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_idx }, "lhs_geptmp");
+						llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero, gep_idx }, "rhs_geptmp");
+						llvm::Value* tmp = m_builder->CreateLoad(rhs_ty0, rhs_gep);
+
+						tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
+						m_builder->CreateStore(tmp, lhs_gep);
+					}
+				}
+				else
+				{
+					// clone memory
+					llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero }, "lhs_geptmp");
+					llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero }, "rhs_geptmp");
+					m_builder->CreateStore(m_builder->CreateLoad(m_ttype.GetTy(), rhs_gep), lhs_gep);
+				}
+			}
+		}
+		else if (rhs.m_ttype.IsBrace())
+		{
+			// is the brace set the same size as the vector?
+			TValueList args = rhs.GetBraceArgs();
+			if (args.size() != m_ttype.GetFixedVecLen())
+			{
+				Error(rhs.GetToken(), "Argument count mismatch in brace.");
+				return;
+			}
+
+			// attempt to copy over each brace member to the fixed vec
+			TValue lhs = GetFromStorage();
+			llvm::Value* zero = m_builder->getInt32(0);
+			TType i0 = m_ttype.GetInternal(0);
+			llvm::Type* lhs_ty0 = i0.GetTy();
+
+			for (size_t i = 0; i < m_ttype.GetFixedVecLen(); ++i)
+			{
+				llvm::Value* gep_idx = m_builder->getInt32(i);
+				llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_idx }, "lhs_geptmp");
+
+				// get the brace member from storage if required
+				TValue arg = args[i].GetFromStorage();
+
+				// if storage location and brace member are identical types, directly load
+				if (i0.IsTypeMatched(arg.GetTType()))
+				{
+					llvm::Value* tmp = arg.m_value;
+					// if arg is a string, clone it
+					if (i0.IsString())
+					{
+						tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
+					}
+					m_builder->CreateStore(tmp, lhs_gep);
+				}
+				else
+				{
+					// types are not identical, need to cast the brace member to the vec type
+					arg = arg.CastToMatchImplicit(i0);
+					if (!arg.IsValid()) return;
+					m_builder->CreateStore(arg.m_value, lhs_gep);
+				}
 			}
 		}
 		else if (rhs.m_ttype.IsVecDynamic())
@@ -947,32 +1186,77 @@ void TValue::Store(TValue rhs)
 	}
 	case LITERAL_TYPE_TUPLE:
 	{
-		if (m_ttype.GetTy() != rhs.m_ttype.GetTy())
+		if (IsTypeMatched(rhs.GetTType()))
+		{
+			llvm::Value* zero = m_builder->getInt32(0);
+
+			// copy in one go
+			llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero }, "lhs_geptmp");
+			llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero }, "rhs_geptmp");
+			m_builder->CreateStore(m_builder->CreateLoad(m_ttype.GetTy(), rhs_gep), lhs_gep);
+
+			// deep copy strings
+			for (size_t i = 0; i < m_ttype.GetInternalCount(); ++i)
+			{
+				TType i0 = m_ttype.GetInternal(i);
+				if (!i0.IsString()) continue;
+
+				llvm::Value* gep_idx = m_builder->getInt32(i);
+				llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_idx }, "lhs_geptmp");
+				llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero, gep_idx }, "rhs_geptmp");
+
+				llvm::Value* tmp = m_builder->CreateLoad(i0.GetTy(), rhs_gep);
+				tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
+				m_builder->CreateStore(tmp, lhs_gep);
+			}
+		}
+		else if (rhs.m_ttype.IsBrace())
+		{
+			// is the brace set the same size as the tuple?
+			TValueList args = rhs.GetBraceArgs();
+			if (args.size() != m_ttype.GetInternalCount())
+			{
+				Error(rhs.GetToken(), "Argument count mismatch in brace.");
+				return;
+			}
+
+			// attempt to copy over each brace member to the fixed vec
+			llvm::Value* zero = m_builder->getInt32(0);
+			
+			for (size_t i = 0; i < m_ttype.GetInternalCount(); ++i)
+			{
+				llvm::Value* gep_idx = m_builder->getInt32(i);
+				llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_idx }, "lhs_geptmp");
+				
+				TType i0 = m_ttype.GetInternal(i);
+				
+				// get the brace member from storage if required
+				TValue arg = args[i].GetFromStorage();
+
+				// if storage location and brace member are identical types, directly load
+				if (i0.IsTypeMatched(arg.GetTType()))
+				{
+					llvm::Value* tmp = arg.m_value;
+					// if arg is a string, clone it
+					if (i0.IsString())
+					{
+						tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
+					}
+					m_builder->CreateStore(tmp, lhs_gep);
+				}
+				else
+				{
+					// types are not identical, need to cast the brace member to the vec type
+					arg = arg.CastToMatchImplicit(i0);
+					if (!arg.IsValid()) return;
+					m_builder->CreateStore(arg.m_value, lhs_gep);
+				}
+			}
+		}
+		else
 		{
 			Error(rhs.GetToken(), "Mismatched tuple types.");
 			return;
-		}
-
-		llvm::Value* zero = m_builder->getInt32(0);
-		
-		// copy in one go
-		llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero }, "lhs_geptmp");
-		llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero }, "rhs_geptmp");
-		m_builder->CreateStore(m_builder->CreateLoad(m_ttype.GetTy(), rhs_gep), lhs_gep);
-
-		// deep copy strings
-		for (size_t i = 0; i < m_ttype.GetInternalCount(); ++i)
-		{
-			TType i0 = m_ttype.GetInternal(i);
-			if (!i0.IsString()) continue;
-			
-			llvm::Value* gep_idx = m_builder->getInt32(i);
-			llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { zero, gep_idx }, "lhs_geptmp");
-			llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { zero, gep_idx }, "rhs_geptmp");
-
-			llvm::Value* tmp = m_builder->CreateLoad(i0.GetTy(), rhs_gep);
-			tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
-			m_builder->CreateStore(tmp, lhs_gep);
 		}
 
 		break;
@@ -986,11 +1270,43 @@ void TValue::Store(TValue rhs)
 
 		llvm::Value* gep_zero = m_builder->getInt32(0);
 
+		// if right side is a brace, check argument size
+		TValueList args = rhs.GetBraceArgs();
+		if (rhs.GetTType().IsBrace() && args.size() != members.size())
+		{
+			Error(rhs.GetToken(), "Argument count mismatch in brace.");
+			return;
+		}
+
+		// matched types, one for one copy
 		for (size_t i = 0; i < members.size(); ++i)
 		{
-			llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { gep_zero, m_builder->getInt32(i)}, member_names[i] + "_lhs");
-			llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_rhs");
-			llvm::Value* tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
+			// where we're going
+			llvm::Value* lhs_gep = m_builder->CreateGEP(m_ttype.GetTy(), m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_lhs");
+			llvm::Value* tmp;
+
+			if (rhs.GetTType().IsBrace())
+			{
+				TValue arg = args[i].GetFromStorage();
+
+				// attempt to cast rhs to match lhs
+				if (members[i].GetLiteralType() != arg.GetLiteralType() || members[i].GetTy() != arg.GetTy())
+				{
+					arg = arg.CastToMatchImplicit(members[i]);
+					if (!arg.IsValid())
+					{
+						Error(arg.GetToken(), "Incompatible type in brace.");
+						return;
+					}
+				}
+				tmp = arg.Value();
+			}
+			else
+			{
+				llvm::Value* rhs_gep = m_builder->CreateGEP(rhs.m_ttype.GetTy(), rhs.m_value, { gep_zero, m_builder->getInt32(i) }, member_names[i] + "_rhs");
+				tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
+			}
+			
 			if (!tmp)
 			{
 				Error(rhs.GetToken(), "Failed to load from member data.");
@@ -1003,6 +1319,8 @@ void TValue::Store(TValue rhs)
 				tmp = m_builder->CreateCall(m_module->getFunction("__new_string_from_string"), { tmp }, "calltmp");
 			}
 
+			// copy members one by one
+			// todo - make this a memcpy
 			m_builder->CreateStore(tmp, lhs_gep);
 		}
 		break;
@@ -1194,4 +1512,11 @@ void TValue::StoreAtIndex(TValue idx, TValue rhs)
 		Error(m_token, "Failed to store into vector index.");
 	}
 
+}
+
+
+//-----------------------------------------------------------------------------
+void TValue::StoreLLVMValue(llvm::Value* val)
+{
+	m_builder->CreateStore(val, m_value);
 }

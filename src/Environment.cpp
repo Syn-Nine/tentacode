@@ -9,9 +9,13 @@ std::vector<Environment*> Environment::m_stack;
 int Environment::m_debugLevel = 0;
 ErrorHandler* Environment::m_errorHandler = nullptr;
 
-std::map<std::string, TFunction> Environment::m_func;
-std::map<std::string, TStruct> Environment::m_struc;
+std::map<std::string, Environment::FuncMap> Environment::m_ns_func;
+std::map<std::string, Environment::StrucMap> Environment::m_ns_struc;
 
+llvm::SmallVector<std::string> Environment::m_namespace;
+std::string Environment::m_fqns;
+
+Environment::FuncMap Environment::m_anon_func;
 
 
 //-----------------------------------------------------------------------------

@@ -6,8 +6,10 @@ llvm::IRBuilder<>* TFunction::m_builder = nullptr;
 llvm::Module* TFunction::m_module = nullptr;
 
 
+
 //-----------------------------------------------------------------------------
 TFunction TFunction::Construct_Internal(
+	std::string fqns,
 	std::string lexeme,
 	llvm::Function* ftn,
 	std::vector<LiteralTypeEnum> types,
@@ -15,6 +17,7 @@ TFunction TFunction::Construct_Internal(
 	LiteralTypeEnum rettype)
 {
 	TFunction ret;
+	ret.m_fqns = fqns;
 	ret.m_body = nullptr;
 	ret.m_llvm_func = ftn;
 	ret.m_internal = true;
@@ -112,13 +115,14 @@ TFunction TFunction::Construct_Internal(
 
 
 //-----------------------------------------------------------------------------
-TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList types, TokenList params, std::vector<bool> mut, void* bodyPtr)
+TFunction TFunction::Construct_Prototype(std::string fqns, Token* name, TypeToken* rettype, TypeTokenList types, TokenList params, std::vector<bool> mut, std::vector<Expr*> defaults, void* bodyPtr)
 {
 	TFunction ret;
 	std::vector<llvm::Type*> args;
 
-	TType retType = TType::Construct(rettype, nullptr);
 
+	TType retType = rettype ? TType::Construct(rettype->type, rettype->args) : TType::Construct(nullptr, nullptr);
+	
 	if (retType.IsValid())
 	{
 		retType.SetReference();
@@ -132,8 +136,8 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 	// all parameters are passed by const reference unless specified
 	for (size_t i = 0; i < params.size(); ++i)
 	{
-		Token* type_clone = new Token(types[i]);
-		TType t = TType::Construct(type_clone, nullptr);
+		Token* type_clone = new Token(*types[i].type);
+		TType t = TType::Construct(type_clone, types[i].args);
 		if (!t.IsValid()) { delete type_clone; return TFunction(); }
 		t.SetReference();
 		if (!mut[i]) t.SetConstant();
@@ -146,6 +150,7 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 	// create type definition and link
 	llvm::FunctionType* FT = llvm::FunctionType::get(m_builder->getVoidTy(), args, false);
 
+	ret.m_llvm_ft = FT;
 	ret.m_llvm_func = llvm::Function::Create(FT, llvm::Function::InternalLinkage, name->Lexeme(), *m_module);
 	if (!ret.m_llvm_func)
 	{
@@ -153,7 +158,46 @@ TFunction TFunction::Construct_Prototype(Token* name, Token* rettype, TokenList 
 		return TFunction();
 	}
 
+	size_t num_defaults = 0;
+	for (size_t i = 0; i < defaults.size(); ++i)
+	{
+		if (defaults[i])
+		{
+			num_defaults++;
+		}
+		else
+		{
+			if (0 < num_defaults)
+			{
+				Environment::Error(name, "Missing default arguments.");
+				return TFunction();
+			}
+		}
+	}
+	ret.m_num_defaults = num_defaults;
+	ret.m_defaults = defaults;
 	ret.m_name = name;
+	ret.m_body = bodyPtr;
+	ret.m_fqns = fqns;
+	ret.m_valid = true;
+
+	return ret;
+}
+
+
+//-----------------------------------------------------------------------------
+TFunction TFunction::Construct_AnonPrototype(const std::string& sig, void* bodyPtr)
+{
+	TFunction ret;
+	std::vector<llvm::Type*> args;
+
+	// create type definition and link
+	llvm::FunctionType* FT = llvm::FunctionType::get(m_builder->getVoidTy(), args, false);
+
+	ret.m_llvm_ft = FT;
+	ret.m_llvm_func = llvm::Function::Create(FT, llvm::Function::InternalLinkage, sig, *m_module);
+	if (!ret.m_llvm_func) return TFunction();
+	
 	ret.m_body = bodyPtr;
 	ret.m_valid = true;
 
@@ -170,7 +214,7 @@ void TFunction::Construct_Body()
 	m_builder->SetInsertPoint(body);
 
 	Environment* sub_env = Environment::Push();
-	sub_env->SetParentFunction(m_name, m_name->Lexeme());
+	sub_env->SetParentFunction(this);
 
 	// all variables come in as references
 	int i = 0;
@@ -187,55 +231,17 @@ void TFunction::Construct_Body()
 		i = i + 1;
 	}
 
-	/****
-	// make local variables 
-	int i = 0;
-	for (auto& arg : ftn->args())
-	{
-		TValue v = m_param_types[i];
-		if (v.IsUDT() && (!m_has_return_ref || 0 < i))
-		{
-			llvm::Type* defty = v.GetTy();
-			llvm::Value* defval = CreateEntryAlloca(m_builder, defty, nullptr, m_param_names[i]);
-
-			TStruct tstruc = Environment::GetStruct(v.GetToken(), v.GetToken()->Lexeme());
-
-			std::vector<std::string>& member_names = tstruc.GetMemberNames();
-			std::vector<TValue>& members = tstruc.GetMemberVec();
-
-			llvm::Value* gep_zero = m_builder->getInt32(0);
-
-			for (size_t i = 0; i < members.size(); ++i)
-			{
-				llvm::Value* lhs_gep = m_builder->CreateGEP(v.GetTy(), defval, { gep_zero, m_builder->getInt32(i) }, member_names[i]);
-				llvm::Value* rhs_gep = m_builder->CreateGEP(v.GetTy(), &arg, { gep_zero, m_builder->getInt32(i) }, member_names[i]);
-				llvm::Value* tmp = m_builder->CreateLoad(members[i].GetTy(), rhs_gep);
-				// shallow copy
-				m_builder->CreateStore(tmp, lhs_gep);
-			}
-			v.SetValue(defval);
-		}
-		else
-		{
-			llvm::Type* defty = arg.getType();
-			llvm::Value* defval = CreateEntryAlloca(m_builder, defty, nullptr, m_param_names[i]);
-			m_builder->CreateStore(&arg, defval);
-			v.SetValue(defval);
-			v.SetStorage(true);
-		}
-		sub_env->DefineVariable(v, m_param_names[i]);
-		i = i + 1;
-	}*/
-
-	StmtList* stmtBody = static_cast<StmtList*>(m_body);
 
 	bool found_return = false;
 
-	for (auto& statement : *stmtBody)
+	// this will get skipped if body is not set and result in a noop
+	if (m_body)
 	{
-		if (Environment::HasErrors()) break;
-		if (STATEMENT_FUNCTION != statement->GetType())
+		StmtList* stmtBody = static_cast<StmtList*>(m_body);
+
+		for (auto& statement : *stmtBody)
 		{
+			if (Environment::HasErrors()) break;
 			TValue v = statement->codegen(m_builder, m_module, sub_env);
 			if (STATEMENT_RETURN == statement->GetType()) found_return = true;
 		}
@@ -247,6 +253,8 @@ void TFunction::Construct_Body()
 	m_builder->CreateBr(tail);
 	m_builder->SetInsertPoint(tail);
 	
+	// todo - fill in zeroinitialized return value if body is a noop
+
 	if (m_has_return_ref && !found_return)
 	{
 		Environment::Error(m_name, "Function requires a return value.");

@@ -39,7 +39,7 @@ TValue TValue::Add(TValue rhs)
 		}
 	}
 
-	Error(m_token, "Failed to add values.");
+	Error(rhs.GetToken(), "Failed to add values.");
 	return NullInvalid();
 }
 
@@ -83,7 +83,6 @@ TValue TValue::Modulus(TValue rhs)
 
 	bool matched = lhs_type == rhs_type;
 
-	// type specific addition
 	if (LITERAL_TYPE_INTEGER == lhs_type && matched)
 	{
 		lhs = lhs.CastToInt(64);
@@ -95,6 +94,18 @@ TValue TValue::Modulus(TValue rhs)
 			return lhs;
 		}
 	}
+	else if (LITERAL_TYPE_FLOAT	== lhs_type && matched)
+	{
+		lhs = lhs.CastToFloat(64);
+		rhs = rhs.CastToFloat(64);
+
+		if (lhs.IsValid() && rhs.IsValid())
+		{
+			lhs.m_value = m_builder->CreateCall(m_module->getFunction("__modf_impl"), { lhs.m_value, rhs.m_value }, "calltmp");
+			return lhs;
+		}
+	}
+
 
 	Error(m_token, "Failed to take modulus.");
 	return NullInvalid();
@@ -156,7 +167,7 @@ TValue TValue::Power(TValue rhs)
 
 	bool matched = lhs_type == rhs_type;
 
-	// type specific addition
+	// integer specific power
 	if (LITERAL_TYPE_INTEGER == lhs_type && matched)
 	{
 		lhs = lhs.CastToInt(64);
@@ -167,15 +178,14 @@ TValue TValue::Power(TValue rhs)
 			return lhs;
 		}
 	}
-	else if (LITERAL_TYPE_FLOAT == lhs_type && matched)
+	
+	// else
+	lhs = lhs.CastToFloat(64);
+	rhs = rhs.CastToFloat(64);
+	if (lhs.IsValid() && rhs.IsValid())
 	{
-		lhs = lhs.CastToFloat(64);
-		rhs = rhs.CastToFloat(64);
-		if (lhs.IsValid() && rhs.IsValid())
-		{
-			lhs.m_value = m_builder->CreateCall(m_module->getFunction("__powf_impl"), { lhs.m_value, rhs.m_value }, "calltmp");
-			return lhs;
-		}
+		lhs.m_value = m_builder->CreateCall(m_module->getFunction("__powf_impl"), { lhs.m_value, rhs.m_value }, "calltmp");
+		return lhs;
 	}
 
 	Error(m_token, "Failed to raise value to power.");

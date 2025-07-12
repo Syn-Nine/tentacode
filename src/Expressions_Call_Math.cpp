@@ -57,7 +57,10 @@ TValue CallExpr::codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, 
 		0 == name.compare("ceil") ||
 		0 == name.compare("round") ||
 		0 == name.compare("fract") ||
-		0 == name.compare("sqrt"))
+		0 == name.compare("sqrt") ||
+		0 == name.compare("log") ||
+		0 == name.compare("log10") ||
+		0 == name.compare("exp"))
 	{
 		if (!CheckArgSize(1)) return TValue::NullInvalid();
 
@@ -103,11 +106,12 @@ TValue CallExpr::codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, 
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
-		TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage().CastToFloat(64);
-		TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage().CastToFloat(64);
+		TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
+		TValue rhs = m_arguments[1]->codegen(builder, module, env).GetFromStorage();
 		if (!lhs.IsValid()) return TValue::NullInvalid();
 		if (!rhs.IsValid()) return TValue::NullInvalid();
-		return TValue::MakeFloat(callee, 64, builder->CreateCall(module->getFunction(name), { lhs.Value(), rhs.Value() }, "calltmp"));
+
+		return lhs.Power(rhs);
 	}	
 	if (0 == name.compare("min") ||
 		0 == name.compare("max"))
@@ -142,9 +146,9 @@ TValue CallExpr::codegen_math(llvm::IRBuilder<>* builder, llvm::Module* module, 
 			lhs = lhs.CastToFloat(64);
 			rhs = rhs.CastToFloat(64);
 			if (0 == name.compare("min"))
-				return TValue::MakeInt(callee, 64, builder->CreateCall(module->getFunction("__minf_impl"), { lhs.Value(), rhs.Value() }, "calltmp"));
+				return TValue::MakeFloat(callee, 64, builder->CreateCall(module->getFunction("__minf_impl"), { lhs.Value(), rhs.Value() }, "calltmp"));
 			else
-				return TValue::MakeInt(callee, 64, builder->CreateCall(module->getFunction("__maxf_impl"), { lhs.Value(), rhs.Value() }, "calltmp"));
+				return TValue::MakeFloat(callee, 64, builder->CreateCall(module->getFunction("__maxf_impl"), { lhs.Value(), rhs.Value() }, "calltmp"));
 		}
 		else
 		{

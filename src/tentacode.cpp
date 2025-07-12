@@ -35,6 +35,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,8 +67,10 @@ bool Run(const char* buf, const char* filename)
 
 		// push global environment
 		Environment* env = Environment::Push();
+		env->PushNamespace("global");
 		env->RegisterErrorHandler(errorHandler);
 
+		
 		TValue::RegisterErrorHandler(errorHandler);
 		TValue::RegisterLLVM(builder.get(), module.get());
 		TFunction::RegisterLLVM(builder.get(), module.get());
@@ -78,6 +81,16 @@ bool Run(const char* buf, const char* filename)
 		LoadExtensions_Raylib(builder.get(), module.get(), env);
 
 		if (2 <= Environment::GetDebugLevel()) printf("\nWalking AST...\n");
+
+		// walk constants
+		for (auto& statement : stmts)
+		{
+			if (env->HasErrors()) break;
+			if (STATEMENT_VAR_CONST == statement->GetType())
+			{
+				statement->codegen(builder.get(), module.get(), env);
+			}
+		}
 
 		// walk function and struct definitions
 		for (auto& statement : stmts)
@@ -94,6 +107,25 @@ bool Run(const char* buf, const char* filename)
 			}
 		}
 
+		// create anonymous function prototypes
+		std::map<std::string, StmtList*> anon_sigs = parser.GetAnonFunctors();
+		for (auto& v : anon_sigs)
+		{
+			std::string sig = v.first;
+			TFunction func = env->GetAnonFunction(sig);
+			if (!func.IsValid())
+			{
+				// need to build
+				func = TFunction::Construct_AnonPrototype(sig, v.second);
+				if (!func.IsValid())
+				{
+					env->Error(nullptr, "Failed to build anonymous prototype.");
+				}
+				env->DefineAnonFunction(func, sig);
+			}
+		}
+
+		
 		llvm::FunctionType* funcType = llvm::FunctionType::get(builder->getVoidTy(), {}, false);
 		llvm::Function* mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, "jit_main", module.get());
 		llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context, "entry", mainFunc);
@@ -102,16 +134,22 @@ bool Run(const char* buf, const char* filename)
 		// push main ftn environment
 		Environment::Push();
 
+		
 		// walk main code
 		for (auto& statement : stmts)
 		{
 			if (env->HasErrors()) break;
-			if (STATEMENT_FUNCTION != statement->GetType() && STATEMENT_STRUCT != statement->GetType())
+			StatementTypeEnum type = statement->GetType();
+			if (STATEMENT_VAR_CONST == type || STATEMENT_FUNCTION == type || STATEMENT_STRUCT == type)
 			{
-				statement->codegen(builder.get(), module.get(), env);
+				// already done
+				continue;
 			}
+			
+			statement->codegen(builder.get(), module.get(), env);
 		}
 
+		
 		// pop main ftn environment
 		Environment::Pop();
 
@@ -128,7 +166,17 @@ bool Run(const char* buf, const char* filename)
 			}
 		}
 
+		// fill in anonymous function bodies
+		for (auto& v : anon_sigs)
+		{
+			if (env->HasErrors()) break;
+			std::string sig = v.first;
+			TFunction func = env->GetAnonFunction(sig);
+			if (func.IsValid()) func.Construct_Body();
+		}
+
 		// pop global environment
+		env->PopNamespace();
 		Environment::Pop();
 
 		if (1 <= Environment::GetDebugLevel())
@@ -172,7 +220,7 @@ int main(int nargs, char* argsv[])
 	llvm::InitializeNativeTargetAsmPrinter();
 	llvm::InitializeNativeTargetAsmParser();
 
-	const char* version = "0.2.1";
+	const char* version = "0.4.0";
 	printf("Launching Tentacode JIT Compiler v%s\n", version);
 
 	Environment::SetDebugLevel(0);
@@ -233,5 +281,7 @@ int main(int nargs, char* argsv[])
 		printf("\nOutput:\n");
 		FP();
 	}
+
+	//std::getchar();
 
 }

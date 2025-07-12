@@ -11,6 +11,8 @@
 #include "Literal.h"
 #include "Token.h"
 
+class TFunction;
+
 class TType
 {
 public:
@@ -37,6 +39,7 @@ public:
 	static TType Construct_Bool(Token* token);
 	static TType Construct_Enum(Token* token);
 	static TType Construct_Float(Token* token, int bits);
+	static TType Construct_Functor(Token* token);
 	static TType Construct_Int(Token* token, int bits);
 	static TType Construct_String(Token* token);
 	static TType Construct_Map(Token* token, TokenPtrList* args);
@@ -45,6 +48,7 @@ public:
 	static TType Construct_Vec(Token* token, TokenPtrList* args);
 	static TType Construct_Ptr(Token* token);
 	static TType Construct_Struct(Token* token);
+	static TType Construct_Brace(Token* token);
 
 
 	bool IsBool() { return m_literal_type == LITERAL_TYPE_BOOL; }
@@ -59,6 +63,8 @@ public:
 	bool IsSet() { return m_literal_type == LITERAL_TYPE_SET; }
 	bool IsTuple() { return m_literal_type == LITERAL_TYPE_TUPLE; }
 	bool IsUDT() { return m_literal_type == LITERAL_TYPE_UDT; }
+	bool IsFunctor() { return m_literal_type == LITERAL_TYPE_FUNCTOR; }
+	bool IsBrace() { return m_literal_type == LITERAL_TYPE_BRACE; }
 
 	bool CanIterate() {
 		return m_literal_type == LITERAL_TYPE_VEC_DYNAMIC ||
@@ -73,15 +79,20 @@ public:
 	{
 		return IsVecAny() || IsMap() || IsTuple() || IsString();
 	}
+	bool CanCast(TType val);
 
 	bool IsVecAny() { return m_literal_type == LITERAL_TYPE_VEC_DYNAMIC || m_literal_type == LITERAL_TYPE_VEC_FIXED; }
 
 	bool IsValid() const { return m_is_valid; }
 	bool IsConstant() const { return m_is_constant; }
 	bool IsReference() const { return m_is_reference; }
+	bool IsTypeMatched(TType val);
+
+	void RemoveConstant() { m_is_constant = false; }
 	void SetConstant() { m_is_constant = true; }
 	void SetReference() { m_is_reference = true; }
 
+	std::string GetLexeme() { return m_lexeme; }
 	Token* GetToken() { return m_token; }
 	llvm::Type* GetTy() { return m_ty; }
 	LiteralTypeEnum GetLiteralType() { return m_literal_type; }
@@ -93,7 +104,6 @@ public:
 	int GetInternalCount() { return m_inner_types.size(); }
 	
 	size_t GetFixedVecLen() const { return m_vec_sz; }
-
 
 	/****
 	//bool IsPointer()    { return m_literal_type == LITERAL_TYPE_POINTER; }

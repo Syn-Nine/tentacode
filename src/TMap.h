@@ -40,6 +40,23 @@ public:
 		m_data = nullptr;*/
 	}
 
+	void Clear()
+	{
+		if (m_empty) return;
+		m_empty = true;
+
+		if (m_is_integer)
+		{
+			if (16 == m_bits) m_map16.clear();
+			else if (32 == m_bits) m_map32.clear();
+			else if (64 == m_bits) m_map64.clear();
+		}
+		else
+		{
+			m_mapStr.clear();
+		}
+	}
+
 	bool ContainsKeyInt(int64_t key)
 	{
 		//printf("testing map for key: %ll\n", key);
@@ -113,74 +130,48 @@ public:
 	int16_t GetIterKey_i16()
 	{
 		auto x = *m_map16_iter;
+		if (m_iter < Size())
+		{
+			++m_iter;
+			++m_map16_iter;
+		}
 		return x.first;
 	}
 
 	int32_t GetIterKey_i32()
 	{
 		auto x = *m_map32_iter;
+		if (m_iter < Size())
+		{
+			++m_iter;
+			++m_map32_iter;
+		}
 		return x.first;
 	}
 
 	int64_t GetIterKey_i64()
 	{
 		auto x = *m_map64_iter;
+		if (m_iter < Size())
+		{
+			++m_iter;
+			++m_map64_iter;
+		}
 		return x.first;
 	}
 
 	std::string GetIterKey_str()
 	{
 		auto x = *m_mapStr_iter;
+		if (m_iter < Size())
+		{
+			++m_iter;
+			++m_mapStr_iter;
+		}
 		return x.first;
 	}
 
-	void* GetIterValue()
-	{
-		if (m_is_integer)
-		{
-			if (16 == m_bits)
-			{
-				auto x = *m_map16_iter;
-				if (m_iter < Size())
-				{
-					++m_iter;
-					++m_map16_iter;
-				}
-				return x.second;
-			}
-			else if (32 == m_bits)
-			{
-				auto x = *m_map32_iter;
-				if (m_iter < Size())
-				{
-					++m_iter;
-					++m_map32_iter;
-				}
-				return x.second;
-			}
-			else if (64 == m_bits)
-			{
-				auto x = *m_map64_iter;
-				if (m_iter < Size())
-				{
-					++m_iter;
-					++m_map64_iter;
-				}
-				return x.second;
-			}
-		}
-		else
-		{
-			auto x = *m_mapStr_iter;
-			if (m_iter < Size())
-			{
-				++m_iter;
-				++m_mapStr_iter;
-			}
-			return x.second;
-		}
-	}
-
+	
 	void GetAtInt(int64_t idx, void* dst)
 	{
 		assert(m_is_integer);

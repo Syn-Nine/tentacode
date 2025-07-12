@@ -59,13 +59,16 @@ public:
 	Token* GetToken() { return m_token; }
 	TType GetTType() { return m_ttype; }
 	llvm::Value* GetPtrToStorage();
+	std::string GetFunctorSig() { return m_functor_sig; }
 	//TValue GetPairLhs() { return *m_pair_lhs; }
 	//TValue GetPairRhs() { return *m_pair_rhs; }
 
 	static TValue Construct(TType ttype, std::string lexeme, bool global, TValueList* targs = nullptr);
+	static TValue Construct_Brace(Token* token, TValueList* targs);
 	static TValue Construct_ConstInt(Token* type, std::string lexeme, Literal lit);
 	static TValue Construct_Reference(TType ttype, std::string lexeme, llvm::Value* ptr);
 	static TValue Construct_Pair(TValue lhs, TValue rhs);
+	static TValue Construct_Functor(TType ttype, const std::string& anon_sig, llvm::Function* ptr);
 	
 	// type checking
 	bool IsInteger() { return m_ttype.IsInteger(); }
@@ -81,6 +84,8 @@ public:
 	bool IsSet() { return m_ttype.IsSet(); }
 	bool IsTuple() { return m_ttype.IsTuple(); }
 	bool IsUDT() { return m_ttype.IsUDT(); }
+	bool IsFunctor() { return m_ttype.IsFunctor(); }
+	bool IsBrace() { return m_ttype.IsBrace(); }
 	//bool IsPointer()    { return m_type == LITERAL_TYPE_POINTER; }
 
 	bool IsVecAny() { return m_ttype.IsVecAny(); }
@@ -88,10 +93,12 @@ public:
 	bool IsValid() { return m_is_valid; }//m_ttype.IsInvalid();
 	bool IsConstant() { return m_ttype.IsConstant(); }
 	bool IsReference() { return m_ttype.IsReference(); }
+
+	bool IsTypeMatched(TType val) { return m_ttype.IsTypeMatched(val); }
 	
 	bool CanIterate() { return m_ttype.CanIterate(); }
 	bool CanIndex() { return m_ttype.CanIndex(); }
-
+	bool CanCast(TType val) { return m_ttype.CanCast(val); }
 	
 	static TValue MakeBool(Token* token, llvm::Value* value);
 	static TValue MakeEnum(Token* token, llvm::Value* value);
@@ -121,12 +128,15 @@ public:
 	TValue Negate();
 	TValue Not();
 	
+	bool IsStorage() { return m_is_storage; }
 	void SetStorage(bool val) { m_is_storage = val; }
 	void Store(TValue rhs);
+	void StoreLLVMValue(llvm::Value* ptr);
 
 	llvm::Value* Value() { return m_value; }
 	void SetValue(llvm::Value* val) { m_value = val; }
-
+	
+	void SetFunctorSig(std::string sig) { m_functor_sig = sig; }
 
 	TValue EmitLen();
 	TValue EmitContains(TValue rhs);
@@ -143,6 +153,8 @@ public:
 	void StoreAtIndex(TValue idx, TValue rhs);
 
 	TValue GetStructVariable(Token* token, llvm::Value* vec_idx, const std::string& name);
+
+	TValueList GetBraceArgs() { return m_brace_args; }
 
 	/*
 	
@@ -188,6 +200,10 @@ private:
 	bool m_is_map_pair;
 	TValue* m_pair_lhs;
 	TValue* m_pair_rhs;
+
+	std::string m_functor_sig;
+
+	TValueList m_brace_args;
 	
 };
 

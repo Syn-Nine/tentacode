@@ -162,14 +162,16 @@ class FunctionStmt : public Stmt
 public:
 	FunctionStmt() = delete;
 
-	FunctionStmt(Token* rettype, Token* name, TokenList types, TokenList params, std::vector<bool> mut, StmtList* body)
+	FunctionStmt(TypeToken* rettype, Token* name, TypeTokenList types, TokenList params, std::vector<bool> mut, std::vector<Expr*> defaults, StmtList* body, std::string fqns)
 	{
 		m_rettype = rettype;
 		m_name = name;
 		m_types = types;
 		m_params = params;
 		m_mutable = mut;
+		m_defaults = defaults;
 		m_body = body;
+		m_fqns = fqns;
 	}
 
 	StatementTypeEnum GetType() { return STATEMENT_FUNCTION; }
@@ -185,11 +187,13 @@ public:
 
 private:
 	Token* m_name;
-	Token* m_rettype;
-	TokenList m_types;
+	TypeToken* m_rettype;
+	TypeTokenList m_types;
 	TokenList m_params;
+	std::vector<Expr*> m_defaults;
 	StmtList* m_body;
 	std::vector<bool> m_mutable;
+	std::string m_fqns;
 };
 
 
@@ -216,6 +220,7 @@ public:
 	Stmt* GetElseBranch() { return m_elseBranch; }*/
 	
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, llvm::BasicBlock* elseifmerge);
 
 private:
 	Token* m_token;
@@ -224,6 +229,46 @@ private:
 	Stmt* m_elseBranch;
 };
 
+
+//-----------------------------------------------------------------------------
+class NamespacePushStmt : public Stmt
+{
+public:
+	NamespacePushStmt() = delete;
+
+	NamespacePushStmt(std::string name)
+	{
+		m_name = name;
+	}
+
+	StatementTypeEnum GetType() { return STATEMENT_NAMESPACE_PUSH; }
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	{
+		env->PushNamespace(m_name);
+		return TValue::NullInvalid();
+	}
+
+private:
+	std::string m_name;
+};
+
+
+//-----------------------------------------------------------------------------
+class NamespacePopStmt : public Stmt
+{
+public:
+	NamespacePopStmt() {}
+	
+	StatementTypeEnum GetType() { return STATEMENT_NAMESPACE_POP; }
+	
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	{
+		env->PopNamespace();
+		return TValue::NullInvalid();
+	}
+
+};
 
 
 //-----------------------------------------------------------------------------
@@ -282,16 +327,17 @@ class StructStmt : public Stmt
 public:
 	StructStmt() = delete;
 
-	StructStmt(Token* name, StmtList* vars)
+	StructStmt(Token* name, StmtList* vars, std::string fqns)
 	{
 		m_name = name;
 		m_vars = vars;
+		m_fqns = fqns;
 	}
 
 	StatementTypeEnum GetType() { return STATEMENT_STRUCT; }
 
 	//Token* Operator() { return m_name; }
-	//StmtList* GetVars() { return m_vars; }
+	StmtList* GetVars() { return m_vars; }
 	
 	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
 		
@@ -299,6 +345,7 @@ public:
 private:
 	Token* m_name;
 	StmtList* m_vars;
+	std::string m_fqns;
 };
 
 
@@ -309,11 +356,12 @@ class VarStmt : public Stmt
 public:
 	VarStmt() = delete;
 
-	VarStmt(TypeToken type, TokenPtrList ids, ArgList exprs)
+	VarStmt(TypeToken type, TokenPtrList ids, ArgList exprs, std::string anon_sig="")
 	{
 		m_type_token = type;
 		m_ids = ids;
 		m_exprs = exprs;
+		m_anon_sig = anon_sig;
 	}
 
 	TokenPtrList IDs() { return m_ids; }
@@ -330,6 +378,7 @@ private:
 	TypeToken m_type_token;
 	TokenPtrList m_ids;
 	ArgList m_exprs;
+	std::string m_anon_sig;
 };
 
 
@@ -339,11 +388,12 @@ class VarConstStmt : public Stmt
 public:
 	VarConstStmt() = delete;
 
-	VarConstStmt(Token* type, TokenPtrList ids, ArgList exprs)
+	VarConstStmt(Token* type, TokenPtrList ids, ArgList exprs, std::string fqns)
 	{
 		m_type = type;
 		m_ids = ids;
 		m_exprs = exprs;
+		m_fqns = fqns;
 	}
 
 	//Token* Id() { return m_id; }
@@ -362,6 +412,7 @@ private:
 	Token* m_type;
 	TokenPtrList m_ids;
 	ArgList m_exprs;
+	std::string m_fqns;
 };
 
 

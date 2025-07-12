@@ -79,6 +79,11 @@ TValue CallExpr::codegen_file(llvm::IRBuilder<>* builder, llvm::Module* module, 
 			return TValue::NullInvalid();
 		}
 	}
+	else
+	{
+		env->Error(callee, "Function not found in namespace.");
+		return TValue::NullInvalid();
+	}
 	
 	return TValue::NullInvalid();
 }

@@ -62,17 +62,9 @@ TValue AssignExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 	if (2 <= Environment::GetDebugLevel()) printf("AssignExpr::codegen()\n");
 
 	std::string var = m_token->Lexeme();
-	TType ttype_hint = env->GetVariable(m_token, var).GetTType();
+	//TType ttype_hint = env->GetVariable(m_token, var).GetTType();
 	
-	TValue rhs;
-	if (EXPRESSION_BRACKET == m_right->GetType())
-	{
-		rhs = static_cast<BracketExpr*>(m_right)->codegen(builder, module, env, ttype_hint);
-	}
-	else
-	{
-		rhs = m_right->codegen(builder, module, env);
-	}
+	TValue rhs = m_right->codegen(builder, module, env);
 	if (!rhs.IsValid())
 	{
 		env->Error(m_token, "Invalid assignment.");
@@ -98,6 +90,8 @@ TValue AssignExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 		env->AssignToVariable(m_token, var, rhs);
 	}
 
+	return env->GetVariable(m_token, var);
+	
 	/*
 	
 	llvm::Value* defval = env->GetVariable(var);
@@ -218,15 +212,16 @@ TValue BinaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 
 
 //-----------------------------------------------------------------------------
-TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, TType ttype_hint)
+TValue BraceExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)//, TType ttype_hint)
 {
-	if (2 <= Environment::GetDebugLevel()) printf("BracketExpr::codegen()\n");
-	
+	if (2 <= Environment::GetDebugLevel()) printf("BraceExpr::codegen()\n");
+
 	TValue::TValueList vals;
 
 	for (Expr* arg : m_arguments)
 	{
-		if (EXPRESSION_REPLICATE == arg->GetType())
+		// todo - go back and make replicate syntax work
+		/*if (EXPRESSION_REPLICATE == arg->GetType())
 		{
 			ReplicateExpr* re = static_cast<ReplicateExpr*>(arg);
 			Expr* lhs = re->Left();
@@ -257,18 +252,133 @@ TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 				return TValue::NullInvalid();
 			}
 		}
-		else
+		else*/
 		{
 			// get from storage in case it's a variable
 			TValue v = arg->codegen(builder, module, env).GetFromStorage();
+			if (!v.IsValid()) return TValue::NullInvalid();
 			vals.push_back(v);
 		}
 	}
 
-	// to do, allow assigning to empty brackets to clear dynamic vectors
+	// to do, allow assigning to empty braces
 	if (vals.empty()) return TValue::NullInvalid();
 
-	return TValue::Construct(ttype_hint, "anon", false, &vals);
+	return TValue::Construct_Brace(m_token, &vals);
+}
+
+
+//-----------------------------------------------------------------------------
+TValue DestructExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+{
+	if (2 <= Environment::GetDebugLevel()) printf("DestructExpr::codegen()\n");
+
+	std::string var = m_token->Lexeme();
+
+	if (!m_left) return TValue::NullInvalid();
+	if (!m_right) return TValue::NullInvalid();
+
+	if (EXPRESSION_COLLECT != m_left->GetType()) return TValue::NullInvalid();
+
+	CollectExpr* ce = static_cast<CollectExpr*>(m_left);
+	ArgList lhs = ce->GetArguments();
+
+	TValue rhs;
+	if (EXPRESSION_COLLECT == m_right->GetType())
+	{
+		TValue::TValueList vals;
+
+		ArgList args = static_cast<CollectExpr*>(m_right)->GetArguments();
+
+		for (Expr* arg : args)
+		{
+			// get from storage in case it's a variable
+			TValue v = arg->codegen(builder, module, env).GetFromStorage();
+			if (!v.IsValid()) return TValue::NullInvalid();
+			vals.push_back(v);
+		}
+
+		if (vals.empty()) return TValue::NullInvalid();
+
+		rhs = TValue::Construct_Brace(m_token, &vals);
+	}
+	else
+	{
+		rhs = m_right->codegen(builder, module, env);
+	}
+
+	if (!rhs.IsBrace())
+	{
+		env->Error(rhs.GetToken(), "Expected brace or collect expression.");
+		return TValue::NullInvalid();
+	}
+
+	// create rhs values
+	TValue::TValueList rvals = rhs.GetBraceArgs();
+
+	if (lhs.size() != rvals.size())
+	{
+		env->Error(rhs.GetToken(), "Assignment count mismatch in destructure.");
+		return TValue::NullInvalid();
+	}
+	
+	// assign to left side
+	for (size_t i = 0; i < lhs.size(); ++i)
+	{
+		if (EXPRESSION_VARIABLE != lhs[i]->GetType())
+		{
+			env->Error(m_token, "Expected variable in left side collection.");
+			return TValue::NullInvalid();
+		}
+		
+		VariableExpr* ve = static_cast<VariableExpr*>(lhs[i]);
+		std::string var = ve->Operator()->Lexeme();
+
+		TValue lval = ve->codegen(builder, module, env);
+		if (!lval.IsValid()) return TValue::NullInvalid();
+
+		Expr* idx_expr = ve->VecIndex();
+		if (idx_expr)
+		{
+			TValue vidx = idx_expr->codegen(builder, module, env);
+			if (!vidx.IsValid())
+			{
+				env->Error(ve->Operator(), "Invalid vector index.");
+				return TValue::NullInvalid();
+			}
+			vidx = vidx.GetFromStorage();
+			env->AssignToVariableIndex(m_token, var, vidx, rvals[i]);
+		}
+		else
+		{
+			env->AssignToVariable(m_token, var, rvals[i]);
+		}
+
+	}
+
+	return TValue::NullInvalid();
+}
+
+
+//-----------------------------------------------------------------------------
+TValue FunctorExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+{
+	if (2 <= Environment::GetDebugLevel()) printf("FunctorExpr::codegen()\n");
+
+	TFunction func = env->GetAnonFunction(m_sig);
+	if (!func.IsValid())
+	{
+		env->Error(m_token, "Failed to get anonymous prototype.");
+		return TValue::NullInvalid();
+	}
+
+	TType type = TType::Construct_Functor(m_token);
+
+	TValue val = TValue::Construct_Functor(type, m_sig, func.GetLLVMFunc());
+	if (val.IsValid()) return val;
+
+	//return TValue::Construct_Functor(TType::Construct_Functor(m_token, nullptr));
+	return TValue::NullInvalid();
 }
 
 
@@ -277,9 +387,9 @@ TValue BracketExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("GetExpr::codegen()\n");
-		
+
 	VariableExpr* vs = static_cast<VariableExpr*>(m_object); // parent object
-	
+
 	Token* struct_token = vs->Operator();
 	std::string var_name = struct_token->Lexeme();
 	std::string mem_name = m_token->Lexeme();
@@ -291,9 +401,14 @@ TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	if (e0)
 	{
 		TValue idx0 = e0->codegen(builder, module, env).GetFromStorage();
+		if (!idx0.IsValid())
+		{
+			env->Error(m_token, "Invalid index.");
+			return TValue::NullInvalid();
+		}
 		obj = obj.GetAtIndex(idx0);
 	}
-	
+
 	TValue idx1;
 	if (m_right) idx1 = m_right->codegen(builder, module, env).GetFromStorage();
 	obj = obj.GetStructVariable(m_token, idx1.Value(), mem_name);
@@ -302,30 +417,55 @@ TValue GetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 }
 
 
-
 //-----------------------------------------------------------------------------
 TValue LogicalExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("LogicalExpr::codegen()\n");
-
 	if (!m_left || !m_right) return TValue::NullInvalid();
+
+	// always evaluate lhs
 	TValue lhs = m_left->codegen(builder, module, env).GetFromStorage();
-	TValue rhs = m_right->codegen(builder, module, env).GetFromStorage();
-	if (!lhs.Value() || !rhs.Value()) return TValue::NullInvalid();
+	if (!lhs.Value()) return TValue::NullInvalid();
 
-	switch (m_token->GetType())
+	llvm::Function* ftn = builder->GetInsertBlock()->getParent();
+	llvm::LLVMContext& context = builder->getContext();
+	llvm::BasicBlock* rhsBB = llvm::BasicBlock::Create(context, "rhs", ftn);
+	llvm::BasicBlock* shortBB = llvm::BasicBlock::Create(context, "short");
+
+	llvm::Value* ret = builder->CreateAlloca(builder->getInt1Ty(), nullptr, "tmp");
+
+	if (TOKEN_AND == m_token->GetType())
 	{
-	case TOKEN_AND:
-		return TValue::MakeBool(m_token, builder->CreateAnd(lhs.Value(), rhs.Value(), "logical_and_cmp"));
-
-	case TOKEN_OR:
-		return TValue::MakeBool(m_token, builder->CreateOr(lhs.Value(), rhs.Value(), "logical_or_cmp"));
-
-	default:
-		break;
+		// if lhs is already false, short circuit false
+		builder->CreateStore(builder->getFalse(), ret);
+		builder->CreateCondBr(lhs.Value(), rhsBB, shortBB);
+	}
+	else if (TOKEN_OR == m_token->GetType())
+	{
+		// if lhs is already true, short circuit true
+		builder->CreateStore(builder->getTrue(), ret);
+		builder->CreateCondBr(builder->CreateNot(lhs.Value(), "nottmp"), rhsBB, shortBB);
+	}
+	else
+	{
+		// invalid token
+		return TValue::NullInvalid();
 	}
 
-	return TValue::NullInvalid();
+	// only evaluate rhs if not short circuiting
+	builder->SetInsertPoint(rhsBB);
+	TValue rhs = m_right->codegen(builder, module, env).GetFromStorage();
+	if (!rhs.Value()) return TValue::NullInvalid();
+
+	// store rhs value
+	builder->CreateStore(rhs.Value(), ret);
+	builder->CreateBr(shortBB);
+
+	// short circuit merge
+	ftn->insert(ftn->end(), shortBB);
+	builder->SetInsertPoint(shortBB);
+
+	return TValue::MakeBool(m_token, builder->CreateLoad(builder->getInt1Ty(), ret));
 }
 
 
@@ -382,7 +522,7 @@ TValue SetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	std::string var_name = vs->Operator()->Lexeme();
 	TValue var = env->GetVariable(m_token, var_name);
 
-	std::string udt_name = var.GetToken()->Lexeme();
+	std::string udt_name = var.GetLexeme();
 	TStruct struc = env->GetStruct(m_token, udt_name);
 	if (!struc.IsValid()) return TValue::NullInvalid();
 
@@ -494,6 +634,8 @@ TValue SetExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	*/
 	return TValue::NullInvalid();
 }
+
+
 
 //-----------------------------------------------------------------------------
 TValue UnaryExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)

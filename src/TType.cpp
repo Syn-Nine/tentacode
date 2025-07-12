@@ -1,4 +1,6 @@
 #include "TType.h"
+#include "TFunction.h"
+
 #include "Environment.h"
 
 llvm::IRBuilder<>* TType::m_builder = nullptr;
@@ -52,7 +54,10 @@ TType TType::Construct(Token* token, TokenPtrList* args)
 	case TOKEN_VAR_VEC:
 		return Construct_Vec(token, args);
 
+	case TOKEN_AT:
+		return Construct_Functor(token);
 
+	
 	case TOKEN_VAR_IMAGE: // intentional fallthrough
 	case TOKEN_VAR_TEXTURE:
 	case TOKEN_VAR_FONT:
@@ -81,6 +86,22 @@ TType TType::Construct_Bool(Token* token)
 	ret.m_lexeme = "bool";
 	ret.m_ty = m_builder->getIntNTy(1);
 	ret.m_ty_sz_bytes = llvm::ConstantExpr::getSizeOf(ret.m_ty);
+	return ret;
+}
+
+
+//-----------------------------------------------------------------------------
+TType TType::Construct_Brace(Token* token)
+{
+	TType ret;
+	ret.m_token = token;
+	ret.m_is_valid = true;
+	ret.m_bits = 0;
+	ret.m_lexeme = "brace";
+	ret.m_literal_type = LITERAL_TYPE_BRACE;
+	ret.m_ty = nullptr;
+	ret.m_ty_sz_bytes = 0;
+
 	return ret;
 }
 
@@ -126,6 +147,21 @@ TType TType::Construct_Float(Token* token, int bits)
 	}
 	ret.m_ty_sz_bytes = llvm::ConstantExpr::getSizeOf(ret.m_ty);
 
+	return ret;
+}
+
+
+//-----------------------------------------------------------------------------
+TType TType::Construct_Functor(Token* token)
+{
+	TType ret;
+	ret.m_token = token;
+	ret.m_is_valid = true;
+	ret.m_bits = 64;
+	ret.m_literal_type = LITERAL_TYPE_FUNCTOR;
+	ret.m_lexeme = "functor";
+	ret.m_ty = m_builder->getPtrTy();
+	ret.m_ty_sz_bytes = llvm::ConstantExpr::getSizeOf(ret.m_ty);
 	return ret;
 }
 
@@ -259,7 +295,10 @@ TType TType::Construct_Vec(Token* token, TokenPtrList* args)
 	TType ret;
 	if (2 != args->size()) return ret;
 
-	ret.m_inner_types.push_back(TType::Construct(args->at(0), nullptr));
+	TType i0 = TType::Construct(args->at(0), nullptr);
+	if (!i0.IsValid()) return TType();
+
+	ret.m_inner_types.push_back(i0);
 
 	if (!args->at(1))
 	{
@@ -351,7 +390,7 @@ TType TType::Construct_Struct(Token* token)
 	ret.m_is_valid = true;
 	ret.m_bits = 64;
 	ret.m_literal_type = LITERAL_TYPE_UDT;
-	ret.m_lexeme = token->Lexeme();
+	ret.m_lexeme = tstruc.GetFQNS() + ":" + token->Lexeme();
 	ret.m_ty = tstruc.GetLLVMStruct();
 	ret.m_ty_sz_bytes = llvm::ConstantExpr::getSizeOf(ret.m_ty);
 	return ret;
@@ -364,4 +403,64 @@ TType TType::GetInternal(size_t idx)
 	if (idx < m_inner_types.size()) return m_inner_types[idx];
 	Environment::Error(m_token, "Attempting to get non-existant inner type.");
 	return TType();
+}
+
+
+//-----------------------------------------------------------------------------
+bool TType::CanCast(TType val)
+{
+	LiteralTypeEnum lt0 = GetLiteralType();
+	LiteralTypeEnum lt1 = val.GetLiteralType();
+
+	if (LITERAL_TYPE_INTEGER == lt0 || LITERAL_TYPE_FLOAT == lt0)
+	{
+		if (LITERAL_TYPE_INTEGER == lt1 || LITERAL_TYPE_FLOAT == lt1) return true;
+	}
+	if (lt0 == lt1)
+	{
+		if (LITERAL_TYPE_BOOL == lt1 || LITERAL_TYPE_ENUM == lt1 || LITERAL_TYPE_STRING == lt1) return true;
+	}
+	
+	if (IsVecAny() && val.IsVecAny()) return GetInternal(0).CanCast(val.GetInternal(0));
+	if (IsSet() && val.IsSet()) return GetInternal(0).CanCast(val.GetInternal(0));
+	
+	if (IsUDT() && val.IsUDT()) return GetTy() == val.GetTy();
+	
+	if (IsTuple() && val.IsTuple() && GetInternalCount() == val.GetInternalCount())
+	{
+		for (size_t i = 0; i < GetInternalCount(); ++i)
+		{
+			// if using tuples internal types must be identical for now
+			if (!GetInternal(i).IsTypeMatched(val.GetInternal(i))) return false;
+		}
+		return true;
+	}
+
+	return false;
+}
+
+
+//-----------------------------------------------------------------------------
+bool TType::IsTypeMatched(TType val)
+{
+	bool ret = GetLiteralType() == val.GetLiteralType();
+	ret = ret && GetInternalCount() == val.GetInternalCount();
+	if (!IsTuple()) ret = ret && GetTy() == val.GetTy();
+
+	// check for internal type equivalent for vectors
+	if (ret && IsVecAny())
+	{
+		ret = ret && GetInternal(0).IsTypeMatched(val.GetInternal(0));
+	}
+
+	// check for type equivalence of tuples
+	if (ret && IsTuple() && GetInternalCount() == val.GetInternalCount())
+	{
+		for (size_t i = 0; i < GetInternalCount(); ++i)
+		{
+			if (!GetInternal(i).IsTypeMatched(val.GetInternal(i))) return false;
+		}
+	}
+
+	return ret;
 }

@@ -40,7 +40,6 @@ void Scanner::Enum()
 	std::string text = m_buffer.substr(m_start, m_current - m_start);
 
 	TokenTypeEnum type = TOKEN_ENUM;
-	if (m_keywordList.count(text)) type = m_keywordList.at(text);
 
 	AddToken(type);
 }
@@ -55,7 +54,13 @@ void Scanner::Identifier()
 		}
 		else if (IsColon(Peek()) && IsColon(PeekNext()))
 		{
+			// standard library namespacing
 			Advance();
+			Advance();
+		}
+		else if (IsColon(Peek()) && IsAlphaNumeric(PeekNext()))
+		{
+			// user namespacing
 			Advance();
 		}
 		else
@@ -82,7 +87,7 @@ bool Scanner::IsAlpha(char c)
 
 bool Scanner::IsAlphaNumeric(char c)
 {
-	return (IsAlpha(c) || IsDigit(c));
+	return (IsAlpha(c) || IsDigit(c) || c == '!');
 }
 
 bool Scanner::IsDigit(char c)
@@ -178,12 +183,7 @@ void Scanner::ScanToken()
 	case '[': AddToken(TOKEN_LEFT_BRACKET); break;
 	case ']': AddToken(TOKEN_RIGHT_BRACKET); break;
 	case ',': AddToken(TOKEN_COMMA); break;
-	case '-': AddToken(TOKEN_MINUS); break;
-	case '+': AddToken(TOKEN_PLUS); break;
-	case '^': AddToken(TOKEN_HAT); break;
 	case ';': AddToken(TOKEN_SEMICOLON); break;
-	case '*': AddToken(TOKEN_STAR); break;
-	case '%': AddToken(TOKEN_PERCENT); break;
 	case '@': AddToken(TOKEN_AT); break;
 	
 	// one or two character tokens
@@ -201,7 +201,12 @@ void Scanner::ScanToken()
 	case '=': AddToken(Match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL); break;
 	case '>': AddToken(Match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER); break;
 	case '<': AddToken(Match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS); break;
-	
+	case '-': AddToken(Match('=') ? TOKEN_MINUS_EQUAL : TOKEN_MINUS); break;
+	case '+': AddToken(Match('=') ? TOKEN_PLUS_EQUAL : TOKEN_PLUS); break;
+	case '*': AddToken(Match('=') ? TOKEN_STAR_EQUAL : TOKEN_STAR); break;
+	case '^': AddToken(Match('=') ? TOKEN_HAT_EQUAL : TOKEN_HAT); break;
+	case '%': AddToken(Match('=') ? TOKEN_PERCENT_EQUAL : TOKEN_PERCENT); break;
+
 	// two character tokens
 	case '&': Match('&') ? AddToken(TOKEN_AND) : AddToken(TOKEN_AMPERSAND); break;
 	case '|': Match('|') ? AddToken(TOKEN_OR) : m_errorHandler->Error(m_filename, m_line, unexpected_character); break;
@@ -266,7 +271,7 @@ void Scanner::ScanToken()
 		}
 		else
 		{
-			AddToken(TOKEN_SLASH);
+			AddToken(Match('=') ? TOKEN_SLASH_EQUAL : TOKEN_SLASH); break;
 		}
 		break;
 

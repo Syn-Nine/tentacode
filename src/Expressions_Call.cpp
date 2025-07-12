@@ -20,9 +20,33 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 	if (2 <= Environment::GetDebugLevel()) printf("CallExpr::codegen()\n");
 	
 	if (!m_callee) return TValue::NullInvalid();
-	if (EXPRESSION_VARIABLE != m_callee->GetType()) return TValue::NullInvalid();
 
-	Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
+	Token* callee = nullptr;
+	TValue lhs_object;
+
+	ExpressionTypeEnum callee_type = m_callee->GetType();
+
+	if (EXPRESSION_VARIABLE == callee_type)
+	{
+		callee = static_cast<VariableExpr*>(m_callee)->Operator();
+	}
+	else if (EXPRESSION_GET == callee_type)
+	{
+		GetExpr* ge = static_cast<GetExpr*>(m_callee);
+		callee = ge->Operator();
+		lhs_object = ge->Object()->codegen(builder, module, env);
+		if (!lhs_object.IsValid())
+		{
+			Environment::Error(lhs_object.GetToken(), "Invalid reference variable.");
+			return TValue::NullInvalid();
+		}
+	}
+	else
+	{
+		Environment::Error(nullptr, "Invalid call expression.");
+		return TValue::NullInvalid();
+	}
+
 	std::string name = callee->Lexeme();
 	
 	// namespaced
@@ -83,7 +107,6 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			std::string ftnlex = ftntok->Lexeme();
 			if (!env->GetFunction(ftntok, ftnlex).IsValid())
 			{
-				env->Error(ftntok, "Function not found.");
 				return TValue::NullInvalid();
 			}
 			n_jobs = n_threads;
@@ -116,7 +139,6 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 			std::string ftnlex = ftntok->Lexeme();
 			if (!env->GetFunction(ftntok, ftnlex).IsValid())
 			{
-				env->Error(ftntok, "Function not found.");
 				return TValue::NullInvalid();
 			}
 			ftn = module->getFunction(ftnlex);
@@ -158,51 +180,60 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 	{
 		if (!CheckArgSize(1)) return TValue::NullInvalid();
 
-		if (EXPRESSION_VARIABLE == m_arguments[0]->GetType())
-		{
-			VariableExpr* ve = static_cast<VariableExpr*>(m_arguments[0]);
-			std::string var = ve->Operator()->Lexeme();
-			TValue tval = env->GetVariable(callee, var);
-			return tval.EmitLen();
-		}
-		/*else if (EXPRESSION_GET == m_arguments[0]->GetType())
-		{
-			GetExpr* ge = static_cast<GetExpr*>(m_arguments[0]);
-			TValue v = m_arguments[0]->codegen(builder, module, env);
-
-			if (v.IsVec())
-			{
-				llvm::Value* src = builder->CreateLoad(builder->getPtrTy(), v.value);
-				llvm::Value* srcType = builder->getInt32(v.fixed_vec_type);
-				return TValue::Integer(builder->CreateCall(module->getFunction("__vec_len"), { srcType, src }, "calltmp"));
-			}
-			else
-			{
-				env->Error(callee, "Argument type mismatch.");
-				return TValue::NullInvalid();
-			}
-		}*/
-		else
-		{
-			env->Error(callee, "Argument type mismatch.");
-			return TValue::NullInvalid();
-		}
-	}/****
-	else if (0 == name.compare("input"))
+		TValue v = m_arguments[0]->codegen(builder, module, env);
+		return v.EmitLen();
+	}
+	else if (0 == name.compare("console_input"))
 	{
-		llvm::Value* s = builder->CreateCall(module->getFunction("input"), {}, "calltmp");
+		llvm::Value* s = builder->CreateCall(module->getFunction("console_input"), {}, "calltmp");
 		return TValue::MakeString(callee, s);
-	}	*/
+	}
 	else
 	{
-		TFunction tfunc = env->GetFunction(callee, name);
-		if (!tfunc.IsValid())
+		TFunction tfunc = env->GetFunction(callee, name, true); // call quietly
+		llvm::FunctionType* ft;
+		llvm::Value* ftn;
+		if (tfunc.IsValid())
 		{
-			env->Error(callee, "Invalid function call.");
-			return TValue::NullInvalid();
+			//builder->CreateStore(tfunc.GetLLVMFunc(), ftn);
+			ftn = tfunc.GetLLVMFunc();
+			ft = tfunc.GetLLVMFuncType();
 		}
+		else
+		{
+			// function not found, is this a functor?
+			TValue functor = env->GetVariable(callee, name, true); // call quietly
+			if (!functor.IsValid())
+			{
+				env->Error(callee, "Function not found in environment.");
+				return TValue::NullInvalid();
+			}
 
-		llvm::Function* ftn = tfunc.GetLLVMFunc();
+			// get the function for this functor
+			tfunc = env->GetAnonFunction(functor.GetFunctorSig());
+			if (!tfunc.IsValid())
+			{
+				env->Error(callee, "Anonymous function not found in environment.");
+				return TValue::NullInvalid();
+			}
+
+			ftn = CreateEntryAlloca(builder, builder->getPtrTy(), nullptr, "ftn_ptr");
+
+			// store the llvm function pointer that's in functor over into ftn
+			TValue temp = functor.GetFromStorage();
+			builder->CreateStore(temp.Value(), ftn);
+			
+			//ftn = builder->CreateLoad(builder->getPtrTy(), functor.Value());
+			ftn = builder->CreateLoad(builder->getPtrTy(), ftn);
+
+			ft = tfunc.GetLLVMFuncType();
+
+		}
+		
+		//return TValue::NullInvalid();
+		//llvm::Value* ftn_load = builder->CreateLoad(builder->getPtrTy(), ftn);
+		//ftn = builder->CreateLoad(builder->getPtrTy(), ftn);
+
 		std::vector<TType> params = tfunc.GetParamTypes();
 
 		if (tfunc.IsInternal())
@@ -233,7 +264,7 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 				}
 				else if (v.IsUDT())
 				{
-					if (0 != v.GetToken()->Lexeme().compare(params[i].GetToken()->Lexeme()))
+					if (0 != v.GetLexeme().compare(params[i].GetLexeme()))
 					{
 						if (!tfunc.IsInternal())
 						{
@@ -250,7 +281,8 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 				}*/
 				args.push_back(v.Value());
 			}
-			llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
+			//llvm::Value* rval = builder->CreateCall(ft, ftn, args, std::string("call_" + name).c_str());
+			llvm::Value* rval = builder->CreateCall(static_cast<llvm::Function*>(ftn), args, std::string("call_" + name).c_str());
 			ret.SetValue(rval);
 			ret.SetStorage(false);
 
@@ -260,23 +292,113 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 		{
 			std::vector<llvm::Value*> args;
 			int start_idx = 0;
-
+			int lhs_object_offset = 0;
+			
 			TType rettype = tfunc.GetReturnType();
 			if (rettype.IsValid())
 			{
-				llvm::Value* v = CreateEntryAlloca(builder, rettype.GetTy(), nullptr, "call_ret_ref");
-				args.push_back(v);
-
-				ret = TValue::Construct(rettype, "temp", false);
-				ret.SetValue(v);
-				ret.SetStorage(true);
-				start_idx = 1;
+				ret = TValue::Construct(rettype, "ret_ref", false);
+				if (!ret.IsStorage() && !ret.IsVecFixed() && !ret.IsTuple() && !ret.IsUDT()) ret = ret.MakeStorage();
+				args.push_back(ret.Value());
+				start_idx += 1;
 			}
 
-			for (size_t i = 0; i < m_arguments.size(); ++i)
+			if (lhs_object.IsValid())
 			{
-				// if not storage, put into storage because we're passing as reference
-				TValue v = m_arguments[i]->codegen(builder, module, env).GetFromStorage().CastToMatchImplicit(params[i + start_idx]).MakeStorage();
+				TType param_type = params[start_idx];
+				TValue v = lhs_object;
+
+				// first parameter must matched type of the lhs object
+				if (!v.IsTypeMatched(param_type))
+				{
+					env->Error(v.GetToken(), "Type mismatch with function first parameter.");
+					return TValue::NullInvalid();
+				}
+
+				// is parameter on a register?
+				if (!v.IsStorage() && !v.IsVecFixed() && !v.IsTuple() && !v.IsUDT())
+				{
+					// put into storage because we're passing as reference
+					if (!v.IsTypeMatched(param_type)) v = v.CastToMatchImplicit(param_type);
+					v = v.MakeStorage();
+				}
+				
+				if (!v.IsValid())
+				{
+					env->Error(callee, "Error creating parameter reference for function call.");
+					return TValue::NullInvalid();
+				}
+
+				args.push_back(v.Value());
+				start_idx += 1;
+				lhs_object_offset = 1;
+			}
+
+			std::vector<TType> params = tfunc.GetParamTypes();
+			size_t num_defaults = tfunc.GetNumDefaults();
+			if (0 == num_defaults)
+			{
+				if (!CheckArgSize(params.size() - start_idx)) return TValue::NullInvalid();
+			}
+			else
+			{
+				if (params.size() - start_idx > m_arguments.size() + num_defaults)
+				{
+					Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
+					Environment::Error(callee, "Argument count mismatch.");
+					return TValue::NullInvalid();
+				}
+			}
+
+			// container for temporary values passed in as function arguments
+			std::vector<TValue> param_vals;
+			std::vector<TValue> param_storage;
+			std::vector<Expr*> defaults = tfunc.GetDefaults();
+
+			for (size_t i = 0; i < params.size() - start_idx; ++i)
+			{
+				TType param_type = params[i + start_idx];
+
+				TValue v;
+				if (m_arguments.size() > i)
+				{
+					v = m_arguments[i]->codegen(builder, module, env);
+				}
+				else
+				{
+					v = defaults[i + lhs_object_offset]->codegen(builder, module, env);
+				}
+				
+				// is parameter on a register?
+				if (!v.IsStorage() && !v.IsVecFixed() && !v.IsTuple() && !v.IsUDT())
+				{
+					// put into storage because we're passing as reference
+					if (!v.IsTypeMatched(param_type)) v = v.CastToMatchImplicit(param_type);
+					v = v.MakeStorage();
+				}
+				else
+				{ // parameter value is in storage
+					
+					// is parameter immutable?
+					if (param_type.IsConstant())
+					{
+						// do we need to cast the value before sending it?
+						if (!v.IsTypeMatched(param_type))
+						{
+							v = v.GetFromStorage().CastToMatchImplicit(param_type).MakeStorage();
+						}
+					}
+					else
+					{
+						// parameter is mutable so types must be matched
+						if (!v.IsTypeMatched(param_type))
+						{
+							env->Error(v.GetToken(), "Type mismatch for mutable parameter.");
+							return TValue::NullInvalid();
+						}
+					}
+				}
+				
 				if (!v.IsValid())
 				{
 					env->Error(callee, "Error creating parameter reference for function call.");
@@ -285,17 +407,10 @@ TValue CallExpr::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envir
 
 				args.push_back(v.Value());
 			}
-			/*llvm::Value* rval = builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
 			
-			if (rettype.IsValid())
-				ret = ret.GetFromStorage();
-			else
-				ret.SetValue(rval);
-			
-			return ret;*/
-			
-			builder->CreateCall(ftn, args, std::string("call_" + name).c_str());
+			builder->CreateCall(ft, ftn, args, std::string("call_" + name).c_str());
 
+			if (lhs_object.IsValid()) return lhs_object;
 			if (rettype.IsValid()) return ret.GetFromStorage();
 			return TValue::NullInvalid();
 		}

@@ -30,7 +30,7 @@ public:
 
 	~TStruct() {}
 
-	static TStruct Construct(Token* name, void* in_vars);
+	static TStruct Construct(std::string fqns, Token* name, void* in_vars);
 
 	static void RegisterLLVM(llvm::IRBuilder<>* builder, llvm::Module* module)
 	{
@@ -48,6 +48,10 @@ public:
 
 	bool IsValid() const { return m_valid; }
 
+	Token* GetToken() { return m_token; }
+
+	std::string GetFQNS() { return m_fqns; }
+
 private:
 
 	static llvm::IRBuilder<>* m_builder;
@@ -63,6 +67,8 @@ private:
 	std::map<std::string, TType> m_type_map;
 	std::vector<TType> m_member_types;
 	std::vector<std::string> m_member_names;
+
+	std::string m_fqns;
 
 };
 

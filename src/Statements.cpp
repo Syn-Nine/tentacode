@@ -47,7 +47,7 @@ TValue BreakStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Envi
 	}
 	else
 	{
-		env->Error(m_keyword, "No parent block for `break`.");
+		env->Error(m_keyword, "No parent block for 'break'.");
 	}
 	
 	return TValue::NullInvalid();
@@ -73,7 +73,7 @@ TValue ContinueStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 	}
 	else
 	{
-		env->Error(m_keyword, "No parent block for `continue`.");
+		env->Error(m_keyword, "No parent block for 'continue'.");
 	}
 	
 	return TValue::NullInvalid();
@@ -114,6 +114,7 @@ TValue ForEachStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 		// make local variable
 		Token* var = m_val;
 		std::string lexeme = var->Lexeme();
+		if (lexeme.compare("_") == 0) lexeme.append("%");
 		TType ttype = TType::Construct_Int(var, 32);
 		TValue val = TValue::Construct(ttype, lexeme, false);
 		if (!val.IsValid()) return TValue::NullInvalid();
@@ -122,7 +123,17 @@ TValue ForEachStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 
 		// evalue range
 		TValue rngLeft = static_cast<RangeExpr*>(m_expr)->Left()->codegen(builder, module, env).GetFromStorage();
+		if (!rngLeft.IsValid() || !rngLeft.IsInteger())
+		{
+			env->Error(rngLeft.GetToken(), "Invalid range left side bound.");
+			return TValue::NullInvalid();
+		}
 		TValue rngRight = static_cast<RangeExpr*>(m_expr)->Right()->codegen(builder, module, env).GetFromStorage();
+		if (!rngRight.IsValid() || !rngRight.IsInteger())
+		{
+			env->Error(rngRight.GetToken(), "Invalid range right side bound.");
+			return TValue::NullInvalid();
+		}
 		rngRight = rngRight.CastToMatchImplicit(rngLeft);
 
 		// assign vector value at index to val variable
@@ -157,7 +168,8 @@ TValue ForEachStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 		// evaluate the container
 		TValue rhs = m_expr->codegen(builder, module, env);
 		if (!rhs.IsValid()) return TValue::NullInvalid();
-		if (!rhs.CanIterate())
+		
+		if (!rhs.CanIterate()) // normal for loop with counter
 		{
 			if (!rhs.IsInteger())
 			{
@@ -169,13 +181,15 @@ TValue ForEachStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 			// make local variable
 			Token* var = m_val;
 			std::string lexeme = var->Lexeme();
+			if (lexeme.compare("_") == 0) lexeme.append("%");
 			TType ttype = TType::Construct_Int(var, 32);
 			TValue val = TValue::Construct(ttype, lexeme, false);
 			if (!val.IsValid()) return TValue::NullInvalid();
 
 			env->DefineVariable(val, lexeme);
+			builder->CreateStore(builder->getInt32(0), val.Value()); // re-initialize counter to zero
 
-			// evalue range
+			// evaluate range
 			TValue rngLeft = TValue::MakeInt(var, 32, builder->getInt32(0));
 			TValue rngRight = rhs.GetFromStorage().CastToMatchImplicit(rngLeft);
 
@@ -206,166 +220,181 @@ TValue ForEachStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, En
 			val.Store(plus);
 
 		}
-
-		TType ttype = rhs.GetTType();
-
-		if (ttype.IsVecAny())
+		else
 		{
-			// len variable
-			TValue len = rhs.EmitLen().GetFromStorage();
-
-			// key variable
-			Token* keytoken = m_key;
-			if (!keytoken) keytoken = new Token(TOKEN_IDENTIFIER, "__loop_idx", m_val->Line(), m_val->Filename()); // anonymous key		
-			TType keyttype = TType::Construct_Int(keytoken, 64);
-			TValue key = TValue::Construct(keyttype, keytoken->Lexeme(), false);
-			if (!key.IsValid()) return TValue::NullInvalid();
-			env->DefineVariable(key, keytoken->Lexeme());
-
-			// val variable
-			TValue val = TValue::Construct(ttype.GetInternal(0), m_val->Lexeme(), false);
-			if (!val.IsValid()) return TValue::NullInvalid();
-			env->DefineVariable(val, m_val->Lexeme());
-
-			// add outer loop
-			builder->CreateBr(LoopBB);
-			builder->SetInsertPoint(LoopBB);
-
-			// make a comparison expression
-			TValue CondV = TValue::MakeBool(keytoken, builder->CreateICmpSLT(key.GetFromStorage().Value(), len.Value(), "cmptmp"));
-			if (!CondV.Value()) return TValue::NullInvalid();
-			builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
-
-			// add inner block
-			ftn->insert(ftn->end(), BodyBB);
-			builder->SetInsertPoint(BodyBB);
-
-			// assign vector value at index to val variable
-			env->AssignToVariable(m_val, m_val->Lexeme(), rhs.GetAtIndex(key.GetFromStorage()));
-
-			if (m_body) m_body->codegen(builder, module, env);
-
-			// add increment section
-			builder->CreateBr(PostBB);
-			ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
-			builder->SetInsertPoint(PostBB);
-
-			TValue plus = key.GetFromStorage();
-			plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
-			key.Store(plus);
-
-			if (!m_key) delete keytoken;
-
-		}
-		else if (ttype.IsSet())
-		{
-			if (m_key)
+			TType ttype = rhs.GetTType();
+			if (ttype.IsVecAny())
 			{
-				env->Error(m_key, "Set type does not support key index.");
-				return TValue::NullInvalid();
-			}
+				// len variable
+				TValue len = rhs.EmitLen().GetFromStorage();
 
-			// len variable
-			TValue len = rhs.EmitLen().GetFromStorage();
-
-			// loop counter
-			Token* cnttoken = new Token(TOKEN_IDENTIFIER, "__loop_idx", m_val->Line(), m_val->Filename()); // anonymous counter
-			TType cntttype = TType::Construct_Int(cnttoken, 64);
-			TValue cnt = TValue::Construct(cntttype, cnttoken->Lexeme(), false);
-			if (!cnt.IsValid()) return TValue::NullInvalid();
-
-			// val variable
-			TValue val = TValue::Construct(ttype.GetInternal(0), m_val->Lexeme(), false);
-			if (!val.IsValid()) return TValue::NullInvalid();
-			env->DefineVariable(val, m_val->Lexeme());
-
-			rhs.EmitStartIterator();
-
-			// add outer loop
-			builder->CreateBr(LoopBB);
-			builder->SetInsertPoint(LoopBB);
-
-			// make a comparison expression
-			TValue CondV = TValue::MakeBool(cnttoken, builder->CreateICmpSLT(cnt.GetFromStorage().Value(), len.Value(), "cmptmp"));
-			if (!CondV.Value()) return TValue::NullInvalid();
-			builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
-
-			// add inner block
-			ftn->insert(ftn->end(), BodyBB);
-			builder->SetInsertPoint(BodyBB);
-
-			// assign vector value at index to val variable
-			env->AssignToVariable(m_val, m_val->Lexeme(), rhs.GetIterValue());
-
-			if (m_body) m_body->codegen(builder, module, env);
-
-			// add increment section
-			builder->CreateBr(PostBB);
-			ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
-			builder->SetInsertPoint(PostBB);
-
-			TValue plus = cnt.GetFromStorage();
-			plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
-			cnt.Store(plus);
-
-			delete cnttoken;
-		}
-		else if (ttype.IsMap())
-		{
-			// len variable
-			TValue len = rhs.EmitLen().GetFromStorage();
-
-			// loop counter
-			Token* cnttoken = new Token(TOKEN_IDENTIFIER, "__loop_idx", m_val->Line(), m_val->Filename()); // anonymous counter
-			TType cntttype = TType::Construct_Int(cnttoken, 64);
-			TValue cnt = TValue::Construct(cntttype, cnttoken->Lexeme(), false);
-			if (!cnt.IsValid()) return TValue::NullInvalid();
-
-			// key variable
-			TValue key;
-			if (m_key)
-			{
-				key = TValue::Construct(ttype.GetInternal(0), m_key->Lexeme(), false);
+				// key variable
+				Token* keytoken = m_key;
+				if (!keytoken) keytoken = new Token(TOKEN_IDENTIFIER, "__loop_idx%", m_val->Line(), m_val->Filename()); // anonymous key		
+				TType keyttype = TType::Construct_Int(keytoken, 64);
+				std::string key_lex = keytoken->Lexeme();
+				if (key_lex.compare("_") == 0) key_lex.append("%");
+				TValue key = TValue::Construct(keyttype, key_lex, false);
 				if (!key.IsValid()) return TValue::NullInvalid();
-				env->DefineVariable(key, m_key->Lexeme());
+				env->DefineVariable(key, key_lex);
+				builder->CreateStore(builder->getInt64(0), key.Value()); // re-initialize counter to zero incase loop is inside a loop
+
+				// val variable
+				std::string val_lex = m_val->Lexeme();
+				if (val_lex.compare("_") == 0) val_lex.append("%");
+				TValue val = TValue::Construct(ttype.GetInternal(0), val_lex, false);
+				if (!val.IsValid()) return TValue::NullInvalid();
+				env->DefineVariable(val, val_lex);
+
+				// add outer loop
+				builder->CreateBr(LoopBB);
+				builder->SetInsertPoint(LoopBB);
+
+				// make a comparison expression
+				TValue CondV = TValue::MakeBool(keytoken, builder->CreateICmpSLT(key.GetFromStorage().Value(), len.Value(), "cmptmp"));
+				if (!CondV.Value()) return TValue::NullInvalid();
+				builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
+
+				// add inner block
+				ftn->insert(ftn->end(), BodyBB);
+				builder->SetInsertPoint(BodyBB);
+
+				// assign vector value at index to val variable
+				env->AssignToVariable(m_val, val_lex, rhs.GetAtIndex(key.GetFromStorage()));
+
+				if (m_body) m_body->codegen(builder, module, env);
+
+				// add increment section
+				builder->CreateBr(PostBB);
+				ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
+				builder->SetInsertPoint(PostBB);
+
+				TValue plus = key.GetFromStorage();
+				plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
+				key.Store(plus);
+
+				if (!m_key) delete keytoken;
+
 			}
+			else if (ttype.IsSet())
+			{
+				if (m_key)
+				{
+					env->Error(m_key, "Set type does not support key index.");
+					return TValue::NullInvalid();
+				}
 
-			// val variable
-			TValue val = TValue::Construct(ttype.GetInternal(1), m_val->Lexeme(), false);
-			if (!val.IsValid()) return TValue::NullInvalid();
-			env->DefineVariable(val, m_val->Lexeme());
+				// len variable
+				TValue len = rhs.EmitLen().GetFromStorage();
 
-			rhs.EmitStartIterator();
+				// loop counter
+				Token* cnttoken = new Token(TOKEN_IDENTIFIER, "__loop_idx%", m_val->Line(), m_val->Filename()); // anonymous counter
+				TType cntttype = TType::Construct_Int(cnttoken, 64);
+				TValue cnt = TValue::Construct(cntttype, cnttoken->Lexeme(), false);
+				if (!cnt.IsValid()) return TValue::NullInvalid();
+				builder->CreateStore(builder->getInt64(0), cnt.Value()); // re-initialize counter to zero incase loop is inside a loop
 
-			// add outer loop
-			builder->CreateBr(LoopBB);
-			builder->SetInsertPoint(LoopBB);
+				// val variable
+				std::string val_lex = m_val->Lexeme();
+				if (val_lex.compare("_") == 0) val_lex.append("%");
+				TValue val = TValue::Construct(ttype.GetInternal(0), val_lex, false);
+				if (!val.IsValid()) return TValue::NullInvalid();
+				env->DefineVariable(val, val_lex);
 
-			// make a comparison expression
-			TValue CondV = TValue::MakeBool(cnttoken, builder->CreateICmpSLT(cnt.GetFromStorage().Value(), len.Value(), "cmptmp"));
-			if (!CondV.Value()) return TValue::NullInvalid();
-			builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
+				rhs.EmitStartIterator();
 
-			// add inner block
-			ftn->insert(ftn->end(), BodyBB);
-			builder->SetInsertPoint(BodyBB);
+				// add outer loop
+				builder->CreateBr(LoopBB);
+				builder->SetInsertPoint(LoopBB);
 
-			// assign vector value at index to val variable
-			if (m_key) env->AssignToVariable(m_key, m_key->Lexeme(), rhs.GetIterKey());
-			env->AssignToVariable(m_val, m_val->Lexeme(), rhs.GetIterValue());
+				// make a comparison expression
+				TValue CondV = TValue::MakeBool(cnttoken, builder->CreateICmpSLT(cnt.GetFromStorage().Value(), len.Value(), "cmptmp"));
+				if (!CondV.Value()) return TValue::NullInvalid();
+				builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
 
-			if (m_body) m_body->codegen(builder, module, env);
+				// add inner block
+				ftn->insert(ftn->end(), BodyBB);
+				builder->SetInsertPoint(BodyBB);
 
-			// add increment section
-			builder->CreateBr(PostBB);
-			ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
-			builder->SetInsertPoint(PostBB);
+				// assign vector value at index to val variable
+				env->AssignToVariable(m_val, val_lex, rhs.GetIterValue());
 
-			TValue plus = cnt.GetFromStorage();
-			plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
-			cnt.Store(plus);
+				if (m_body) m_body->codegen(builder, module, env);
 
-			delete cnttoken;
+				// add increment section
+				builder->CreateBr(PostBB);
+				ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
+				builder->SetInsertPoint(PostBB);
+
+				TValue plus = cnt.GetFromStorage();
+				plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
+				cnt.Store(plus);
+
+				delete cnttoken;
+			}
+			else if (ttype.IsMap())
+			{
+				// len variable
+				TValue len = rhs.EmitLen().GetFromStorage();
+
+				// loop counter
+				Token* cnttoken = new Token(TOKEN_IDENTIFIER, "__loop_idx%", m_val->Line(), m_val->Filename()); // anonymous counter
+				TType cntttype = TType::Construct_Int(cnttoken, 64);
+				TValue cnt = TValue::Construct(cntttype, cnttoken->Lexeme(), false);
+				if (!cnt.IsValid()) return TValue::NullInvalid();
+				builder->CreateStore(builder->getInt64(0), cnt.Value()); // re-initialize counter to zero incase loop is inside a loop
+
+				// always populate key and value, set to "_" var if not requested
+				
+				// key variable
+				std::string key_lex = "_";
+				if (m_key) key_lex = m_key->Lexeme();
+				if (key_lex.compare("_") == 0) key_lex.append("%");
+				TValue key = TValue::Construct(ttype.GetInternal(0), key_lex, false);
+				if (!key.IsValid()) return TValue::NullInvalid();
+				env->DefineVariable(key, key_lex);
+
+				// val variable
+				std::string val_lex = m_val->Lexeme(); // always valid
+				if (val_lex.compare("_") == 0) val_lex.append("%");
+				TValue val = TValue::Construct(ttype.GetInternal(1), val_lex, false);
+				if (!val.IsValid()) return TValue::NullInvalid();
+				env->DefineVariable(val, val_lex);
+
+				rhs.EmitStartIterator();
+
+				// add outer loop
+				builder->CreateBr(LoopBB);
+				builder->SetInsertPoint(LoopBB);
+
+				// make a comparison expression
+				TValue CondV = TValue::MakeBool(cnttoken, builder->CreateICmpSLT(cnt.GetFromStorage().Value(), len.Value(), "cmptmp"));
+				if (!CondV.Value()) return TValue::NullInvalid();
+				builder->CreateCondBr(CondV.GetFromStorage().Value(), BodyBB, MergeBB);
+
+				// add inner block
+				ftn->insert(ftn->end(), BodyBB);
+				builder->SetInsertPoint(BodyBB);
+
+				// assign map value at index to val variable
+				key = rhs.GetIterKey();
+				if (m_key) env->AssignToVariable(m_key, key_lex, key);
+				env->AssignToVariable(m_val, val_lex, rhs.GetAtIndex(key.GetFromStorage()));
+
+
+				if (m_body) m_body->codegen(builder, module, env);
+
+				// add increment section
+				builder->CreateBr(PostBB);
+				ftn->insert(ftn->end(), PostBB); // continue statements arrive here or fall-through from inner block
+				builder->SetInsertPoint(PostBB);
+
+				TValue plus = cnt.GetFromStorage();
+				plus.SetValue(builder->CreateAdd(plus.Value(), builder->getInt64(1), "addtmp"));
+				cnt.Store(plus);
+
+				delete cnttoken;
+			}
 		}
 	}
 
@@ -391,13 +420,13 @@ TValue FunctionStmt::codegen_prototype(llvm::IRBuilder<>* builder,
 	std::string name = m_name->Lexeme();
 
 	// check for existing function definition
-	if (env->IsFunction(name))
+	if (env->GetFunction(m_name, name, true).IsValid())
 	{
 		env->Error(m_name, "Function already defined in environment.");
 		return TValue::NullInvalid();
 	}
 
-	TFunction func = TFunction::Construct_Prototype(m_name, m_rettype, m_types, m_params, m_mutable, m_body);
+	TFunction func = TFunction::Construct_Prototype(m_fqns, m_name, m_rettype, m_types, m_params, m_mutable, m_defaults, m_body);
 	
 	if (func.IsValid()) env->DefineFunction(func, name);
 	
@@ -414,8 +443,7 @@ TValue FunctionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 	std::string name = m_name->Lexeme();
 
 	// check for existing function definition
-	TFunction func = env->GetFunction(m_name, name);
-	
+	TFunction func = env->GetFunction(m_name, m_fqns + ":" + name);
 	if (func.IsValid()) func.Construct_Body();
 	
 	return TValue::NullInvalid();
@@ -425,6 +453,11 @@ TValue FunctionStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 
 //-----------------------------------------------------------------------------
 TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+{
+	return codegen(builder, module, env, nullptr);
+}
+
+TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, llvm::BasicBlock* elseifmerge)
 {
 	if (2 <= Environment::GetDebugLevel()) printf("IfStmt::codegen()\n");
 	TValue CondV = m_condition->codegen(builder, module, env);
@@ -439,7 +472,8 @@ TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environ
 	llvm::LLVMContext& context = builder->getContext();
 	llvm::BasicBlock* ThenBB = llvm::BasicBlock::Create(context, "then", ftn);
 	llvm::BasicBlock* ElseBB = llvm::BasicBlock::Create(context, "else");
-	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(context, "ifcont");
+	llvm::BasicBlock* MergeBB = elseifmerge;
+	if (!MergeBB) MergeBB = llvm::BasicBlock::Create(context, "ifcont");
 
 	builder->CreateCondBr(CondV.GetFromStorage().Value(), ThenBB, ElseBB);
 	builder->SetInsertPoint(ThenBB);
@@ -451,12 +485,23 @@ TValue IfStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environ
 	ftn->insert(ftn->end(), ElseBB);
 	builder->SetInsertPoint(ElseBB);
 
-	if (m_elseBranch) m_elseBranch->codegen(builder, module, env);
+	if (m_elseBranch)
+	{
+		if (STATEMENT_IF == m_elseBranch->GetType())
+		{
+			static_cast<IfStmt*>(m_elseBranch)->codegen(builder, module, env, MergeBB);
+		}
+		else
+		{
+			m_elseBranch->codegen(builder, module, env);
+		}
+	}
 
-	builder->CreateBr(MergeBB);
-
-	ftn->insert(ftn->end(), MergeBB);
-	builder->SetInsertPoint(MergeBB);
+	if (!elseifmerge) {
+		builder->CreateBr(MergeBB);
+		ftn->insert(ftn->end(), MergeBB);
+		builder->SetInsertPoint(MergeBB);
+	}
 
 	return TValue::NullInvalid();
 }
@@ -502,10 +547,10 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 {
 	if (2 <= Environment::GetDebugLevel()) printf("ReturnStmt::codegen()\n");
 
-	TFunction tfunc = env->GetParentFunction();
-	llvm::Function* ftn = tfunc.GetLLVMFunc();
+	TFunction* tfunc = env->GetParentFunction();
+	llvm::Function* ftn = tfunc->GetLLVMFunc();
 	
-	TType rettype = tfunc.GetReturnType();
+	TType rettype = tfunc->GetReturnType();
 	
 	if (m_value)
 	{
@@ -518,18 +563,8 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 			return TValue::NullInvalid();
 		}
 
-		TValue retptr = env->GetVariable(v.GetToken(), "__ret_ref");
-		//retptr.SetValue(builder->CreateBitCast(retptr.Value(), rettype.GetTy(), "bitcast"));
-
-		if (v.IsNumeric())
-		{
-			v = v.CastToMatchImplicit(rettype);
-		}
-		else if (v.IsString())
-		{
-			v.SetValue(builder->CreateCall(module->getFunction("__new_string_from_string"), { v.Value() }, "calltmp"));
-		}
-		builder->CreateStore(v.Value(), retptr.Value());
+		TValue retvar = env->GetVariable(v.GetToken(), "__ret_ref");
+		retvar.Store(v);
 	}
 	else
 	{
@@ -547,61 +582,6 @@ TValue ReturnStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 	llvm::BasicBlock* tail = llvm::BasicBlock::Create(builder->getContext(), "rettail", ftn);
 	builder->SetInsertPoint(tail);
 
-
-	//TValue ret = tfunc.GetReturnRef();
-	/****
-	if (m_value)
-	{
-		TValue v = m_value->codegen(builder, module, env).GetFromStorage();
-		if (v.IsInvalid()) return v;
-
-		if (ret.IsInvalid())
-		{
-			env->Error(v.GetToken(), "Function does not have a return type.");
-			return TValue::NullInvalid();
-		}
-
-		TValue retptr = env->GetVariable(v.GetToken(), "__ret_ref");
-		retptr.SetTy(llvm::PointerType::get(retptr.GetTy(), 0));
-		retptr = retptr.GetFromStorage();
-		retptr.SetValue(builder->CreateBitCast(retptr.Value(), retptr.GetTy(), "bitcast"));
-		
-		if (v.IsUDT())
-		{	
-			TStruct tstruc = env->GetStruct(v.GetToken(), v.GetToken()->Lexeme());
-
-			std::vector<std::string>& member_names = tstruc.GetMemberNames();
-			std::vector<TValue>& members = tstruc.GetMemberVec();
-
-			llvm::Value* gep_zero = builder->getInt32(0);
-
-			for (size_t i = 0; i < members.size(); ++i)
-			{
-				llvm::Value* lhs_gep = builder->CreateGEP(v.GetTy(), retptr.Value(), { gep_zero, builder->getInt32(i) }, member_names[i]);
-				llvm::Value* rhs_gep = builder->CreateGEP(v.GetTy(), v.Value(), { gep_zero, builder->getInt32(i) }, member_names[i]);
-				llvm::Value* tmp = builder->CreateLoad(members[i].GetTy(), rhs_gep);
-				// shallow copy
-				builder->CreateStore(tmp, lhs_gep);
-			}
-		}
-		else
-		{
-			if (v.IsNumeric()) v = v.CastToMatchImplicit(ret);
-			builder->CreateStore(v.Value(), retptr.Value());
-		}
-	}
-	else
-	{
-		
-	}
-
-	env->EmitReturnCleanup();
-
-	builder->CreateRetVoid();
-
-	llvm::BasicBlock* tail = llvm::BasicBlock::Create(builder->getContext(), "rettail", ftn);
-	builder->SetInsertPoint(tail);
-	*/
 	return TValue::NullInvalid();
 }
 
@@ -615,13 +595,13 @@ TValue StructStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Env
 	std::string name = m_name->Lexeme();
 
 	// check for existing function definition
-	if (env->IsStruct(name))
+	if (env->GetStruct(m_name, name, true).IsValid())
 	{
 		env->Error(m_name, "Structure already defined in environment.");
 		return TValue::NullInvalid();
 	}
 
-	TStruct struc = TStruct::Construct(m_name, m_vars);
+	TStruct struc = TStruct::Construct(m_fqns, m_name, m_vars);
 	if (struc.IsValid()) env->DefineStruct(struc, name);
 
 	return TValue::NullInvalid();
@@ -635,26 +615,36 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 	if (2 <= Environment::GetDebugLevel()) printf("VarStmt::codegen()\n");
 
 	bool global = !env->HasParent();
-	TType type = TType::Construct(m_type_token.type, m_type_token.args);
-	if (!type.IsValid()) return TValue::NullInvalid();
 
 	std::vector<TValue> tvals;
 	for (auto& expr : m_exprs)
 	{
 		TValue temp;
-		if (expr)
-		{
-			if (EXPRESSION_BRACKET == expr->GetType())
-			{
-				temp = static_cast<BracketExpr*>(expr)->codegen(builder, module, env, type);
-			}
-			else
-			{
-				temp = expr->codegen(builder, module, env).GetFromStorage();
-			}
-		}
+		if (expr) temp = expr->codegen(builder, module, env).GetFromStorage();
 		tvals.push_back(temp);
 	}
+
+	// if type token is auto, need to use the first expression to determine the type
+	TType type;
+	if (TOKEN_VAR_AUTO == m_type_token.type->GetType())
+	{
+		if (tvals.empty())
+		{
+			Environment::Error(m_type_token.type, "Assignment expression expected for type 'auto'.");
+			return TValue::NullInvalid();
+		}
+		else
+		{
+			if (!tvals[0].IsValid()) return TValue::NullInvalid();
+			type = tvals[0].GetTType();
+			type.RemoveConstant();
+		}
+	}
+	else
+	{
+		type = TType::Construct(m_type_token.type, m_type_token.args);
+	}
+	if (!type.IsValid()) return TValue::NullInvalid();
 
 	for (size_t i = 0; i < m_ids.size(); ++i)
 	{
@@ -664,6 +654,27 @@ TValue VarStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Enviro
 		TValue val = TValue::Construct(type, lexeme, global);
 		if (val.IsValid())
 		{
+			if (type.IsFunctor())
+			{
+				TFunction func = env->GetAnonFunction(m_anon_sig);
+				if (!func.IsValid())
+				{
+					env->Error(id, "Failed to get anonymous prototype.");
+					return TValue::NullInvalid();
+				}
+
+				val.SetFunctorSig(m_anon_sig);
+				val.StoreLLVMValue(func.GetLLVMFunc());
+			}
+
+			// check if aleady exists
+			TValue temp = env->GetVariable(val.GetToken(), lexeme, true);
+			if (temp.IsValid() && temp.IsConstant())
+			{
+				env->Error(id, "Attempting to shadow a constant.");
+				return TValue::NullInvalid();
+			}
+
 			env->DefineVariable(val, lexeme);
 			if (tvals[i].IsValid())
 			{
@@ -693,8 +704,16 @@ TValue VarConstStmt::codegen(llvm::IRBuilder<>* builder, llvm::Module* module, E
 		Literal lit = le->GetLiteral();
 		std::string lexeme = id->Lexeme();
 
+		//// check for existing function definition
+		//if (env->IsConstVariableDefined(m_fqns, lexeme))
+		//{
+		//	env->Error(id, "Constant already defined in environment.");
+		//	return TValue::NullInvalid();
+		//}
+
 		TValue val = TValue::Construct_ConstInt(m_type, lexeme, lit);
-		if (val.Value()) env->DefineVariable(val, lexeme);
+		//if (val.Value()) env->DefineVariable(val, lexeme);
+		if (val.Value()) env->DefineConstVariable(val, m_fqns, lexeme);
 	}
 	
 	return TValue::NullInvalid();

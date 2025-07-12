@@ -5,7 +5,38 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("str::contains"))
+	if (0 == name.compare("str::tochar"))
+	{
+		if (!CheckArgSize(1)) return TValue::NullInvalid();
+
+		TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
+		lhs = lhs.CastToInt(32);
+		if (lhs.IsInteger())
+		{
+			return TValue::MakeString(callee, builder->CreateCall(module->getFunction("__str_tochar"), { lhs.Value() }, "calltmp"));
+		}
+		else
+		{
+			env->Error(callee, "Argument type mismatch.");
+			return TValue::NullInvalid();
+		}
+	}
+	else if (0 == name.compare("str::toint"))
+	{
+		if (!CheckArgSize(1)) return TValue::NullInvalid();
+
+		TValue lhs = m_arguments[0]->codegen(builder, module, env).GetFromStorage();
+		if (lhs.IsString())
+		{
+			return TValue::MakeInt(callee, 32, builder->CreateCall(module->getFunction("__str_toint"), { lhs.Value() }, "calltmp"));
+		}
+		else
+		{
+			env->Error(callee, "Argument type mismatch.");
+			return TValue::NullInvalid();
+		}
+	}
+	else if (0 == name.compare("str::contains"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
@@ -21,7 +52,7 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			env->Error(callee, "Argument type mismatch.");
 			return TValue::NullInvalid();
 		}
-		}
+	}
 	else if (0 == name.compare("str::replace"))
 	{
 		if (!CheckArgSize(3)) return TValue::NullInvalid();
@@ -206,6 +237,11 @@ TValue CallExpr::codegen_str(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			env->Error(callee, "Argument type mismatch.");
 			return TValue::NullInvalid();
 		}
+	}
+	else
+	{
+		env->Error(callee, "Function not found in namespace.");
+		return TValue::NullInvalid();
 	}
 	
 	return TValue::NullInvalid();

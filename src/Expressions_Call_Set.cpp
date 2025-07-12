@@ -5,7 +5,7 @@ TValue CallExpr::codegen_set(llvm::IRBuilder<>* builder, llvm::Module* module, E
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("set::insert"))
+	if (0 == name.compare("set::insert!"))
 	{
 		if (!CheckArgSize(2)) return TValue::NullInvalid();
 
@@ -90,6 +90,11 @@ TValue CallExpr::codegen_set(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			return TValue::NullInvalid();
 		}
 	}*/
+	else
+	{
+		env->Error(callee, "Function not found in namespace.");
+		return TValue::NullInvalid();
+	}
 
 	return TValue::NullInvalid();
 }

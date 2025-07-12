@@ -102,6 +102,11 @@ TValue TValue::AsString()
 
 	switch (GetLiteralType())
 	{
+	case LITERAL_TYPE_ENUM:
+	{
+		s = m_builder->CreateCall(m_module->getFunction("__enum_to_string"), { lhs.m_value }, "calltmp");
+		break;
+	}
 	case LITERAL_TYPE_INTEGER:
 	{
 		lhs = lhs.CastToInt(64); // upcast
@@ -235,6 +240,12 @@ TValue TValue::CastToMatchImplicit(TValue src)
 //-----------------------------------------------------------------------------
 TValue TValue::CastToMatchImplicit(TType src)
 {
+	if (!CanCast(src))
+	{
+		Error(m_token, "Unable to implicit cast between types.");
+		return NullInvalid();
+	}
+
 	LiteralTypeEnum dstType = GetLiteralType();
 	LiteralTypeEnum srcType = src.GetLiteralType();
 	int numBits = src.NumBits();

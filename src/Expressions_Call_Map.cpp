@@ -5,32 +5,25 @@ TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, E
 {
 	std::string name = callee->Lexeme();
 
-	if (0 == name.compare("map::insert"))
+	if (0 == name.compare("map::insert!"))
 	{
-		if (2 > m_arguments.size() || 3 < m_arguments.size())
-		{
+		//if (2 > m_arguments.size() || 3 < m_arguments.size())
+		if (!CheckArgSize(2)) return TValue::NullInvalid();
+		/*{
 			Token* callee = (static_cast<VariableExpr*>(m_callee))->Operator();
 			Environment::Error(callee, "Argument count mismatch.");
 			return TValue::NullInvalid();
-		}
+		}*/
 
 		if (EXPRESSION_VARIABLE == m_arguments[0]->GetType())
 		{
 			VariableExpr* ve = static_cast<VariableExpr*>(m_arguments[0]);
 			std::string var = ve->Operator()->Lexeme();
 			TValue tval = env->GetVariable(callee, var);
-
-			TValue mhs = m_arguments[1]->codegen(builder, module, env);
-			TValue rhs;
-			if (3 == m_arguments.size())
+			TValue rhs = m_arguments[1]->codegen(builder, module, env);
+			if (tval.IsMap() && rhs.IsMapPair())
 			{
-				rhs = m_arguments[2]->codegen(builder, module, env);
-				mhs = TValue::Construct_Pair(mhs, rhs);
-			}
-			
-			if (tval.IsMap() && mhs.IsMapPair())
-			{
-				tval.EmitMapInsert(mhs);
+				tval.EmitMapInsert(rhs);
 			}
 			else
 			{
@@ -108,6 +101,11 @@ TValue CallExpr::codegen_map(llvm::IRBuilder<>* builder, llvm::Module* module, E
 			return TValue::NullInvalid();
 		}
 	}*/
+	else
+	{
+		env->Error(callee, "Function not found in namespace.");
+		return TValue::NullInvalid();
+	}
 
 	return TValue::NullInvalid();
 }

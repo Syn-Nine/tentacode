@@ -96,26 +96,26 @@ private:
 
 
 //-----------------------------------------------------------------------------
-class BracketExpr : public Expr
+class BraceExpr : public Expr
 {
 public:
-	BracketExpr() = delete;
-	BracketExpr(Token* bracket, ArgList arguments)
+	BraceExpr() = delete;
+	BraceExpr(Token* brace, ArgList arguments)
 	{
-		m_token = bracket;
+		m_token = brace;
 		m_arguments = arguments;
 	}
 
-	ExpressionTypeEnum GetType() { return EXPRESSION_BRACKET; }
+	ExpressionTypeEnum GetType() { return EXPRESSION_BRACE; }
 
 	//Token* Operator() { return m_token; }
-	//ArgList GetArguments() { return m_arguments; }
+	ArgList GetArguments() { return m_arguments; }
 
-	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	/*TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
 	{
 		return codegen(builder, module, env, TType());
-	}
-	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env, TType ttype_hint);
+	}*/
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);//, TType ttype_hint);
 
 
 private:
@@ -123,6 +123,33 @@ private:
 	ArgList m_arguments;
 };
 
+
+//-----------------------------------------------------------------------------
+class CollectExpr : public Expr
+{
+public:
+	CollectExpr() = delete;
+	CollectExpr(Token* brace, ArgList arguments)
+	{
+		m_token = brace;
+		m_arguments = arguments;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_COLLECT; }
+
+	ArgList GetArguments() { return m_arguments; }
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env)
+	{
+		env->Error(nullptr, "Attempting to codegen collect expression.");
+		return TValue::NullInvalid();
+	}
+
+
+private:
+	Token* m_token;
+	ArgList m_arguments;
+};
 
 
 //-----------------------------------------------------------------------------
@@ -162,6 +189,59 @@ private:
 	ArgList m_arguments;
 };
 
+
+//-----------------------------------------------------------------------------
+class DestructExpr : public Expr
+{
+public:
+	DestructExpr() = delete;
+	DestructExpr(Expr* left, Token* equals, Expr* right)
+	{
+		m_token = equals;
+		m_left = left;
+		m_right = right;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_DESTRUCT; }
+
+	Token* Operator() { return m_token; }
+	/*Expr* Right() { return m_right; }
+	Expr* VecIndex() { return m_vecIndex; }*/
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+
+
+private:
+	Token* m_token;
+	Expr* m_left;
+	Expr* m_right;
+};
+
+
+//-----------------------------------------------------------------------------
+class FunctorExpr : public Expr
+{
+public:
+	FunctorExpr() = delete;
+	FunctorExpr(Token* token, ArgList arguments, std::string sig)
+	{
+		m_token = token;
+		m_arguments = arguments;
+		m_sig = sig;
+	}
+
+	ExpressionTypeEnum GetType() { return EXPRESSION_FUNCTOR; }
+
+	Token* Operator() { return m_token; }
+	ArgList GetArguments() { return m_arguments; }
+
+	TValue codegen(llvm::IRBuilder<>* builder, llvm::Module* module, Environment* env);
+
+private:
+	Token* m_token;
+	ArgList m_arguments;
+	std::string m_sig;
+};
 
 
 //-----------------------------------------------------------------------------

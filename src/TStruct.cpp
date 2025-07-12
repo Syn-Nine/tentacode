@@ -7,7 +7,7 @@ llvm::Module* TStruct::m_module = nullptr;
 
 
 //-----------------------------------------------------------------------------
-TStruct TStruct::Construct(Token* name, void* in_vars)
+TStruct TStruct::Construct(std::string fqns, Token* name, void* in_vars)
 {
 	StmtList* vars = static_cast<StmtList*>(in_vars);
 
@@ -37,6 +37,7 @@ TStruct TStruct::Construct(Token* name, void* in_vars)
 				arg_ty.push_back(type.GetTy());
 				ret.m_gep_loc.insert(std::make_pair(lexeme, m_builder->getInt32(i)));
 				ret.m_type_map.insert(std::make_pair(lexeme, type));
+				i++;
 			}
 		}
 		else
@@ -44,7 +45,6 @@ TStruct TStruct::Construct(Token* name, void* in_vars)
 			Environment::Error(name, "Expected variable statement in structure definition.");
 			return TStruct();
 		}
-		i++;
 	}
 
 	if (!ret.m_member_types.empty())
@@ -57,6 +57,7 @@ TStruct TStruct::Construct(Token* name, void* in_vars)
 			Environment::Error(name, "Failed to compile structure.");
 			return TStruct();
 		}
+		ret.m_fqns = fqns;
 		ret.m_valid = true;
 	}
 	else

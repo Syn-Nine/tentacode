@@ -56,15 +56,9 @@ public:
 		case TOKEN_DOT: type = "TOKEN_DOT"; break;
 		case TOKEN_DOT_DOT: type = "TOKEN_DOT_DOT"; break;
 		case TOKEN_DOT_DOT_EQUAL: type = "TOKEN_DOT_DOT_EQUAL"; break;
-		case TOKEN_MINUS: type = "TOKEN_MINUS"; break;
-		case TOKEN_PERCENT: type = "TOKEN_PERCENT"; break;
-		case TOKEN_PLUS: type = "TOKEN_PLUS"; break;
-		case TOKEN_HAT: type = "TOKEN_HAT"; break;
 		case TOKEN_COLON: type = "TOKEN_COLON"; break;
 		//case TOKEN_COLON_COLON: type = "TOKEN_COLON_COLON"; break;
 		case TOKEN_SEMICOLON: type = "TOKEN_SEMICOLON"; break;
-		case TOKEN_SLASH: type = "TOKEN_SLASH"; break;
-		case TOKEN_STAR: type = "TOKEN_STAR"; break;
 		case TOKEN_AT: type = "TOKEN_AT"; break;
 		case TOKEN_AMPERSAND: type = "TOKEN_AMPERSAND"; break;
 
@@ -77,7 +71,19 @@ public:
 		case TOKEN_GREATER_EQUAL: type = "TOKEN_GREATER_EQUAL"; break;
 		case TOKEN_LESS: type = "TOKEN_LESS"; break;
 		case TOKEN_LESS_EQUAL: type = "TOKEN_LESS_EQUAL"; break;
-		
+		case TOKEN_MINUS: type = "TOKEN_MINUS"; break;
+		case TOKEN_MINUS_EQUAL: type = "TOKEN_MINUS_EQUAL"; break;
+		case TOKEN_PLUS: type = "TOKEN_PLUS"; break;
+		case TOKEN_PLUS_EQUAL: type = "TOKEN_PLUS_EQUAL"; break;
+		case TOKEN_SLASH: type = "TOKEN_SLASH"; break;
+		case TOKEN_SLASH_EQUAL: type = "TOKEN_SLASH_EQUAL"; break;
+		case TOKEN_STAR: type = "TOKEN_STAR"; break;
+		case TOKEN_STAR_EQUAL: type = "TOKEN_STAR_EQUAL"; break;
+		case TOKEN_HAT: type = "TOKEN_HAT"; break;
+		case TOKEN_HAT_EQUAL: type = "TOKEN_HAT_EQUAL"; break;
+		case TOKEN_PERCENT: type = "TOKEN_PERCENT"; break;
+		case TOKEN_PERCENT_EQUAL: type = "TOKEN_PERCENT_EQUAL"; break;
+
 
 		// literals
 		case TOKEN_IDENTIFIER: type = "TOKEN_IDENTIFIER"; break;
@@ -93,6 +99,7 @@ public:
 		case TOKEN_PRINTLN: type = "TOKEN_PRINTLN"; break;
 		case TOKEN_FORMAT: type = "TOKEN_FORMAT"; break;
 		case TOKEN_PAIR: type = "TOKEN_PAIR"; break;
+		//
 		case TOKEN_VAR_I16: type = "TOKEN_VAR_I16"; break;
 		case TOKEN_VAR_I32: type = "TOKEN_VAR_I32"; break;
 		case TOKEN_VAR_I64: type = "TOKEN_VAR_I64"; break;
@@ -105,6 +112,8 @@ public:
 		case TOKEN_VAR_BOOL: type = "TOKEN_VAR_BOOL"; break;
 		case TOKEN_VAR_SET: type = "TOKEN_VAR_SET"; break;
 		case TOKEN_VAR_TUPLE: type = "TOKEN_VAR_TUPLE"; break;
+		case TOKEN_VAR_AUTO: type = "TOKEN_VAR_AUTO"; break;
+		//
 		case TOKEN_AND: type = "TOKEN_AND"; break;
 		case TOKEN_ELSE: type = "TOKEN_ELSE"; break;
 		case TOKEN_IF: type = "TOKEN_IF"; break;
@@ -125,8 +134,8 @@ public:
 		//case TOKEN_GLOBAL: type = "TOKEN_GLOBAL"; break;
 		case TOKEN_FILELINE: type = "TOKEN_FILELINE"; break;
 		case TOKEN_PI: type = "TOKEN_PI"; break;
-		case TOKEN_NAMESPACE_PUSH: type = "TOKEN_NAMESPACE_PUSH"; break;
-		case TOKEN_NAMESPACE_POP: type = "TOKEN_NAMESPACE_POP"; break;
+		//case TOKEN_NAMESPACE_PUSH: type = "TOKEN_NAMESPACE_PUSH"; break;
+		//case TOKEN_NAMESPACE_POP: type = "TOKEN_NAMESPACE_POP"; break;
 
 
 		// raylib custom
@@ -179,5 +188,6 @@ struct TypeToken
 	TypeToken() { type = nullptr; args = nullptr; }
 };
 
+typedef std::vector<TypeToken> TypeTokenList;
 
 #endif // TOKEN_H
