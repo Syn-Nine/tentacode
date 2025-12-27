@@ -1,1 +1,1 @@
-[Documentation](https://code.thehideoutgames.com/book/)
+[Documentation](https://tentacode.org/docs/language/basic_types/)
